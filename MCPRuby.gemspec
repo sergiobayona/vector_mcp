@@ -28,6 +28,12 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "base64", "~> 0.2"
+  spec.add_dependency "json", "~> 2.6"
+  spec.add_dependency "logger", "~> 1.5"
   spec.add_development_dependency "bundler", ">= 2.0"
   spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "rspec", "~> 3.12"
+  spec.add_development_dependency "rubocop", "~> 1.60"
+  spec.add_development_dependency "ruby-lsp", "~> 0.1.0"
 end

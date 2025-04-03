@@ -2,11 +2,15 @@ PATH
   remote: .
   specs:
     MCPRuby (0.1.0)
+      base64 (~> 0.2)
+      json (~> 2.6)
+      logger (~> 1.5)
 
 GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
+    base64 (0.2.0)
     date (3.4.1)
     diff-lcs (1.6.1)
     io-console (0.8.0)
@@ -66,6 +70,26 @@ GEM
     rubocop-ast (1.44.0)
       parser (>= 3.3.7.2)
       prism (~> 1.4)
+    rubocop-capybara (2.22.1)
+      lint_roller (~> 1.1)
+      rubocop (~> 1.72, >= 1.72.1)
+    rubocop-factory_bot (2.27.1)
+      lint_roller (~> 1.1)
+      rubocop (~> 1.72, >= 1.72.1)
+    rubocop-performance (1.25.0)
+      lint_roller (~> 1.1)
+      rubocop (>= 1.75.0, < 2.0)
+      rubocop-ast (>= 1.38.0, < 2.0)
+    rubocop-rake (0.7.1)
+      lint_roller (~> 1.1)
+      rubocop (>= 1.72.1)
+    rubocop-rspec (2.31.0)
+      rubocop (~> 1.40)
+      rubocop-capybara (~> 2.17)
+      rubocop-factory_bot (~> 2.22)
+      rubocop-rspec_rails (~> 2.28)
+    rubocop-rspec_rails (2.29.1)
+      rubocop (~> 1.61)
     ruby-lsp (0.23.13)
       language_server-protocol (~> 3.17.0)
       prism (>= 1.2, < 2.0)
@@ -89,6 +113,9 @@ DEPENDENCIES
   rake (~> 13.0)
   rspec (~> 3.0)
   rubocop (~> 1.21)
+  rubocop-performance (~> 1.10)
+  rubocop-rake (~> 0.6)
+  rubocop-rspec (~> 2.0)
   ruby-lsp
 
 BUNDLED WITH

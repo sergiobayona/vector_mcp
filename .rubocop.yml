@@ -1,8 +1,39 @@
 AllCops:
+  NewCops: enable
+  SuggestExtensions: false
   TargetRubyVersion: 3.1
 
-Style/StringLiterals:
-  EnforcedStyle: double_quotes
+# Relax documentation requirements
+Style/Documentation:
+  Enabled: false
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+  
+# Increase method length limits
+Metrics/MethodLength:
+  Max: 20
+
+# Increase ABC size limits
+Metrics/AbcSize:
+  Max: 30
+
+# Increase class length limits
+Metrics/ClassLength:
+  Max: 150
+
+# Increase line length
+Layout/LineLength:
+  Max: 150
+
+# Increase cyclomatic complexity
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+# Increase perceived complexity
+Metrics/PerceivedComplexity:
+  Max: 10
+
+# If you're using RSpec and Rake, you might want to include these extensions
+require:
+  - rubocop-rake

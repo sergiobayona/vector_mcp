@@ -1,11 +1,94 @@
-/.bundle/
-/.yardoc
-/_yardoc/
+# Ruby specific
+*.gem
+*.rbc
+/.config
 /coverage/
-/doc/
+/InstalledFiles
 /pkg/
 /spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
 /tmp/
 
-# rspec failure tracking
+# Used by dotenv library
+.env
+.env.*
+
+# Environment normalization
+/.bundle/
+/vendor/bundle
+/lib/bundler/man/
+
+# RSpec
 .rspec_status
+
+# Documentation
+/.yardoc/
+/_yardoc/
+/doc/
+/rdoc/
+
+# GEM specific
+Gemfile.lock
+.ruby-version
+.ruby-gemset
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.solargraph.yml
+
+# Database files
+*.sqlite3
+*.sqlite3-journal
+
+# Log files
+*.log
+
+# RVM
+.rvmrc
+
+# rbenv
+.rbenv-vars
+
+# byebug history
+.byebug_history
+
+# gemrelease state files
+.gemrelease
+
+# Generated files
+node_modules/
+*.so
+*.o
+*.a
+mkmf.log
+
+# Platform specific
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Recycle bin used on file shares
+$RECYCLE.BIN/
+
+# Temp folder on WSL
+/tmp
+
+# Temp folder on Windows
+/temp
+
+# Various file backups
+*.bak
+*.orig
+*.patch
+
+# Gem builds
+/gems/*.gem
+.cursor/**/*
