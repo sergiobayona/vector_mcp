@@ -5,6 +5,7 @@ require_relative "definitions"
 require_relative "session"
 require_relative "errors"
 require_relative "transport/stdio" # Default transport
+require_relative "transport/sse"
 require_relative "handlers/core" # Default handlers
 require_relative "util" # Needed if not using Handlers::Core
 
@@ -78,14 +79,15 @@ module MCPRuby
 
     # --- Server Execution ---
 
-    def run(transport: :stdio)
+    def run(transport: :stdio, options: {})
       case transport
       when :stdio
         transport_instance = MCPRuby::Transport::Stdio.new(self)
         transport_instance.run
-      # Add other transports later
-      # when :sse
-      #   MCPRuby::Transport::SSE.new(self).run
+      when :sse
+        # Pass options like host, port, path_prefix to the SSE transport
+        transport_instance = MCPRuby::Transport::SSE.new(self, options)
+        transport_instance.run
       else
         logger.fatal("Unsupported transport: #{transport}")
         raise ArgumentError, "Unsupported transport: #{transport}"
@@ -93,22 +95,24 @@ module MCPRuby
     end
 
     # --- Message Handling Logic (called by transport) ---
-
-    def handle_message(message, session, transport)
+    # Now returns the result/error hash, transport handles sending
+    # Added session_id for context if needed, though not used in core handlers yet
+    def handle_message(message, session, session_id)
       id = message["id"]
       method = message["method"]
       params = message["params"] || {} # Ensure params is always a hash
 
       if id && method # It's a request
-        logger.info("Received request [#{id}]: #{method}")
-        handle_request(id, method, params, session, transport)
+        logger.info("[#{session_id}] Received request [#{id}]: #{method}")
+        handle_request(id, method, params, session) # Removed transport
       elsif method # It's a notification
-        logger.info("Received notification: #{method}")
-        handle_notification(method, params, session, transport)
+        logger.info("[#{session_id}] Received notification: #{method}")
+        handle_notification(method, params, session) # Removed transport
+        nil # Notifications don't return a value to send back
       elsif id # It's a response (client shouldn't send these)
-        logger.warn("Received unexpected response [#{id}]")
+        logger.warn("[#{session_id}] Received unexpected response [#{id}]")
+        nil
       else # Invalid message
-        # Raise error to be caught by transport's handler_line
         raise MCPRuby::InvalidRequestError, "Invalid message format: #{message.inspect}"
       end
     end
@@ -129,35 +133,35 @@ module MCPRuby
 
     private
 
-    def handle_request(id, method, params, session, transport)
+    # Returns the result hash or raises a ProtocolError
+    def handle_request(id, method, params, session)
       unless session.initialized?
         raise MCPRuby::InitializationError.new(request_id: id) unless method == "initialize"
 
-        result = session.initialize!(params)
-        transport.send_response(id, result)
-
-        # Raise specific error
-
-        return
+        # Handle initialize request specifically (Session#initialize! already returns the result hash)
+        return session.initialize!(params)
       end
 
       handler = @request_handlers[method]
       raise MCPRuby::MethodNotFoundError.new(method, request_id: id) unless handler
 
       begin
-        @in_flight_requests[id] = { method: method, params: params, session: session, transport: transport }
+        # Track request *start* - response handled by caller now
+        @in_flight_requests[id] = { method: method, params: params, session: session }
         # Pass params, session, and server instance to the handler
+        # Handler is expected to return the result hash
         result = handler.call(params, session, self)
-        transport.send_response(id, result)
+        result # Return the result hash
       # Catch application-level errors defined in handlers/core or user code
       rescue MCPRuby::NotFoundError, MCPRuby::InvalidParamsError
-        raise # Re-raise known protocol errors to be handled by transport
+        raise # Re-raise known protocol errors to be handled by caller
       rescue StandardError => e
         logger.error("Error executing request '#{method}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
         # Wrap unexpected errors in InternalError
         raise MCPRuby::InternalError.new("Request handler failed", request_id: id,
                                                                    details: { method: method, error: e.message, backtrace: e.backtrace.first(5) })
       ensure
+        # Still remove tracking *after* handler execution (success or raise)
         @in_flight_requests.delete(id)
       end
     end

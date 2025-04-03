@@ -28,9 +28,11 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "async", "~> 2.21"
+  spec.add_dependency "async-http", "~> 0.88"
   spec.add_dependency "base64", "~> 0.2"
   spec.add_dependency "eventmachine", "~> 1.2"
-  spec.add_dependency "faye-websocket", "~> 0.11"
+  spec.add_dependency "falcon", "~> 0.51"
   spec.add_dependency "json", "~> 2.6"
   spec.add_dependency "logger", "~> 1.5"
   spec.add_dependency "rack", ">= 1", "< 4"

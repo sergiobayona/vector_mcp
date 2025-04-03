@@ -93,38 +93,6 @@ module MCPRuby
         enqueue_message(session_id, message)
       end
 
-      private
-
-      # --- Rack App Construction ---
-
-      def build_rack_app(session)
-        sse_path = "#{@path_prefix}/sse"
-        message_path = "#{@path_prefix}/message"
-        logger.info("Building Rack app with SSE endpoint: #{sse_path}, Message endpoint: #{message_path}")
-
-        this = self # Capture self for closure
-
-        Rack::Builder.new do
-          use Rack::CommonLogger, this.logger # Log requests using our logger
-          use Rack::Lint # Helps catch Rack specification violations
-
-          map sse_path do
-            run ->(env) { this.handle_sse_connection(env, session) }
-          end
-
-          map message_path do
-            run ->(env) { this.handle_message_post(env, session) }
-          end
-
-          # Optional: Add a root path handler for basic info/health check
-          map "/" do
-            run ->(_env) { [200, { "Content-Type" => "text/plain" }, ["MCPRuby Server OK"]] }
-          end
-        end.to_app
-      end
-
-      # --- SSE Connection Handler (GET /mcp/sse) ---
-
       def handle_sse_connection(env, session)
         request = Rack::Request.new(env)
         unless request.get?
@@ -198,8 +166,6 @@ module MCPRuby
         [200, headers, body]
       end
 
-      # --- Message POST Handler (POST /mcp/message?session_id=...) ---
-
       def handle_message_post(env, session)
         request = Rack::Request.new(env)
 
@@ -259,11 +225,41 @@ module MCPRuby
         end
       end
 
+      private
+
+      # --- Rack App Construction ---
+
+      def build_rack_app(session)
+        sse_path = "#{@path_prefix}/sse"
+        message_path = "#{@path_prefix}/message"
+        logger.info("Building Rack app with SSE endpoint: #{sse_path}, Message endpoint: #{message_path}")
+
+        this = self # Capture self for closure
+
+        Rack::Builder.new do
+          use Rack::CommonLogger, this.logger # Log requests using our logger
+          use Rack::Lint # Helps catch Rack specification violations
+
+          map sse_path do
+            run ->(env) { this.handle_sse_connection(env, session) }
+          end
+
+          map message_path do
+            run ->(env) { this.handle_message_post(env, session) }
+          end
+
+          # Optional: Add a root path handler for basic info/health check
+          map "/" do
+            run ->(_env) { [200, { "Content-Type" => "text/plain" }, ["MCPRuby Server OK"]] }
+          end
+        end.to_app
+      end
+
       # --- Message Enqueuing Helpers ---
 
       def enqueue_message(session_id, message_hash)
         client_conn = @clients_mutex.synchronize { @clients[session_id] }
-        if client_conn && client_conn.queue && !client_conn.queue.closed?
+        if client_conn && client_conn.queue
           logger.debug { "[ENQUEUE #{session_id}] Queuing message: #{message_hash.inspect}" }
           client_conn.queue.enqueue(message_hash)
           true

@@ -10,58 +10,37 @@ require "mcp_ruby"
 MCPRuby.logger.level = Logger::DEBUG
 
 # Create an instance of the server
-server = MCPRuby.new_server(name: "MCPRuby::ExampleServer", version: "0.0.1")
+server = MCPRuby.new_server(name: "MCPRuby::ExampleSSE_Server", version: "0.0.1")
 
-# --- Example Tool ---
+# --- Register Tools, Resources, Prompts (same as before) ---
+# ... (copy the register_tool, register_resource, register_prompt blocks) ...
 server.register_tool(
   name: "ruby_echo",
   description: "Echoes the input string.",
   input_schema: {
     type: "object",
-    properties: {
-      message: { type: "string", description: "The message to echo." }
-    },
+    properties: { message: { type: "string", description: "The message to echo." } },
     required: ["message"]
   }
-) do |args, _session|
-  input_message = args["message"] || args[:message]
-  server.logger.info("Echoing: #{input_message}")
-  "You said via MCPRuby: #{input_message}"
-end
+) { |args, _session| "You said via MCPRuby SSE: #{args["message"]}" }
 
-# --- Example Resource ---
 server.register_resource(
-  uri: "memory://data/example.txt",
-  name: "Example Data",
-  description: "Some simple data stored in server memory.",
-  mime_type: "text/plain"
-) do |_session|
-  server.logger.info("Reading memory resource")
-  "This is the content of the example resource.\nTimestamp: #{Time.now}"
-end
+  uri: "memory://data/example.txt", name: "Example Data", description: "Test data."
+) { |_session| "SSE Resource Content at #{Time.now}" }
 
-# --- Example Prompt ---
 server.register_prompt(
-  name: "simple_greeting",
-  description: "Generates a simple greeting.",
-  arguments: [
-    { name: "name", description: "The name of the person to greet.", required: true }
-  ]
-) do |args, _session|
-  user_name = args["name"] || args[:name]
-  server.logger.info("Generating greeting for: #{user_name}")
-  [
-    { role: "user", content: { type: "text", text: "Greet #{user_name} using MCPRuby style." } },
-    { role: "assistant", content: { type: "text", text: "Alright, crafting a greeting for #{user_name} now." } }
-  ]
-end
+  name: "simple_greeting", description: "Greets someone.", arguments: [{ name: "name", required: true }]
+) { |args, _session| [{ role: "user", content: { type: "text", text: "Hi #{args["name"]} from SSE!" } }] }
 
-# --- Run the server using the default stdio transport ---
+# --- Run the server using SSE transport ---
 begin
-  server.run(transport: :stdio)
+  server.run(transport: :sse, options: { host: "localhost", port: 8080, path_prefix: "/mcp" })
 rescue MCPRuby::Error => e
   MCPRuby.logger.fatal("MCPRuby Error: #{e.message}")
   exit 1
+rescue Interrupt
+  MCPRuby.logger.info("Server interrupted.")
+  exit 0
 rescue StandardError => e
   MCPRuby.logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
   exit 1
