@@ -50,7 +50,7 @@ module MCPRuby
   # For application-level errors (-32000 to -32099)
   class ServerError < ProtocolError
     def initialize(message = "Server error", code: -32_000, request_id: nil, details: nil)
-      super(message, code: code, request_id: request_id, details: details)
+      super
     end
   end
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'json'
-require 'base64'
+require "json"
+require "base64"
 
 module MCPRuby
   module Util
@@ -14,22 +14,22 @@ module MCPRuby
       items.map do |item|
         case item
         when String
-          { type: 'text', text: item }
+          { type: "text", text: item }
         when Hash
           # Could be a pre-formatted content object, or just data to JSONify
           if item.key?(:type) && %w[text image resource blob].include?(item[:type].to_s)
             # Maybe add symbol key conversion here if needed
             item
           else
-            { type: 'text', text: item.to_json, mimeType: 'application/json' }
+            { type: "text", text: item.to_json, mimeType: "application/json" }
           end
         when ->(obj) { obj.respond_to?(:force_encoding) && obj.encoding == Encoding::ASCII_8BIT }
-          { type: 'blob', blob: Base64.strict_encode64(item), mimeType: 'application/octet-stream' }
+          { type: "blob", blob: Base64.strict_encode64(item), mimeType: "application/octet-stream" }
         # Add specific class handling (e.g., for custom Image classes) if needed
         # when SomeImageClass
         #   content_array << { type: 'image', data: Base64.strict_encode64(item.data), mimeType: item.mime_type }
         else
-          { type: 'text', text: item.to_s }
+          { type: "text", text: item.to_s }
         end
       end
     end
