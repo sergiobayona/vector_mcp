@@ -41,6 +41,10 @@ module MCPRuby
         exit(1) # Exit if the transport loop itself crashes
       end
 
+      def send_response(id, result)
+        send_message({ jsonrpc: "2.0", id: id, result: result })
+      end
+
       private
 
       def handle_line(line, session)
@@ -75,10 +79,6 @@ module MCPRuby
       rescue StandardError => e
         # Log errors during sending, but avoid crashing the loop if possible
         logger.error("Failed to send message: #{e.message}")
-      end
-
-      def send_response(id, result)
-        send_message({ jsonrpc: "2.0", id: id, result: result })
       end
 
       def send_error(id, code, message, data)

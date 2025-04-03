@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require "uri"
 
 RSpec.describe MCPRuby::Definitions do
   describe MCPRuby::Definitions::Tool do
