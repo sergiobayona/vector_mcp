@@ -10,6 +10,7 @@ require_relative "mcp_ruby/session"
 require_relative "mcp_ruby/util"
 require_relative "mcp_ruby/handlers/core"
 require_relative "mcp_ruby/transport/stdio"
+require_relative "mcp_ruby/transport/sse"
 require_relative "mcp_ruby/server"
 
 module MCPRuby
