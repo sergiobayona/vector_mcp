@@ -385,7 +385,6 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       # Send invalid request
       req = { jsonrpc: "2.0", id: req_id, params: {} }
       send_jsonrpc(req)
-      binding.pry
       response = read_jsonrpc
       expect(response["id"]).to eq(req[:id])
       expect(response).to include("error")
