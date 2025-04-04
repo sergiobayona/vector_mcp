@@ -50,7 +50,7 @@ RSpec.describe MCPRuby::Transport::Stdio do
 
     it "processes valid JSON-RPC messages" do
       message = { jsonrpc: "2.0", method: "test", id: 1 }
-      allow($stdin).to receive(:gets).and_return(message.to_json + "\n", nil)
+      allow($stdin).to receive(:gets).and_return("#{message.to_json}\n", nil)
       allow(server).to receive(:handle_message)
       allow(session).to receive(:initialized?).and_return(true)
 

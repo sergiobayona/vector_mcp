@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # spec/mcp_ruby/transport/sse_spec.rb
 
 require "spec_helper"
@@ -31,7 +33,8 @@ class MockWritableBody
     @condition.signal
   end
 
-  def close # Simulate peer closing connection
+  # Simulate peer closing connection
+  def close
     @closed_by_peer = true
     @finished = true
     @condition.signal
@@ -116,7 +119,7 @@ RSpec.describe MCPRuby::Transport::SSE do
   around(:each) do |example|
     # Only wrap in Async if the example is marked with :async
     if example.metadata[:async]
-      Async do |task|
+      Async do |_task|
         example.run
       end
     else

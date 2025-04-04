@@ -95,7 +95,7 @@ module MCPRuby
         enqueue_message(session_id, message)
       end
 
-      def handle_sse_connection(env, session)
+      def handle_sse_connection(env, _session)
         request = Rack::Request.new(env)
         unless request.get?
           logger.warn("Received non-GET request on SSE endpoint: #{request.request_method}")
@@ -128,7 +128,7 @@ module MCPRuby
 
         # Run the SSE event sending logic in a separate task
         # Capture the task so we can potentially stop it later
-        sse_task = Async do |task|
+        Async do |task|
           client_conn.task = task # Store the task reference
           begin
             # 1. Send the initial endpoint event
@@ -261,7 +261,7 @@ module MCPRuby
 
       def enqueue_message(session_id, message_hash)
         client_conn = @clients_mutex.synchronize { @clients[session_id] }
-        if client_conn && client_conn.queue
+        if client_conn&.queue
           logger.debug { "[ENQUEUE #{session_id}] Queuing message: #{message_hash.inspect}" }
           client_conn.queue.enqueue(message_hash)
           true
@@ -304,6 +304,6 @@ module MCPRuby
                  end
         [status, { "Content-Type" => "application/json" }, [format_error_body(id, code, message, data)]]
       end
-    end # class SSE
-  end # module Transport
-end # module MCPRuby
+    end
+  end
+end

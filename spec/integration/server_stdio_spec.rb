@@ -298,7 +298,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
-      expect(response["error"]["data"]["details"]).to include("Resource not found: memory://does/not/exist")
+      expect(response["error"]["data"]).to include("Resource not found: memory://does/not/exist")
     end
   end
 
@@ -360,7 +360,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
-      expect(response["error"]["data"]["details"]).to include("Prompt not found: non_existent_prompt")
+      expect(response["error"]["data"]).to include("Prompt not found: non_existent_prompt")
     end
   end
 
@@ -385,7 +385,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       # Send invalid request
       req = { jsonrpc: "2.0", id: req_id, params: {} }
       send_jsonrpc(req)
-
+      binding.pry
       response = read_jsonrpc
       expect(response["id"]).to eq(req[:id])
       expect(response).to include("error")
