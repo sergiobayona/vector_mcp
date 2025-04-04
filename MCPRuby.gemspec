@@ -30,12 +30,11 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "async", "~> 2.21"
   spec.add_dependency "async-http", "~> 0.88"
+  spec.add_dependency "async-io", "~> 1.34"
   spec.add_dependency "base64", "~> 0.2"
   spec.add_dependency "falcon", "~> 0.51"
   spec.add_dependency "json", "~> 2.6"
-  spec.add_dependency "logger", "~> 1.5"
   spec.add_dependency "rack", ">= 1", "< 4"
-  spec.add_dependency "thin", "~> 1.7"
   spec.add_development_dependency "bundler", ">= 2.0"
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.12"
