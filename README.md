@@ -274,7 +274,7 @@ server.run(
   transport: :sse,
   options: {
     host: "0.0.0.0",        # Default: 'localhost'
-    port: 8080,             # Default: 3000
+    port: 8080,             # Default: 8000
     path_prefix: "/my_mcp"  # Default: '/mcp'. Endpoints become /my_mcp/sse and /my_mcp/message
   }
 )

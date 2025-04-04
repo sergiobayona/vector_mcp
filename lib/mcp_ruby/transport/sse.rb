@@ -29,7 +29,7 @@ module MCPRuby
         @server = server
         @logger = server.logger
         @host = options[:host] || "localhost"
-        @port = options[:port] || 3000
+        @port = options[:port] || 8000
         # Ensure path_prefix starts with / and doesn't end with /
         prefix = options[:path_prefix] || "/mcp"
         @path_prefix = prefix.start_with?("/") ? prefix : "/#{prefix}"
