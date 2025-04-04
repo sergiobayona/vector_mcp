@@ -40,25 +40,34 @@ class MockWritableBody
   # Helper for tests to wait for and read chunks
   def read_chunks(count = 1, timeout = 0.1)
     read = []
-    task = Async do
-      loop do
-        break if read.size >= count || @finished || @closed_by_peer
+    task = nil
 
-        if @chunks.empty?
-          # Wait for signal or timeout
-          @condition.wait
-        else
-          read << @chunks.shift
+    begin
+      task = Async do
+        loop do
+          break if read.size >= count || @finished || @closed_by_peer
+
+          if @chunks.empty?
+            # Wait for signal or timeout
+            @condition.wait(timeout)
+            break if @chunks.empty? # If we timed out and still no chunks, break
+          else
+            read << @chunks.shift
+          end
         end
       end
-    end
-    # Wait for the task to complete or timeout
-    result = task.wait_for(timeout)
-    raise "Timeout waiting for chunks" if result.nil? && read.size < count
 
-    read
-  ensure
-    task&.stop # Ensure task is stopped
+      # Wait for the task to complete or timeout
+      result = task.wait_for(timeout)
+      raise "Timeout waiting for chunks" if result.nil? && read.size < count
+
+      read
+    ensure
+      if task
+        task.stop
+        task.wait
+      end
+    end
   end
 end
 
@@ -172,9 +181,10 @@ RSpec.describe MCPRuby::Transport::SSE do
           transport.handle_sse_connection(env, session_double)
         end
 
-        # Give the block a moment to run and register
-        Async::Task.current.sleep 0.01
+        # Wait for the initial endpoint event to be written
+        mock_body.read_chunks(1, 0.5)
 
+        # Verify client registration
         clients_mutex.synchronize do
           expect(clients.keys).to include(session_id)
           expect(clients[session_id]).to be_a(MCPRuby::Transport::SSE::ClientConnection)
@@ -182,9 +192,11 @@ RSpec.describe MCPRuby::Transport::SSE do
           expect(clients[session_id].queue).to be_a(Async::Queue)
         end
 
-        # Simulate closing the connection to allow cleanup
+        # Simulate closing the connection
         mock_body.close
-        Async::Task.current.sleep 0.01 # Allow cleanup task to run
+
+        # Wait for cleanup
+        Async::Task.current.sleep 0.1
 
         # Stop the task
         task.stop
@@ -296,11 +308,19 @@ RSpec.describe MCPRuby::Transport::SSE do
         env = Rack::MockRequest.env_for(message_path, method: "POST",
                                                       input: request_body.to_json,
                                                       "CONTENT_TYPE" => "application/json")
-        status, _headers, _body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(202)
 
-        # Check the queue
-        queued_message = @client_queue.dequeue(timeout: 0.1)
+        # Call the handler directly
+        status, _headers, _body = transport.handle_message_post(env, session_double)
+        expect(status).to eq(202) # Verify the immediate HTTP response
+
+        # Give the handler a brief moment to enqueue
+        Async::Task.current.sleep 0.01
+
+        # Check queue size first (non-blocking)
+        expect(@client_queue.size).to eq(1)
+
+        # Now dequeue and verify (should be immediate)
+        queued_message = @client_queue.dequeue(timeout: 0.01)
         expected_response = { jsonrpc: "2.0", id: "req-2", result: server_result }
         expect(queued_message).to eq(expected_response)
       end
