@@ -5,7 +5,6 @@ PATH
       async (~> 2.21)
       async-http (~> 0.88)
       base64 (~> 0.2)
-      eventmachine (~> 1.2)
       falcon (~> 0.51)
       json (~> 2.6)
       logger (~> 1.5)

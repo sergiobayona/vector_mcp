@@ -32,7 +32,7 @@ module MCPRuby
         arguments = params["arguments"] || {}
         server.logger.debug { "Handling tools/call request for '#{tool_name}' with args: #{arguments.inspect}" }
         tool = server.tools[tool_name]
-        raise MCPRuby::NotFoundError, "Tool not found: #{tool_name}" unless tool
+        raise MCPRuby::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
 
         # TODO: Add input schema validation here
 
@@ -54,7 +54,7 @@ module MCPRuby
         uri_s = params["uri"]
         server.logger.debug("Handling resources/read request for '#{uri_s}'")
         resource = server.resources[uri_s]
-        raise MCPRuby::NotFoundError, "Resource not found: #{uri_s}" unless resource
+        raise MCPRuby::NotFoundError.new("Not Found", details: "Resource not found: #{uri_s}") unless resource
 
         # Execute the resource's handler block, passing session
         content_data = resource.handler.call(session)
@@ -85,7 +85,7 @@ module MCPRuby
         arguments = params["arguments"] || {}
         server.logger.debug("Handling prompts/get request for '#{prompt_name}'")
         prompt = server.prompts[prompt_name]
-        raise MCPRuby::NotFoundError, "Prompt not found: #{prompt_name}" unless prompt
+        raise MCPRuby::NotFoundError.new("Not Found", details: "Prompt not found: #{prompt_name}") unless prompt
 
         # TODO: Validate arguments against prompt.arguments definition
 

@@ -55,14 +55,16 @@ module MCPRuby
         endpoint = Falcon::Endpoint.parse("http://#{@host}:#{@port}")
 
         Async do |task|
-          # Set up signal handling within the Async block
-          task.reactor.trap(:INT) do
-            logger.info "SIGINT received, stopping server..."
-            task.stop
-          end
-          task.reactor.trap(:TERM) do
-            logger.info "SIGTERM received, stopping server..."
-            task.stop
+          # Set up signal handling using Async's signal handling
+          task.async do
+            Async::IO::Signal.trap(:INT) do
+              logger.info "SIGINT received, stopping server..."
+              task.stop
+            end
+            Async::IO::Signal.trap(:TERM) do
+              logger.info "SIGTERM received, stopping server..."
+              task.stop
+            end
           end
 
           logger.info("Falcon server starting on #{endpoint.url}")

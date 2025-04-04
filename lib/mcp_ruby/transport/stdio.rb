@@ -51,7 +51,9 @@ module MCPRuby
         message = nil # Define outside the begin block for rescue access
         begin
           message = JSON.parse(line)
-          server.handle_message(message, session, self) # Pass transport for sending
+          result = server.handle_message(message, session, self) # Pass transport for sending
+          # Send the result if it's not nil (notifications return nil)
+          send_message({ jsonrpc: "2.0", id: message["id"], result: result }) if result
         rescue JSON::ParserError => e
           logger.error("JSON Parse Error: #{e.message}")
           id = MCPRuby::Util.extract_id_from_invalid_json(line)
