@@ -3,6 +3,7 @@
 # Add lib directory to load path
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
+require "pry-byebug"
 require "mcp_ruby"
 
 RSpec.configure do |config|

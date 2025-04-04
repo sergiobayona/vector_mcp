@@ -143,11 +143,14 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       # 2. Expect initialize result
       init_response = read_jsonrpc
       expect(init_response["id"]).to eq(init_request[:id])
-      expect(init_response["result"]).to include(
-        "protocolVersion" => MCPRuby::Server::PROTOCOL_VERSION,
-        "serverInfo" => hash_including("name" => "MCPRuby::ExampleServer", "version" => "0.0.1"),
-        "capabilities" => hash_including(:tools, :resources, :prompts) # Check keys exist
-      )
+      expect(init_response["result"]).to eq({
+                                              "protocolVersion" => "2024-11-05",
+                                              "capabilities" => { "tools" => { "listChanged" => false },
+                                                                  "resources" => { "subscribe" => false, "listChanged" => false },
+                                                                  "prompts" => { "listChanged" => false },
+                                                                  "experimental" => {} },
+                                              "serverInfo" => { "name" => "MCPRuby::ExampleServer", "version" => "0.0.1" }
+                                            })
 
       # 3. Send initialized notification
       initialized_notification = {
@@ -229,11 +232,12 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       }
       send_jsonrpc(call_req)
       response = read_jsonrpc
+      MCPRuby.logger.debug "Error response: #{response.inspect}"
       expect(response["id"]).to eq(call_req[:id])
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
-      expect(response["error"]["data"]["details"]).to include("Tool not found: non_existent_tool")
+      expect(response["error"]["data"]).to include("Tool not found: non_existent_tool")
     end
   end
 
