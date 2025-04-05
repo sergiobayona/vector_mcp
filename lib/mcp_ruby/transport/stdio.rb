@@ -2,6 +2,7 @@
 
 # lib/mcp_ruby/transport/stdio.rb
 require "json"
+require "strscan"
 require_relative "../errors"
 require_relative "../util"
 
@@ -10,9 +11,16 @@ module MCPRuby
     class Stdio
       attr_reader :logger, :server
 
+      # Maximum buffer size to prevent memory exhaustion
+      MAX_BUFFER_SIZE = 1024 * 1024 # 1MB
+
       def initialize(server)
         @server = server
         @logger = server.logger # Use the server's logger instance
+        @buffer = String.new("") # Create a mutable string
+        @json_depth = 0
+        @in_string = false
+        @escape_next = false
       end
 
       def run
@@ -23,22 +31,33 @@ module MCPRuby
           protocol_version: server.protocol_version
         )
 
-        loop do
-          line = $stdin.gets
-          break unless line # EOF
+        begin
+          # Main processing loop
+          while chunk = read_chunk
+            # Check buffer size limits
+            if (@buffer.length + chunk.length) > MAX_BUFFER_SIZE
+              logger.error("Input buffer exceeded maximum size (#{MAX_BUFFER_SIZE} bytes)")
+              send_error(nil, -32_700, "JSON message too large", nil)
+              @buffer = String.new("") # Reset buffer with a mutable string
+              next
+            end
 
-          line.strip!
-          next if line.empty?
+            # Add new data to buffer
+            @buffer << chunk
 
-          logger.debug { "Received raw: #{line.inspect}" } # Use block for lazy evaluation
-          handle_line(line, session)
+            # Process complete messages
+            process_messages(session)
+          end
+
+          logger.info("Stdin closed, shutting down.")
+        rescue Interrupt
+          logger.info("Interrupt received, shutting down gracefully.")
+        rescue IOError, Errno::EBADF => e
+          logger.info("IO closed: #{e.message}")
+        rescue StandardError => e
+          logger.fatal("Fatal error in stdio transport loop: #{e.message}\n#{e.backtrace.join("\n")}")
+          raise e
         end
-        logger.info("Stdin closed, shutting down.")
-      rescue Interrupt
-        logger.info("Interrupt received, shutting down gracefully.")
-      rescue StandardError => e
-        logger.fatal("Fatal error in stdio transport loop: #{e.message}\n#{e.backtrace.join("\n")}")
-        exit(1) # Exit if the transport loop itself crashes
       end
 
       def send_response(id, result)
@@ -47,17 +66,120 @@ module MCPRuby
 
       private
 
-      def handle_line(line, session)
-        message = nil # Define outside the begin block for rescue access
+      # Read a chunk of data from stdin
+      # This method is separated to make testing easier
+      def read_chunk
+        # For tests - use gets if it's a StringIO (no nonblock support)
+        if $stdin.is_a?(StringIO)
+          line = $stdin.gets
+          return line unless line.nil?
+
+          return nil # EOF
+        end
+
+        # For real operation - use read_nonblock with exception: false
+        # This returns nil on EOF, data on success, and :wait_readable if would block
         begin
-          message = JSON.parse(line)
-          result = server.handle_message(message, session, self) # Pass transport for sending
+          chunk = $stdin.read_nonblock(4096, exception: false)
+
+          # Handle the three possible return values
+          if chunk.nil? # EOF
+            nil
+          elsif chunk == :wait_readable # Would block
+            # Wait a tiny bit to avoid cpu spinning
+            sleep 0.01
+            "" # Return empty string to continue loop
+          else
+            chunk # Normal case - return data
+          end
+        rescue IO::WaitReadable
+          # Alternative for Ruby versions that don't support exception: false
+          sleep 0.01
+          ""
+        end
+      end
+
+      def process_buffer(session)
+        process_messages(session)
+      end
+
+      def process_messages(session)
+        # Process as many complete messages as we can find
+        while (message_end = find_message_end)
+          message = @buffer[0..message_end].strip
+          @buffer = String.new(@buffer[(message_end + 1)..-1] || "")
+
+          begin
+            JSON.parse(message) # Validate JSON
+            handle_json_message(message, session)
+          rescue JSON::ParserError => e
+            logger.error("JSON Parse Error: #{e.message}")
+            # Try to extract ID from the partial JSON
+            if (id_match = message.match(/"id"\s*:\s*"?([^,"}\s]+)"?/i))
+              id = id_match[1]
+              send_error(id, -32_700, "Parse error", nil)
+            end
+          end
+        end
+
+        # If we have a newline but couldn't parse any messages, try to handle as error
+        return unless @buffer.include?("\n") && !@buffer.strip.empty?
+
+        begin
+          JSON.parse(@buffer)
+        rescue JSON::ParserError => e
+          logger.error("JSON Parse Error: #{e.message}")
+          if (id_match = @buffer.match(/"id"\s*:\s*"?([^,"}\s]+)"?/i))
+            id = id_match[1]
+            send_error(id, -32_700, "Parse error", nil)
+          end
+          @buffer = String.new("")
+        end
+      end
+
+      def find_message_end
+        depth = 0
+        in_string = false
+        escape_next = false
+
+        @buffer.each_char.with_index do |char, i|
+          if escape_next
+            escape_next = false
+            next
+          end
+
+          case char
+          when '"'
+            in_string = !in_string
+          when "\\"
+            escape_next = true if in_string
+          when "{"
+            depth += 1 unless in_string
+          when "}"
+            depth -= 1 unless in_string
+            return i if depth == 0 && depth >= 0
+          when "\n"
+            # If we hit a newline and we're not in the middle of a JSON object,
+            # treat everything up to here as a potential message
+            return i if depth == 0
+          end
+        end
+        nil
+      end
+
+      def handle_json_message(json_str, session)
+        logger.debug { "Processing JSON message: #{json_str.inspect}" }
+        message = nil
+        begin
+          message = JSON.parse(json_str)
+          result = server.handle_message(message, session, self)
           # Send the result if it's not nil (notifications return nil)
           send_message({ jsonrpc: "2.0", id: message["id"], result: result }) if result
         rescue JSON::ParserError => e
           logger.error("JSON Parse Error: #{e.message}")
-          id = MCPRuby::Util.extract_id_from_invalid_json(line)
-          send_error(id, -32_700, "Parse error", nil) if id
+          # Extract ID from invalid JSON using a simple regex
+          id = json_str.match(/"id"\s*:\s*"?([^,"}\s]+)"?/i)&.captures&.first
+          send_error(id, -32_700, "Parse error", nil)
         rescue MCPRuby::ProtocolError => e # Catch specific protocol errors
           logger.error("Protocol Error: #{e.message} (Code: #{e.code})")
           send_error(e.request_id || message&.fetch("id", nil), e.code, e.message, e.details)

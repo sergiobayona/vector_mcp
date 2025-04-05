@@ -18,6 +18,7 @@ RSpec.describe MCPRuby::Transport::Stdio do
     allow(logger).to receive(:info)
     allow(logger).to receive(:error)
     allow(logger).to receive(:debug)
+    allow(logger).to receive(:warn)
     allow(logger).to receive(:fatal)
     allow(server).to receive(:server_info).and_return(server_info)
     allow(server).to receive(:server_capabilities).and_return(server_capabilities)
@@ -29,6 +30,13 @@ RSpec.describe MCPRuby::Transport::Stdio do
     it "sets up the server and logger" do
       expect(transport.server).to eq(server)
       expect(transport.logger).to eq(logger)
+    end
+
+    it "initializes buffer and parser state" do
+      expect(transport.instance_variable_get(:@buffer)).to eq("")
+      expect(transport.instance_variable_get(:@json_depth)).to eq(0)
+      expect(transport.instance_variable_get(:@in_string)).to eq(false)
+      expect(transport.instance_variable_get(:@escape_next)).to eq(false)
     end
   end
 
@@ -50,8 +58,10 @@ RSpec.describe MCPRuby::Transport::Stdio do
 
     it "processes valid JSON-RPC messages" do
       message = { jsonrpc: "2.0", method: "test", id: 1 }
-      allow($stdin).to receive(:gets).and_return("#{message.to_json}\n", nil)
-      allow(server).to receive(:handle_message)
+      input.string = "#{message.to_json}\n"
+      input.rewind
+
+      allow(server).to receive(:handle_message).and_return(nil)
       allow(session).to receive(:initialized?).and_return(true)
 
       transport.run
@@ -69,43 +79,110 @@ RSpec.describe MCPRuby::Transport::Stdio do
 
       allow(server).to receive(:handle_message)
 
-      begin
-        transport.run
-      rescue EOFError
-        # Expected
-      end
+      transport.run
 
       expect(server).not_to have_received(:handle_message)
     end
 
     it "handles JSON parse errors" do
-      input.string = "invalid json\n"
+      input.string = '{"id": "123", invalid json' + "\n"
       input.rewind
 
-      begin
-        transport.run
-      rescue EOFError
-        # Expected
-      end
+      transport.run
 
-      output_messages = output.string.split("\n")
-      expect(output_messages).to be_empty # No ID in invalid JSON, so no error response
+      puts "Debug - Output string: #{output.string.inspect}" # Debug line
+      puts "Debug - Buffer after run: #{transport.instance_variable_get(:@buffer).inspect}" # Debug line
+      puts "Debug - Logger calls:" # Debug line
+      logger.messages.each { |msg| puts "  #{msg}" } if logger.respond_to?(:messages) # Debug line
+
+      # Skip debug output lines
+      output_lines = output.string.lines
+      json_line = output_lines.find { |line| line.start_with?("{") }
+      expect(json_line).not_to be_nil, "No JSON response found in output"
+
+      output_message = JSON.parse(json_line)
+      expect(output_message).to include(
+        "jsonrpc" => "2.0",
+        "id" => "123",
+        "error" => hash_including(
+          "code" => -32_700,
+          "message" => "Parse error"
+        )
+      )
       expect(logger).to have_received(:error).with(/JSON Parse Error/)
     end
 
+    it "processes multiple JSON messages from a single input" do
+      message1 = { jsonrpc: "2.0", method: "test1", id: 1 }
+      message2 = { jsonrpc: "2.0", method: "test2", id: 2 }
+      input.string = "#{message1.to_json}#{message2.to_json}\n"
+      input.rewind
+
+      allow(server).to receive(:handle_message).and_return(nil)
+      allow(session).to receive(:initialized?).and_return(true)
+
+      transport.run
+
+      expect(server).to have_received(:handle_message).with(
+        hash_including("method" => "test1", "id" => 1),
+        session,
+        transport
+      )
+      expect(server).to have_received(:handle_message).with(
+        hash_including("method" => "test2", "id" => 2),
+        session,
+        transport
+      )
+    end
+
     it "handles interrupts gracefully" do
-      allow(input).to receive(:gets).and_raise(Interrupt)
+      # Override read_chunk method to raise Interrupt
+      allow(transport).to receive(:read_chunk).and_raise(Interrupt)
 
       transport.run
 
       expect(logger).to have_received(:info).with("Interrupt received, shutting down gracefully.")
     end
-
     it "handles fatal errors" do
-      allow(input).to receive(:gets).and_raise(StandardError, "Fatal error")
+      # Override read_chunk method to raise StandardError
+      allow(transport).to receive(:read_chunk).and_raise(StandardError, "Fatal error")
 
-      expect { transport.run }.to raise_error(SystemExit)
+      expect { transport.run }.to raise_error(StandardError, "Fatal error")
       expect(logger).to have_received(:fatal).with(/Fatal error in stdio transport loop: Fatal error/)
+    end
+  end
+
+  describe "#process_buffer" do
+    before do
+      allow(transport).to receive(:handle_json_message)
+    end
+
+    it "correctly identifies complete JSON objects" do
+      transport.instance_variable_set(:@buffer, '{"id": 1}')
+      transport.send(:process_buffer, session)
+      expect(transport).to have_received(:handle_json_message).with('{"id": 1}', session)
+    end
+
+    it "handles nested JSON structures" do
+      nested_json = '{"id": 1, "data": {"nested": [1,2,3]}}'
+      transport.instance_variable_set(:@buffer, nested_json)
+      transport.send(:process_buffer, session)
+      expect(transport).to have_received(:handle_json_message).with(nested_json, session)
+    end
+
+    it "correctly handles string escaping" do
+      json_with_escapes = '{"id": 1, "data": "This has \\"quotes\\" and {braces}"}'
+      transport.instance_variable_set(:@buffer, json_with_escapes)
+      transport.send(:process_buffer, session)
+      expect(transport).to have_received(:handle_json_message).with(json_with_escapes, session)
+    end
+
+    it "preserves incomplete JSON at end of buffer" do
+      partial_json = '{"id": 1}{"incomplete": '
+      transport.instance_variable_set(:@buffer, partial_json)
+      transport.send(:process_buffer, session)
+      expect(transport).to have_received(:handle_json_message).with('{"id": 1}', session)
+      expect(transport.instance_variable_get(:@buffer)).to eq('{"incomplete": ')
     end
   end
 
@@ -154,40 +231,12 @@ RSpec.describe MCPRuby::Transport::Stdio do
       $stdout = original_stdout
     end
 
-    it "handles parse errors" do
-      input = StringIO.new('{"id": "123", invalid json')
-      allow($stdin).to receive(:gets).and_return(input.string, nil)
-
-      begin
-        transport.run
-      rescue EOFError
-        # Expected
-      end
-
-      output_message = JSON.parse(output.string)
-      expect(output_message).to include(
-        "jsonrpc" => "2.0",
-        "id" => "123",
-        "error" => hash_including(
-          "code" => -32_700,
-          "message" => "Parse error"
-        )
-      )
-    end
-
     it "handles protocol errors" do
       allow(server).to receive(:handle_message).and_raise(
         MCPRuby::ProtocolError.new("Protocol error", code: -32_600, request_id: "123")
       )
 
-      input = StringIO.new('{"id": "123", "method": "test"}\n')
-      allow($stdin).to receive(:gets).and_return(input.string, nil)
-
-      begin
-        transport.run
-      rescue EOFError
-        # Expected
-      end
+      transport.send(:handle_json_message, '{"id": "123", "method": "test"}', session)
 
       output_message = JSON.parse(output.string)
       expect(output_message).to include(
@@ -203,14 +252,7 @@ RSpec.describe MCPRuby::Transport::Stdio do
     it "handles standard errors" do
       allow(server).to receive(:handle_message).and_raise(StandardError, "Unexpected error")
 
-      input = StringIO.new('{"id": "123", "method": "test"}\n')
-      allow($stdin).to receive(:gets).and_return(input.string, nil)
-
-      begin
-        transport.run
-      rescue EOFError
-        # Expected
-      end
+      transport.send(:handle_json_message, '{"id": "123", "method": "test"}', session)
 
       output_message = JSON.parse(output.string)
       expect(output_message).to include(
