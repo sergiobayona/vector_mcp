@@ -5,6 +5,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "pry-byebug"
 require "mcp_ruby"
+require "async/rspec"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

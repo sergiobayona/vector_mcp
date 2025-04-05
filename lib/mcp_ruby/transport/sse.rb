@@ -95,7 +95,7 @@ module MCPRuby
         enqueue_message(session_id, message)
       end
 
-      def handle_sse_connection(env, _session)
+      def handle_sse_connection(env, session)
         request = Rack::Request.new(env)
         unless request.get?
           logger.warn("Received non-GET request on SSE endpoint: #{request.request_method}")
@@ -118,18 +118,20 @@ module MCPRuby
         logger.info("SSE client connected: #{session_id}")
         logger.debug("Sending endpoint URL: #{message_post_url}")
 
-        # Store client connection info
-        # The task is captured within the Async::HTTP::Body::Writable block below
+        # Create a ClientConnection object but don't register it yet
         client_conn = ClientConnection.new(session_id, client_queue, nil)
-        @clients_mutex.synchronize { @clients[session_id] = client_conn }
 
         # Use Async::HTTP::Body::Writable for the response body
         body = Async::HTTP::Body::Writable.new
 
-        # Run the SSE event sending logic in a separate task
-        # Capture the task so we can potentially stop it later
-        Async do |task|
-          client_conn.task = task # Store the task reference
+        # Create and launch the client task directly with a variable to hold the reference
+        client_task = Async do |task|
+          # Set the task reference immediately
+          client_conn.task = task
+
+          # NOW register the client with complete information
+          @clients_mutex.synchronize { @clients[session_id] = client_conn }
+
           begin
             # 1. Send the initial endpoint event
             body.write("event: endpoint\ndata: #{message_post_url}\n\n")

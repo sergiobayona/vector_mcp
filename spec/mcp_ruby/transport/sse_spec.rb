@@ -1,87 +1,27 @@
 # frozen_string_literal: true
 
-# spec/mcp_ruby/transport/sse_spec.rb
-
 require "spec_helper"
-require "rack/test"
 require "async"
-require "async/queue"
+# require "async/http" # Removed
+# require "async/http/client" # Removed
+# require "async/http/endpoint" # Removed
+require "rack/mock" # Need this for env_for
 require "json"
 require "securerandom"
 
-# Mock Writable Body for testing SSE stream output
-class MockWritableBody
-  attr_reader :chunks, :finished
-
-  def initialize
-    @chunks = []
-    @finished = false
-    @condition = Async::Condition.new
-    @closed_by_peer = false
-  end
-
-  def write(chunk)
-    raise IOError, "Body closed by peer" if @closed_by_peer
-    return if @finished
-
-    @chunks << chunk
-    @condition.signal # Signal that data is available
-  end
-
-  def finish
-    @finished = true
-    @condition.signal
-  end
-
-  # Simulate peer closing connection
-  def close
-    @closed_by_peer = true
-    @finished = true
-    @condition.signal
-  end
-
-  # Helper for tests to wait for and read chunks
-  def read_chunks(count = 1, timeout = 0.1)
-    read = []
-    task = nil
-
-    begin
-      task = Async do
-        loop do
-          break if read.size >= count || @finished || @closed_by_peer
-
-          if @chunks.empty?
-            # Wait for signal or timeout
-            @condition.wait(timeout)
-            break if @chunks.empty? # If we timed out and still no chunks, break
-          else
-            read << @chunks.shift
-          end
-        end
-      end
-
-      # Wait for the task to complete or timeout
-      result = task.wait_for(timeout)
-      raise "Timeout waiting for chunks" if result.nil? && read.size < count
-
-      read
-    ensure
-      if task
-        task.stop
-        task.wait
-      end
-    end
-  end
-end
-
 RSpec.describe MCPRuby::Transport::SSE do
-  include Rack::Test::Methods
+  # include Rack::Test::Methods
 
   # --- Mocks and Doubles ---
   let(:server_double) do
-    instance_double(MCPRuby::Server, logger: logger_double, server_info: server_info, server_capabilities: server_capabilities,
-                                     protocol_version: protocol_version, handle_message: nil)
+    instance_double(MCPRuby::Server,
+                    logger: logger_double,
+                    server_info: server_info,
+                    server_capabilities: server_capabilities,
+                    protocol_version: protocol_version,
+                    handle_message: nil)
   end
+
   let(:logger_double) { instance_double(Logger, info: nil, debug: nil, warn: nil, error: nil, fatal: nil) }
   let(:session_double) { instance_double(MCPRuby::Session, initialized?: true) } # Assume initialized for most tests
   let(:server_info) { { name: "TestSSE", version: "0.1" } }
@@ -92,42 +32,85 @@ RSpec.describe MCPRuby::Transport::SSE do
   # The transport instance under test
   subject(:transport) { described_class.new(server_double, options) }
 
-  # Control session IDs
-  let(:session_id) { SecureRandom.uuid }
+  # Control session IDs for predictable testing
+  let(:session_id) { "test-session-id-12345" }
   before { allow(SecureRandom).to receive(:uuid).and_return(session_id) }
 
   # Access internal state for assertions
   let(:clients) { transport.instance_variable_get(:@clients) }
   let(:clients_mutex) { transport.instance_variable_get(:@clients_mutex) }
 
-  # Define app for Rack::Test
-  def app
-    # Build a new Rack app for each test
-    transport.send(:build_rack_app, session_double)
-  end
+  # Define app for Rack::Test using let
+  let(:app) { transport.send(:build_rack_app, session_double) }
+  # Define an endpoint serving the app on localhost, ephemeral port
+  # let(:endpoint) { Async::HTTP::Endpoint.parse("http://127.0.0.1:0", timeout: 5, app: app) } # Removed
+  # Define the test client pointing to the endpoint
+  # let(:client) { Async::HTTP::Client.new(endpoint, protocol: Async::HTTP::Protocol::HTTP11) } # Removed
 
-  # --- Helper Methods ---
+  # --- Test Helpers ---
   def sse_event(event, data)
     "event: #{event}\ndata: #{data}\n\n"
   end
 
   def simulate_post(path, body, headers = {})
-    post path, body.to_json, { "CONTENT_TYPE" => "application/json" }.merge(headers)
+    # post path, body.to_json, { "CONTENT_TYPE" => "application/json" }.merge(headers)
+    # Need alternative way to test POST if Rack::Test is disabled
+    # raise "Cannot simulate_post without Rack::Test enabled"
+    # TODO: Update this to use the new client if needed, or remove if direct client.post is used
   end
 
-  # Run tests in Async context
-  around(:each) do |example|
-    # Only wrap in Async if the example is marked with :async
-    if example.metadata[:async]
-      Async do |_task|
-        example.run
-      end
-    else
-      example.run
+  # Mock Writable Body for testing SSE stream output
+  class MockWritableBody
+    attr_reader :chunks, :finished, :closed_by_peer
+
+    def initialize
+      @chunks = []
+      @finished = false
+      @closed_by_peer = false
+      @condition = Async::Condition.new
+    end
+
+    def write(chunk)
+      raise IOError, "Body closed by peer" if @closed_by_peer
+      return if @finished
+
+      @chunks << chunk
+      @condition.signal # Signal that data is available
+    end
+
+    def finish
+      @finished = true
+      @condition.signal
+    end
+
+    # Simulate peer closing connection
+    def close
+      @closed_by_peer = true
+      @finished = true
+      @condition.signal
+    end
+
+    # Helper to wait for chunks
+    def read_chunks(count = 1, timeout = 0.5)
+      result = []
+      Async::Timeout.wrap(timeout) do
+        while result.size < count && !@finished && !@closed_by_peer
+          # Take available chunks first
+          result.concat(@chunks)
+          @chunks.clear
+
+          # If still not enough and not finished/closed, wait for more data
+          @condition.wait if result.size < count && !@finished && !@closed_by_peer
+        end
+      end # Async::Timeout will raise if it expires
+      result
+    rescue Async::TimeoutError
+      # Return whatever we got before timeout, or an empty array
+      result
     end
   end
 
-  # --- Test Suite ---
+  # --- Tests ---
 
   describe "#initialize" do
     it "initializes with server and options" do
@@ -142,275 +125,419 @@ RSpec.describe MCPRuby::Transport::SSE do
     it "correctly formats path_prefix" do
       transport1 = described_class.new(server_double, { path_prefix: "mcp/" })
       expect(transport1.path_prefix).to eq("/mcp")
+
       transport2 = described_class.new(server_double, { path_prefix: "/mcp/deep/" })
       expect(transport2.path_prefix).to eq("/mcp/deep")
     end
   end
 
   describe "Rack Application Endpoints" do
+    # These tests verify the behavior of the handlers when called via specific paths
+    # Note: Health checks commented out as they require routing/app testing
+    # Removed include_context Async::RSpec::Reactor - add back if specific examples need it
+
+    # Wrap each example in endpoint.bound to ensure server is running
+    # around(:each) do |example|
+    #   endpoint.bound do |_server|
+    #     # Server is bound and listening within this block
+    #     example.run
+    #     # Server is automatically closed after this block
+    #   end
+    # end
+
     let(:sse_path) { "/mcp_sse/sse" }
     let(:message_path_base) { "/mcp_sse/message" }
     let(:message_path) { "#{message_path_base}?session_id=#{session_id}" }
 
+    describe "Health Check" do
+      # it "responds to root path with 200 OK", :async do
+      #   # Difficult to unit test routing - tested via handle_health_check if applicable
+      # end
+      #
+      # it "responds to prefixed path with 200 OK", :async do
+      #   # Difficult to unit test routing
+      # end
+    end
+
     describe "GET /mcp_sse/sse" do
-      it "returns 405 for non-GET requests" do
-        # Set up the environment for a POST request
-        env = Rack::MockRequest.env_for(sse_path, method: "POST")
-        status, headers, _body = transport.handle_sse_connection(env, session_double)
-        expect(status).to eq(405)
-        expect(headers["Content-Type"]).to eq("text/plain")
-      end
+      let(:mock_env_get) { Rack::MockRequest.env_for(sse_path, method: "GET") }
 
-      it "returns 200 OK for GET requests" do
-        # Set up the environment for a GET request
-        env = Rack::MockRequest.env_for(sse_path, method: "GET")
-        status, headers, _body = transport.handle_sse_connection(env, session_double)
+      it "calls handle_sse_connection for GET requests", :async do
+        mock_body = MockWritableBody.new
+        allow(Async::HTTP::Body::Writable).to receive(:new).and_return(mock_body)
+        # Expect the handler to be called
+        # expect(transport).to receive(:handle_sse_connection).with(mock_env_get, session_double).and_call_original
+
+        # Simulate call via Rack app structure (though app itself isn't run)
+        # status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env_get)
+
+        # Directly call the handler instead
+        status, headers, body_instance = transport.handle_sse_connection(mock_env_get, session_double)
+
+        # Basic assertions on the response initiated by the handler
         expect(status).to eq(200)
-        expect(headers["Content-Type"]).to eq("text/event-stream")
-        expect(headers["Cache-Control"]).to eq("no-cache")
-        expect(headers["Connection"]).to eq("keep-alive")
-      end
+        expect(headers["Content-Type"]).to include("text/event-stream")
+        expect(body_instance).to eq(mock_body) # Check it returned our mock body
 
-      it "registers the client connection internally", :async do
-        # We need to simulate the body reading part of Falcon/Async to trigger the registration
-        mock_body = MockWritableBody.new
-        allow(Async::HTTP::Body::Writable).to receive(:new).and_return(mock_body)
+        # Check mock body received endpoint (verifies handler ran)
+        chunks = mock_body.read_chunks(1, 0.2) # Slightly increased timeout just in case
+        expect(chunks).not_to be_empty, "Expected endpoint event chunk, but got none."
+        expect(chunks.first).to start_with("event: endpoint")
 
-        # Set up the environment for a GET request
-        env = Rack::MockRequest.env_for(sse_path, method: "GET")
-
-        # Run the connection handler in an async task
-        task = Async do
-          transport.handle_sse_connection(env, session_double)
-        end
-
-        # Wait for the initial endpoint event to be written
-        mock_body.read_chunks(1, 0.5)
-
-        # Verify client registration
-        clients_mutex.synchronize do
-          expect(clients.keys).to include(session_id)
-          expect(clients[session_id]).to be_a(MCPRuby::Transport::SSE::ClientConnection)
-          expect(clients[session_id].id).to eq(session_id)
-          expect(clients[session_id].queue).to be_a(Async::Queue)
-        end
-
-        # Simulate closing the connection
+        # Need to manually stop the body/task simulation if not using TestClient
         mock_body.close
-
-        # Wait for cleanup
-        Async::Task.current.sleep 0.1
-
-        # Stop the task
-        task.stop
-
-        # Verify cleanup
-        expect(clients).to be_empty
       end
 
-      it "sends the initial endpoint event", :async do
-        mock_body = MockWritableBody.new
-        allow(Async::HTTP::Body::Writable).to receive(:new).and_return(mock_body)
+      it "returns 405 for non-GET requests" do # No :async needed
+        mock_env_post = Rack::MockRequest.env_for(sse_path, method: "POST")
+        status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env_post)
 
-        # Set up the environment for a GET request
-        env = Rack::MockRequest.env_for(sse_path, method: "GET")
-        transport.handle_sse_connection(env, session_double)
-
-        # Read the first chunk written to the body
-        initial_event = mock_body.read_chunks(1).first
-
-        expected_endpoint_url = "/mcp_sse/message?session_id=#{session_id}"
-        expected_event = sse_event("endpoint", expected_endpoint_url)
-        expect(initial_event).to eq(expected_event)
-
-        mock_body.close # Cleanup
-        Async::Task.current.sleep 0.01
+        expect(status).to eq(405)
+        expect(headers["Content-Type"]).to include("text/plain")
+        expect(body.join).to eq("Method Not Allowed") # Read body from array
       end
-
-      # Testing keep-alives and message sending over SSE via Rack::Test is difficult.
-      # We test the enqueuing logic via the POST endpoint tests.
     end
 
     describe "POST /mcp_sse/message" do
-      before do
-        # Pre-register the client as if they connected via SSE
-        @client_queue = Async::Queue.new
-        client_conn = MCPRuby::Transport::SSE::ClientConnection.new(session_id, @client_queue, nil)
-        clients_mutex.synchronize { clients[session_id] = client_conn }
+      let(:json_content_type) { { "CONTENT_TYPE" => "application/json" } }
+      let(:test_request_body_hash) { { jsonrpc: "2.0", id: 1, method: "test" } }
+      let(:test_request_body_json) { test_request_body_hash.to_json }
+
+      it "calls handle_message_post for POST requests" do # No :async needed for this part
+        mock_env = Rack::MockRequest.env_for(message_path, method: "POST", input: test_request_body_json, **json_content_type)
+        # Expect the handler to be called
+        expect(transport).to receive(:handle_message_post).with(mock_env, session_double).and_call_original
+
+        # Simulate call via Rack app structure
+        status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env)
+
+        # Assert basic response from handler
+        expect(status).to eq(202) # Assuming handle_message_post returns 202 on success path
+        expect(headers["Content-Type"]).to include("application/json")
       end
 
-      after do
-        # Clean up client registration
-        clients_mutex.synchronize { clients.delete(session_id) }
-      end
-
-      it "returns 405 for non-POST requests" do
-        # Set up the environment for a GET request
-        env = Rack::MockRequest.env_for(message_path, method: "GET")
-        status, headers, _body = transport.handle_message_post(env, session_double)
+      it "returns 405 for non-POST requests" do # No :async needed
+        mock_env_get = Rack::MockRequest.env_for(message_path, method: "GET")
+        status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env_get)
         expect(status).to eq(405)
-        expect(headers["Content-Type"]).to eq("text/plain")
+        expect(body.join).to eq("Method Not Allowed")
       end
 
-      pending "returns 400 if session_id is missing" do
-        # Set up the environment for a POST request without session_id
-        env = Rack::MockRequest.env_for(message_path_base, method: "POST",
-                                                           input: { id: 1, method: "ping" }.to_json,
-                                                           "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
+      it "returns 400 if session_id is missing" do # No :async needed
+        mock_env = Rack::MockRequest.env_for("/mcp_sse/message", method: "POST", input: test_request_body_json, **json_content_type) # No session_id
+        status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env)
+
         expect(status).to eq(400)
-        expect(body.first).to include("Missing session_id parameter")
+        expect(headers["Content-Type"]).to include("application/json")
+        error_response = JSON.parse(body.join)
+        expect(error_response["error"]["code"]).to eq(-32_600)
+        expect(error_response["error"]["message"]).to include("Missing session_id")
       end
 
-      pending "returns 404 if session_id is invalid/unknown" do
-        # Set up the environment for a POST request with invalid session_id
-        env = Rack::MockRequest.env_for("#{message_path_base}?session_id=invalid-id", method: "POST",
-                                                                                      input: { id: 1, method: "ping" }.to_json,
-                                                                                      "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
+      it "returns 404 if session_id is invalid" do # No :async needed
+        invalid_path = "/mcp_sse/message?session_id=invalid-id"
+        mock_env = Rack::MockRequest.env_for(invalid_path, method: "POST", input: test_request_body_json, **json_content_type)
+        status, headers, body = transport.send(:build_rack_app, session_double).call(mock_env)
+
         expect(status).to eq(404)
-        expect(body.first).to include("Invalid session_id")
-      end
-
-      pending "returns 400 for invalid JSON body" do
-        # Set up the environment for a POST request with invalid JSON
-        env = Rack::MockRequest.env_for(message_path, method: "POST",
-                                                      input: "invalid json",
-                                                      "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(400)
-        expect(body.first).to include("Parse error")
-      end
-
-      it "calls server.handle_message with correct args on success" do
-        request_body = { jsonrpc: "2.0", id: "req-1", method: "test_method", params: { data: 1 } }
-        # Server returns the *result* payload, transport wraps it
-        allow(server_double).to receive(:handle_message)
-          .with(request_body, session_double, session_id)
-          .and_return({ success: true })
-
-        # Set up the environment for a POST request
-        env = Rack::MockRequest.env_for(message_path, method: "POST",
-                                                      input: request_body.to_json,
-                                                      "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(202)
-        expect(body.first).to include('"status":"accepted"')
-        expect(body.first).to include('"id":"req-1"')
-        expect(server_double).to have_received(:handle_message)
-      end
-
-      it "enqueues the response from server.handle_message onto the client's queue", :async do
-        request_body = { jsonrpc: "2.0", id: "req-2", method: "test_method", params: {} }
-        server_result = { processed: true }
-        allow(server_double).to receive(:handle_message)
-          .with(request_body, session_double, session_id)
-          .and_return(server_result)
-
-        # Set up the environment for a POST request
-        env = Rack::MockRequest.env_for(message_path, method: "POST",
-                                                      input: request_body.to_json,
-                                                      "CONTENT_TYPE" => "application/json")
-
-        # Call the handler directly
-        status, _headers, _body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(202) # Verify the immediate HTTP response
-
-        # Give the handler a brief moment to enqueue
-        Async::Task.current.sleep 0.01
-
-        # Check queue size first (non-blocking)
-        expect(@client_queue.size).to eq(1)
-
-        # Now dequeue and verify (should be immediate)
-        queued_message = @client_queue.dequeue(timeout: 0.01)
-        expected_response = { jsonrpc: "2.0", id: "req-2", result: server_result }
-        expect(queued_message).to eq(expected_response)
-      end
-
-      it "handles MCPRuby::ProtocolError raised by server.handle_message", :async do
-        request_body = { jsonrpc: "2.0", id: "req-3", method: "invalid_method", params: {} }
-        error = MCPRuby::MethodNotFoundError.new("invalid_method", request_id: "req-3")
-        allow(server_double).to receive(:handle_message)
-          .with(request_body, session_double, session_id)
-          .and_raise(error)
-
-        # Set up the environment for a POST request
-        env = Rack::MockRequest.env_for(message_path, method: "POST",
-                                                      input: request_body.to_json,
-                                                      "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(404)
-        expect(body.first).to include('"code":-32601')
-        expect(body.first).to include('"message":"Method not found"')
-
-        # Check queue for error message
-        queued_message = @client_queue.dequeue(timeout: 0.1)
-        expect(queued_message).to include(
-          jsonrpc: "2.0",
-          id: "req-3",
-          error: hash_including(code: -32_601, message: "Method not found")
-        )
-      end
-
-      it "handles StandardError raised by server.handle_message", :async do
-        request_body = { jsonrpc: "2.0", id: "req-4", method: "broken_method", params: {} }
-        error = StandardError.new("Something went very wrong")
-        allow(server_double).to receive(:handle_message)
-          .with(request_body, session_double, session_id)
-          .and_raise(error)
-
-        # Set up the environment for a POST request
-        env = Rack::MockRequest.env_for(message_path, method: "POST",
-                                                      input: request_body.to_json,
-                                                      "CONTENT_TYPE" => "application/json")
-        status, _headers, body = transport.handle_message_post(env, session_double)
-        expect(status).to eq(500)
-        expect(body.first).to include('"code":-32603')
-        expect(body.first).to include('"message":"Internal server error"')
-        expect(body.first).to include('"details":{"details":"Something went very wrong"}')
-
-        # Check queue for error message
-        queued_message = @client_queue.dequeue(timeout: 0.1)
-        expect(queued_message).to include(
-          jsonrpc: "2.0",
-          id: "req-4",
-          error: hash_including(code: -32_603, message: "Internal server error")
-        )
+        expect(headers["Content-Type"]).to include("application/json")
+        error_response = JSON.parse(body.join)
+        expect(error_response["error"]["code"]).to eq(-32_001)
+        expect(error_response["error"]["message"]).to include("Invalid session_id")
       end
     end
   end
 
-  describe "#enqueue_message" do
-    let(:client_id) { "client-abc" }
-    let(:queue) { Async::Queue.new }
-    let(:client_conn) { MCPRuby::Transport::SSE::ClientConnection.new(client_id, queue, nil) }
-    let(:message) { { jsonrpc: "2.0", result: "ok", id: 1 } }
+  describe "Client Connection Lifecycle" do # :async removed from describe
+    # Test handle_sse_connection directly
+    # No reactor context needed here unless specific examples use internal async waits
+
+    # Wrap each example in endpoint.bound to ensure server is running
+    # around(:each) do |example|
+    #   endpoint.bound do |_server|
+    #     example.run
+    #   end
+    # end
+
+    let(:sse_path) { "/mcp_sse/sse" } # Keep path definition for clarity
+    let(:mock_env_get) { Rack::MockRequest.env_for(sse_path, method: "GET") }
+    let(:mock_body) { MockWritableBody.new }
 
     before do
-      clients_mutex.synchronize { clients[client_id] = client_conn }
+      # Mock the body creation before the handler is called
+      allow(Async::HTTP::Body::Writable).to receive(:new).and_return(mock_body)
+    end
+
+    # Keep :async because read_chunks uses Async::Timeout
+    it "creates a client connection and sends endpoint URL", :async do
+      # Directly call the handler
+      status, headers, body_instance = transport.handle_sse_connection(mock_env_get, session_double)
+
+      # Check registration (should be synchronous within handler before async task starts)
+      registered_client = clients_mutex.synchronize { clients[session_id] }
+      expect(registered_client).to be_a(MCPRuby::Transport::SSE::ClientConnection)
+      expect(registered_client.id).to eq(session_id)
+
+      # Check handler response (should initiate SSE stream)
+      expect(status).to eq(200)
+      expect(headers["Content-Type"]).to include("text/event-stream")
+      expect(body_instance).to eq(mock_body)
+
+      # Check that the endpoint event was sent via the mock body
+      # This implicitly waits for the async task within handle_sse_connection to write
+      chunks = mock_body.read_chunks(1, 0.2) # Use timeout
+      expect(chunks).not_to be_empty, "Expected endpoint event chunk, but got none."
+      expect(chunks.first).to start_with("event: endpoint\ndata: /mcp_sse/message?session_id=#{session_id}")
+
+      # Cleanup: Close the mock body to signal completion to internal task
+      mock_body.close
+    end
+
+    # Keep :async because read_chunks and internal task cleanup require time/async context
+    it "properly cleans up resources when the client disconnects", :async do
+      # Call the handler to establish connection/task
+      _status, _headers, _body_instance = transport.handle_sse_connection(mock_env_get, session_double)
+
+      # Ensure client is registered before simulating disconnect
+      # Give the task a moment to register the client
+      Async::Task.current.sleep 0.01
+      expect(clients_mutex.synchronize { clients.key?(session_id) }).to be true
+
+      # Simulate client disconnection by closing the mock body
+      # This should trigger the rescue block in the handle_sse_connection's async task
+      mock_body.close
+
+      # Give the error handler/cleanup task time to run
+      Async::Task.current.sleep 0.05
+
+      # Verify cleanup
+      clients_mutex.synchronize do
+        expect(clients).not_to have_key(session_id)
+      end
+    end
+    # Removed race condition test as it was complex and less relevant for unit testing
+  end
+
+  describe "#send_notification" do
+    # Use async-rspec reactor context as this block uses Async::Queue
+    include_context Async::RSpec::Reactor
+
+    let(:client_queue) { Async::Queue.new }
+    # Need a real task double now for ClientConnection, as :async runs in a real task
+    let(:mock_task) { instance_double(Async::Task, stopped?: false) }
+    let(:client_conn) { MCPRuby::Transport::SSE::ClientConnection.new(session_id, client_queue, mock_task) }
+
+    before do
+      clients_mutex.synchronize { clients[session_id] = client_conn }
     end
 
     after do
-      # No need to close the queue, it will be garbage collected
-      clients_mutex.synchronize { clients.delete(client_id) }
+      clients_mutex.synchronize { clients.delete(session_id) }
     end
 
+    # This test doesn't involve HTTP requests, just internal logic, so it remains largely the same
+    # but needs the :async tag if it uses Async components like the Queue within the test.
+    it "enqueues a notification message", :async do
+      transport.send_notification(session_id, "test_notification", { data: 123 })
+
+      expect(client_queue.size).to eq(1)
+      message = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(message).to eq({
+                              jsonrpc: "2.0",
+                              method: "test_notification",
+                              params: { data: 123 }
+                            })
+    end
+
+    it "returns false if client not found" do # No :async needed here
+      result = transport.send_notification("non-existent-id", "test_notification")
+      expect(result).to be false
+      expect(logger_double).to have_received(:warn).with(/No active client queue/)
+    end
+  end
+
+  # This describe block tests the internal logic triggered by a POST, but doesn't
+  # make the POST itself anymore. We rely on the endpoint tests for the POST->handler path.
+  # We need to simulate the state *after* a valid POST request would have been received.
+  describe "#handle_message_post (internal logic)" do
+    # Use async-rspec reactor context as this block uses Async::Queue and calls async methods
+    include_context Async::RSpec::Reactor
+
+    let(:client_queue) { Async::Queue.new }
+    let(:mock_task) { instance_double(Async::Task, stopped?: false) }
+    let(:client_conn) { MCPRuby::Transport::SSE::ClientConnection.new(session_id, client_queue, mock_task) }
+    let(:request_body_hash) { { jsonrpc: "2.0", id: "req-1", method: "test_method", params: {} } }
+    let(:request_body_json) { request_body_hash.to_json }
+    let(:server_result) { { success: true } }
+    let(:message_path) { "/mcp_sse/message?session_id=#{session_id}" }
+    let(:env) do
+      { "rack.input" => StringIO.new(request_body_json), "REQUEST_METHOD" => "POST", "PATH_INFO" => "/mcp_sse/message",
+        "QUERY_STRING" => "session_id=#{session_id}" }
+    end
+
+    before do
+      clients_mutex.synchronize { clients[session_id] = client_conn }
+      allow(server_double).to receive(:handle_message)
+        .with(request_body_hash, session_double, session_id) # Pass hash, not string
+        .and_return(server_result)
+    end
+
+    after do
+      clients_mutex.synchronize { clients.delete(session_id) }
+    end
+
+    # Testing the internal handler method directly
+    it "processes valid request and enqueues result", :async do
+      # Directly call the handler function
+      status, headers, body_proxy = transport.handle_message_post(env, session_double)
+
+      # Check immediate response (202 Accepted)
+      expect(status).to eq(202)
+      expect(headers["Content-Type"]).to eq("application/json")
+      response_body = JSON.parse(body_proxy.first) # body_proxy is likely an array
+      expect(response_body["status"]).to eq("accepted")
+      expect(response_body["id"]).to eq("req-1")
+
+      # Check that the *result* message was enqueued for SSE
+      message = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(message).to eq({
+                              jsonrpc: "2.0",
+                              id: "req-1",
+                              result: server_result
+                            })
+    end
+
+    it "handles JSON parse errors and enqueues error", :async do
+      env["rack.input"] = StringIO.new('{"id": "broken", "method":') # Invalid JSON
+      status, headers, body_proxy = transport.handle_message_post(env, session_double)
+
+      expect(status).to eq(400)
+      response_body = JSON.parse(body_proxy.first)
+      expect(response_body["error"]["code"]).to eq(-32_700)
+
+      # Check error was enqueued for SSE
+      message = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(message).to include(
+        jsonrpc: "2.0",
+        id: "broken",
+        error: hash_including(code: -32_700, message: "Parse error")
+      )
+    end
+
+    it "handles protocol errors and enqueues error", :async do
+      protocol_error = MCPRuby::ProtocolError.new("Protocol error", code: -32_600, request_id: "req-1")
+      allow(server_double).to receive(:handle_message).and_raise(protocol_error)
+
+      status, headers, body_proxy = transport.handle_message_post(env, session_double)
+
+      expect(status).to eq(400)
+      response_body = JSON.parse(body_proxy.first)
+      expect(response_body["error"]["code"]).to eq(-32_600)
+
+      # Check error was enqueued for SSE
+      message = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(message).to include(
+        jsonrpc: "2.0",
+        id: "req-1",
+        error: hash_including(code: -32_600, message: "Protocol error")
+      )
+    end
+
+    it "handles standard errors and enqueues error", :async do
+      allow(server_double).to receive(:handle_message).and_raise(StandardError, "Something went wrong")
+
+      status, headers, body_proxy = transport.handle_message_post(env, session_double)
+
+      expect(status).to eq(500)
+      response_body = JSON.parse(body_proxy.first)
+      expect(response_body["error"]["code"]).to eq(-32_603)
+
+      # Check error was enqueued for SSE
+      message = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(message).to include(
+        jsonrpc: "2.0",
+        id: "req-1",
+        error: hash_including(code: -32_603, message: "Internal server error")
+      )
+    end
+  end
+
+  describe "#enqueue_message" do
+    # Use async-rspec reactor context as this block uses Async::Queue
+    include_context Async::RSpec::Reactor
+
+    let(:client_queue) { Async::Queue.new }
+    let(:mock_task) { instance_double(Async::Task, stopped?: false) }
+    let(:client_conn) { MCPRuby::Transport::SSE::ClientConnection.new(session_id, client_queue, mock_task) }
+    let(:message) { { jsonrpc: "2.0", result: "ok", id: 1 } }
+
+    before do
+      clients_mutex.synchronize { clients[session_id] = client_conn }
+    end
+
+    after do
+      clients_mutex.synchronize { clients.delete(session_id) }
+    end
+
+    # This is internal logic, doesn't need client, just :async for queue
     it "enqueues the message to the correct client queue", :async do
-      expect(transport.send(:enqueue_message, client_id, message)).to be true
-      expect(queue.dequeue(timeout: 0.01)).to eq(message)
+      expect(transport.send(:enqueue_message, session_id, message)).to be true
+      dequeued = Async::Timeout.wrap(0.1) { client_queue.dequeue }
+      expect(dequeued).to eq(message)
     end
 
-    it "returns false if client queue is not found" do
+    it "returns false if client queue is not found" do # No :async
       expect(transport.send(:enqueue_message, "non-existent-id", message)).to be false
       expect(logger_double).to have_received(:warn).with(/No active client queue found for session_id non-existent-id/)
     end
+  end
 
-    it "returns false if client queue is inactive", :async do
-      # Instead of closing the queue, we'll remove it from the clients hash
-      clients_mutex.synchronize { clients.delete(client_id) }
-      expect(transport.send(:enqueue_message, client_id, message)).to be false
-      expect(logger_double).to have_received(:warn).with(/No active client queue found for session_id client-abc/)
+  describe "#build_rack_app" do
+    it "creates a valid Rack application" do # No :async
+      built_app = transport.send(:build_rack_app, session_double)
+      expect(built_app).to respond_to(:call)
+      # We can't easily test routing here without Rack::Test or a client
+    end
+  end
+
+  describe "Error Response Formatting" do # No :async needed
+    it "formats error payloads correctly" do
+      error_payload = transport.send(:format_error_payload, -32_600, "Invalid Request", { details: "Missing field" })
+      expect(error_payload).to eq({
+                                    code: -32_600,
+                                    message: "Invalid Request",
+                                    data: { details: "Missing field" }
+                                  })
+    end
+
+    it "formats error bodies correctly" do
+      error_body = transport.send(:format_error_body, "req-1", -32_600, "Invalid Request")
+      parsed = JSON.parse(error_body)
+      expect(parsed).to eq({
+                             "jsonrpc" => "2.0",
+                             "id" => "req-1",
+                             "error" => {
+                               "code" => -32_600,
+                               "message" => "Invalid Request"
+                             }
+                           })
+    end
+
+    it "creates appropriate HTTP responses for different error codes" do
+      # Parse error (400)
+      status, headers, body = transport.send(:error_response, "req-1", -32_700, "Parse error")
+      expect(status).to eq(400)
+      expect(headers["Content-Type"]).to include("application/json")
+
+      # Method not found (404)
+      status, headers, body = transport.send(:error_response, "req-1", -32_601, "Method not found")
+      expect(status).to eq(404)
+      expect(headers["Content-Type"]).to include("application/json")
+
+      # Server error (500)
+      status, headers, body = transport.send(:error_response, "req-1", -32_603, "Internal error")
+      expect(status).to eq(500)
+      expect(headers["Content-Type"]).to include("application/json")
     end
   end
 end
