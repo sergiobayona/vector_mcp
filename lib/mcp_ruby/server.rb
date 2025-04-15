@@ -109,10 +109,12 @@ module MCPRuby
         logger.info("[#{session_id}] Received notification: #{method}")
         handle_notification(method, params, session) # Removed transport
         nil # Notifications don't return a value to send back
-      elsif id # It's a response (client shouldn't send these)
-        logger.warn("[#{session_id}] Received unexpected response [#{id}]")
-        nil
-      else # Invalid message
+      elsif id # It's a response (client shouldn't send these) OR an invalid request with ID but no method
+        # JSON-RPC spec says: "If there was an error in detecting the id in the Request object (e.g. Parse error/Invalid Request), it MUST be Null."
+        # However, it also says an error object MUST be included for Invalid Request. We prioritize sending an error.
+        logger.warn("[#{session_id}] Received message with id [#{id}] but no method. Treating as Invalid Request.")
+        raise MCPRuby::InvalidRequestError.new("Request object must include a 'method' member", request_id: id)
+      else # Invalid message (no id, no method)
         raise MCPRuby::InvalidRequestError, "Invalid message format: #{message.inspect}"
       end
     end

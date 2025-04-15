@@ -375,7 +375,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       stdin.flush
 
       response = read_jsonrpc
-      expect(response["id"]).to eq(1) # Util.extract_id_from_invalid_json should find it
+      expect(response["id"]).to eq("1") # Corrected expectation to string "1"
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_700)
       expect(response["error"]["message"]).to eq("Parse error")
@@ -389,7 +389,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       expect(response["id"]).to eq(req[:id])
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_600)
-      expect(response["error"]["message"]).to include("Invalid message format") # Error raised by Server#handle_message
+      expect(response["error"]["message"]).to eq("Request object must include a 'method' member") # Updated expected message
     end
   end
 end

@@ -228,7 +228,6 @@ RSpec.describe MCPRuby::Server do
 
   describe "#handle_message" do
     let(:session) { instance_double("MCPRuby::Session") }
-    let(:transport) { instance_double("MCPRuby::Transport::Stdio") }
 
     context "with a valid request message" do
       let(:message) do
@@ -238,18 +237,25 @@ RSpec.describe MCPRuby::Server do
           "params" => { "key" => "value" }
         }
       end
+      let(:expected_result) { { "key" => "value" } }
 
       before do
         allow(session).to receive(:initialized?).and_return(true)
-        # Allow the private method to be called
-        transport.instance_eval { def send_response(*args); end }
-        allow(transport).to receive(:send_response).with(any_args)
-        server.on_request("test_method") { |params| params }
+        # Stub the internal handle_request method
+        allow(server).to receive(:handle_request)
+          .with(message["id"], message["method"], message["params"], session)
+          .and_return(expected_result)
       end
 
-      it "processes the request and sends a response" do
-        expect(transport).to receive(:send_response).with("123", { "key" => "value" })
-        server.handle_message(message, session, transport)
+      it "calls handle_request with correct arguments" do
+        server.handle_message(message, session, "test_session")
+        expect(server).to have_received(:handle_request)
+          .with(message["id"], message["method"], message["params"], session)
+      end
+
+      it "returns the result from handle_request" do
+        result = server.handle_message(message, session, "test_session")
+        expect(result).to eq(expected_result)
       end
     end
 
@@ -260,24 +266,45 @@ RSpec.describe MCPRuby::Server do
           "params" => { "key" => "value" }
         }
       end
+      let(:mock_handler) { double("NotificationHandler") }
 
       before do
         allow(session).to receive(:initialized?).and_return(true)
-        server.on_notification("test_notification") { |params| params }
+        # Stub the internal handle_notification method
+        allow(server).to receive(:handle_notification)
+          .with(message["method"], message["params"], session)
+        allow(mock_handler).to receive(:call)
+        server.on_notification("test_notification", &mock_handler.method(:call))
       end
 
-      it "processes the notification" do
-        expect { server.handle_message(message, session, transport) }.not_to raise_error
+      it "calls handle_notification with correct arguments" do
+        server.handle_message(message, session, "test_session")
+        expect(server).to have_received(:handle_notification)
+          .with(message["method"], message["params"], session)
+      end
+
+      it "returns nil" do
+        expect(server.handle_message(message, session, "test_session")).to be_nil
       end
     end
 
-    context "with an invalid message" do
+    context "when receiving a message with id but no method" do
+      let(:message) { { "id" => "456" } }
+
+      it "raises an InvalidRequestError" do
+        expect do
+          server.handle_message(message, session, "test_session")
+        end.to raise_error(MCPRuby::InvalidRequestError, /Request object must include a 'method' member/)
+      end
+    end
+
+    context "with an invalid message (no id, no method)" do
       let(:message) { {} }
 
       it "raises an InvalidRequestError" do
         expect do
-          server.handle_message(message, session, transport)
-        end.to raise_error(MCPRuby::InvalidRequestError)
+          server.handle_message(message, session, "test_session")
+        end.to raise_error(MCPRuby::InvalidRequestError, /Invalid message format/)
       end
     end
   end
