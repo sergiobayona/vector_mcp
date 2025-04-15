@@ -1,55 +1,63 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# If running from source checkout, setup load path
-$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+# Simple example of a stdio-based MCP server
+# It registers a couple of example tools, resources, and prompts.
 
-require "mcp_ruby"
+require "vector_mcp"
 
-# Configure the shared logger level if desired
-MCPRuby.logger.level = Logger::DEBUG
+# Set debug logging level for development
+VectorMCP.logger.level = Logger::DEBUG
 
-# Create an instance of the server
-server = MCPRuby.new_server(name: "MCPRuby::ExampleServer", version: "0.0.1")
+# Create a server instance with a name/version
+server = VectorMCP.new_server(name: "VectorMCP::ExampleServer", version: "0.0.1")
 
-# Register Tools, Resources, Prompts
+# Register a simple echo tool
 server.register_tool(
   name: "ruby_echo",
   description: "Echoes the input string.",
   input_schema: {
     type: "object",
-    properties: { message: { type: "string", description: "The message to echo." } },
+    properties: {
+      message: { type: "string" }
+    },
     required: ["message"]
   }
-) { |args, _session| "You said via MCPRuby: #{args["message"]}" }
+) { |args, _session| "You said via VectorMCP: #{args["message"]}" }
 
+# Register a simple in-memory resource
 server.register_resource(
   uri: "memory://data/example.txt",
   name: "Example Data",
   description: "Some simple data stored in server memory."
-) { |_session| "This is the content of the example resource." }
+) do |_session|
+  "This is the content of the example resource. It's #{Time.now}."
+end
 
+# Register a simple greeting prompt
 server.register_prompt(
   name: "simple_greeting",
   description: "Generates a simple greeting.",
-  arguments: [{ name: "name", required: true }]
+  arguments: [
+    { name: "name", description: "Name to greet", required: true }
+  ]
 ) do |args, _session|
   [
-    { role: "user", content: { type: "text", text: "Greet #{args["name"]} using MCPRuby style." } },
+    { role: "user", content: { type: "text", text: "Greet #{args["name"]} using VectorMCP style." } },
     { role: "assistant", content: { type: "text", text: "Alright, crafting a greeting for #{args["name"]} now." } }
   ]
 end
 
-# Run the server using stdio transport
+# Start the server!
 begin
-  server.run(transport: :stdio)
-rescue MCPRuby::Error => e
-  MCPRuby.logger.fatal("MCPRuby Error: #{e.message}")
-  exit 1
+  server.run # By default, uses stdio transport
+rescue VectorMCP::Error => e
+  VectorMCP.logger.fatal("VectorMCP Error: #{e.message}")
+  exit(1)
 rescue Interrupt
-  MCPRuby.logger.info("Server interrupted.")
-  exit 0
+  VectorMCP.logger.info("Server interrupted.")
+  exit(0)
 rescue StandardError => e
-  MCPRuby.logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
-  exit 1
+  VectorMCP.logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
+  exit(1)
 end
