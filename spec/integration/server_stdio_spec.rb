@@ -5,7 +5,7 @@ require "open3"
 require "json"
 require "timeout"
 
-RSpec.describe "MCPRuby Server (Stdio Integration)" do
+RSpec.describe "VectorMCP Server (Stdio Integration)" do
   # Path to the example server script to run
   # Adjust if your example script is located elsewhere or named differently
   let(:server_script) { File.expand_path("../../examples/stdio_server.rb", __dir__) }
@@ -26,7 +26,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
   # Helper to send JSON-RPC message (as hash) to server's stdin
   def send_jsonrpc(message_hash)
     json_message = message_hash.to_json
-    MCPRuby.logger.debug "[TEST->] #{json_message}"
+    VectorMCP.logger.debug "[TEST->] #{json_message}"
     begin
       stdin.puts(json_message)
       stdin.flush
@@ -49,7 +49,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
           raise EOFError, "Server stdout closed unexpectedly." if raw_line.nil?
         end
       end
-      MCPRuby.logger.debug "[<-TEST] #{raw_line.strip}"
+      VectorMCP.logger.debug "[<-TEST] #{raw_line.strip}"
       JSON.parse(raw_line)
     rescue Timeout::Error
       raise Timeout::Error, "Timeout waiting for response from server after #{timeout_seconds}s. Last read line: #{raw_line.inspect}"
@@ -59,7 +59,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       # Log stderr from server process to help diagnose crashes
       begin
         server_stderr = stderr.read unless stderr.closed?
-        MCPRuby.logger.error "Server stderr dump on EOFError:\n#{server_stderr}" if server_stderr && !server_stderr.empty?
+        VectorMCP.logger.error "Server stderr dump on EOFError:\n#{server_stderr}" if server_stderr && !server_stderr.empty?
       rescue IOError
         # Ignore IOError when trying to read from closed stderr
       end
@@ -75,14 +75,14 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     @server_stdin, @server_stdout, @server_stderr, @server_wait_thr = Open3.popen3("ruby", server_script)
     @server_pid = @server_wait_thr.pid
     @request_id = 0 # Reset request ID counter for each test
-    MCPRuby.logger.info "Started server process (PID: #{@server_pid}) for test."
+    VectorMCP.logger.info "Started server process (PID: #{@server_pid}) for test."
 
     # Optional: Small sleep to allow server to fully initialize (usually not needed for stdio)
     # sleep 0.1
   end
 
   after(:each) do
-    MCPRuby.logger.info "Stopping server process (PID: #{server_pid})."
+    VectorMCP.logger.info "Stopping server process (PID: #{server_pid})."
     begin
       # Close stdin first to signal EOF to server
       stdin.close if stdin && !stdin.closed?
@@ -95,17 +95,17 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
         Timeout.timeout(3) do
           wait_thr.join
         end
-        MCPRuby.logger.info "Server process (PID: #{server_pid}) terminated cleanly."
+        VectorMCP.logger.info "Server process (PID: #{server_pid}) terminated cleanly."
       rescue Timeout::Error
-        MCPRuby.logger.warn "Server process (PID: #{server_pid}) did not exit after TERM, sending KILL."
+        VectorMCP.logger.warn "Server process (PID: #{server_pid}) did not exit after TERM, sending KILL."
         Process.kill("KILL", server_pid)
         wait_thr.join # Wait again after KILL
       end
     rescue Errno::ESRCH
       # Process already exited, which is fine
-      MCPRuby.logger.info "Server process (PID: #{server_pid}) already exited."
+      VectorMCP.logger.info "Server process (PID: #{server_pid}) already exited."
     rescue StandardError => e
-      MCPRuby.logger.error "Error during server process cleanup: #{e.class}: #{e.message}"
+      VectorMCP.logger.error "Error during server process cleanup: #{e.class}: #{e.message}"
     ensure
       # Ensure pipes are closed even if errors occurred
       stdout.close if stdout && !stdout.closed?
@@ -116,7 +116,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     begin
       server_stderr_output = stderr.read unless stderr.closed?
       unless server_stderr_output.nil? || server_stderr_output.empty?
-        MCPRuby.logger.warn "Server stderr output during test:\n---\n#{server_stderr_output}\n---"
+        VectorMCP.logger.warn "Server stderr output during test:\n---\n#{server_stderr_output}\n---"
       end
     rescue IOError
       # Ignore IOError when trying to read from closed stderr
@@ -133,7 +133,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
         id: req_id,
         method: "initialize",
         params: {
-          protocolVersion: MCPRuby::Server::PROTOCOL_VERSION,
+          protocolVersion: VectorMCP::Server::PROTOCOL_VERSION,
           capabilities: {}, # Client capabilities (empty for test)
           clientInfo: { name: "RSpecClient", version: "1.0" }
         }
@@ -149,7 +149,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
                                                                   "resources" => { "subscribe" => false, "listChanged" => false },
                                                                   "prompts" => { "listChanged" => false },
                                                                   "experimental" => {} },
-                                              "serverInfo" => { "name" => "MCPRuby::ExampleServer", "version" => "0.0.1" }
+                                              "serverInfo" => { "name" => "VectorMCP::ExampleServer", "version" => "0.0.1" }
                                             })
 
       # 3. Send initialized notification
@@ -167,7 +167,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     before do
       # Perform handshake before each test in this context
       send_jsonrpc({ jsonrpc: "2.0", id: req_id, method: "initialize",
-                     params: { protocolVersion: MCPRuby::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
+                     params: { protocolVersion: VectorMCP::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
       read_jsonrpc # Consume initialize result
       send_jsonrpc({ jsonrpc: "2.0", method: "initialized", params: {} })
     end
@@ -185,7 +185,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     before do
       # Perform handshake
       send_jsonrpc({ jsonrpc: "2.0", id: req_id, method: "initialize",
-                     params: { protocolVersion: MCPRuby::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
+                     params: { protocolVersion: VectorMCP::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
       read_jsonrpc
       send_jsonrpc({ jsonrpc: "2.0", method: "initialized", params: {} })
     end
@@ -219,7 +219,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       expect(response["id"]).to eq(call_req[:id])
       expect(response["result"]["isError"]).to be false
       expect(response["result"]["content"]).to eq([
-                                                    { "type" => "text", "text" => "You said via MCPRuby: Integration Test!" }
+                                                    { "type" => "text", "text" => "You said via VectorMCP: Integration Test!" }
                                                   ])
     end
 
@@ -232,10 +232,10 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       }
       send_jsonrpc(call_req)
       response = read_jsonrpc
-      MCPRuby.logger.debug "Error response: #{response.inspect}"
+      VectorMCP.logger.debug "Error response: #{response.inspect}"
       expect(response["id"]).to eq(call_req[:id])
       expect(response).to include("error")
-      expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
+      expect(response["error"]["code"]).to eq(-32_001) # VectorMCP::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
       expect(response["error"]["data"]).to include("Tool not found: non_existent_tool")
     end
@@ -245,7 +245,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     before do
       # Perform handshake
       send_jsonrpc({ jsonrpc: "2.0", id: req_id, method: "initialize",
-                     params: { protocolVersion: MCPRuby::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
+                     params: { protocolVersion: VectorMCP::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
       read_jsonrpc
       send_jsonrpc({ jsonrpc: "2.0", method: "initialized", params: {} })
     end
@@ -296,7 +296,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       response = read_jsonrpc
       expect(response["id"]).to eq(read_req[:id])
       expect(response).to include("error")
-      expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
+      expect(response["error"]["code"]).to eq(-32_001) # VectorMCP::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
       expect(response["error"]["data"]).to include("Resource not found: memory://does/not/exist")
     end
@@ -306,7 +306,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     before do
       # Perform handshake
       send_jsonrpc({ jsonrpc: "2.0", id: req_id, method: "initialize",
-                     params: { protocolVersion: MCPRuby::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
+                     params: { protocolVersion: VectorMCP::Server::PROTOCOL_VERSION, capabilities: {}, clientInfo: {} } })
       read_jsonrpc
       send_jsonrpc({ jsonrpc: "2.0", method: "initialized", params: {} })
     end
@@ -341,7 +341,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       expect(response["result"]["description"]).to eq("Generates a simple greeting.")
       expect(response["result"]["messages"]).to eq([
                                                      { "role" => "user",
-                                                       "content" => { "type" => "text", "text" => "Greet RSpec using MCPRuby style." } },
+                                                       "content" => { "type" => "text", "text" => "Greet RSpec using VectorMCP style." } },
                                                      { "role" => "assistant",
                                                        "content" => { "type" => "text", "text" => "Alright, crafting a greeting for RSpec now." } }
                                                    ])
@@ -358,7 +358,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
       response = read_jsonrpc
       expect(response["id"]).to eq(get_req[:id])
       expect(response).to include("error")
-      expect(response["error"]["code"]).to eq(-32_001) # MCPRuby::NotFoundError code
+      expect(response["error"]["code"]).to eq(-32_001) # VectorMCP::NotFoundError code
       expect(response["error"]["message"]).to eq("Not Found")
       expect(response["error"]["data"]).to include("Prompt not found: non_existent_prompt")
     end
@@ -370,7 +370,7 @@ RSpec.describe "MCPRuby Server (Stdio Integration)" do
     it "returns a parse error for invalid JSON" do
       # Send raw invalid JSON string
       invalid_json_string = '{"jsonrpc": "2.0", "id": 1, "method": "test'
-      MCPRuby.logger.debug "[TEST->] #{invalid_json_string}"
+      VectorMCP.logger.debug "[TEST->] #{invalid_json_string}"
       stdin.puts(invalid_json_string)
       stdin.flush
 

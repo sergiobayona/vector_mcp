@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# lib/mcp_ruby/transport/stdio.rb
+# lib/vector_mcp/transport/stdio.rb
 require "json"
 require_relative "../errors"
 require_relative "../util"

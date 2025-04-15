@@ -5,11 +5,11 @@ require "async/http/client"
 require "async/http/endpoint"
 require "uri"
 
-require_relative "../../../lib/mcp_ruby/server"
+require_relative "../../../lib/vector_mcp/server"
 
-RSpec.describe MCPRuby::Transport::SSE do
+RSpec.describe VectorMCP::Transport::SSE do
   let(:app) do
-    MCPRuby::Server.new(
+    VectorMCP::Server.new(
       name: "test-server",
       transport: :sse
     )

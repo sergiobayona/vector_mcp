@@ -2,16 +2,16 @@
 
 require "spec_helper"
 
-RSpec.describe MCPRuby::Server do
+RSpec.describe VectorMCP::Server do
   let(:server_name) { "TestServer" }
   let(:server_version) { "1.0.0" }
-  let(:server) { MCPRuby::Server.new(name: server_name, version: server_version) }
+  let(:server) { VectorMCP::Server.new(name: server_name, version: server_version) }
 
   describe "#initialize" do
     it "sets the correct attributes" do
       expect(server.name).to eq(server_name)
       expect(server.version).to eq(server_version)
-      expect(server.protocol_version).to eq(MCPRuby::Server::PROTOCOL_VERSION)
+      expect(server.protocol_version).to eq(VectorMCP::Server::PROTOCOL_VERSION)
       expect(server.logger).to be_a(Logger)
     end
 
@@ -37,7 +37,7 @@ RSpec.describe MCPRuby::Server do
         &handler
       )
 
-      expect(server.tools[tool_name]).to be_a(MCPRuby::Definitions::Tool)
+      expect(server.tools[tool_name]).to be_a(VectorMCP::Definitions::Tool)
       expect(server.tools[tool_name].name).to eq(tool_name)
       expect(server.tools[tool_name].description).to eq(tool_description)
     end
@@ -77,7 +77,7 @@ RSpec.describe MCPRuby::Server do
         &handler
       )
 
-      expect(server.resources[uri]).to be_a(MCPRuby::Definitions::Resource)
+      expect(server.resources[uri]).to be_a(VectorMCP::Definitions::Resource)
       expect(server.resources[uri].uri).to eq(uri)
       expect(server.resources[uri].name).to eq(name)
     end
@@ -117,7 +117,7 @@ RSpec.describe MCPRuby::Server do
         &handler
       )
 
-      expect(server.prompts[name]).to be_a(MCPRuby::Definitions::Prompt)
+      expect(server.prompts[name]).to be_a(VectorMCP::Definitions::Prompt)
       expect(server.prompts[name].name).to eq(name)
       expect(server.prompts[name].description).to eq(description)
     end
@@ -227,7 +227,7 @@ RSpec.describe MCPRuby::Server do
   end
 
   describe "#handle_message" do
-    let(:session) { instance_double("MCPRuby::Session") }
+    let(:session) { instance_double("VectorMCP::Session") }
 
     context "with a valid request message" do
       let(:message) do
@@ -294,7 +294,7 @@ RSpec.describe MCPRuby::Server do
       it "raises an InvalidRequestError" do
         expect do
           server.handle_message(message, session, "test_session")
-        end.to raise_error(MCPRuby::InvalidRequestError, /Request object must include a 'method' member/)
+        end.to raise_error(VectorMCP::InvalidRequestError, /Request object must include a 'method' member/)
       end
     end
 
@@ -304,7 +304,7 @@ RSpec.describe MCPRuby::Server do
       it "raises an InvalidRequestError" do
         expect do
           server.handle_message(message, session, "test_session")
-        end.to raise_error(MCPRuby::InvalidRequestError, /Invalid message format/)
+        end.to raise_error(VectorMCP::InvalidRequestError, /Invalid message format/)
       end
     end
   end

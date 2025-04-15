@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe MCPRuby::Util do
+RSpec.describe VectorMCP::Util do
   describe ".convert_to_mcp_content" do
     context "with string input" do
       it "converts a single string to text content" do

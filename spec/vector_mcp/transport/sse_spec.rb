@@ -3,22 +3,22 @@
 require "spec_helper"
 require "rack/test" # For simulating requests
 require "async/queue" # For mocking client queue
-require "mcp_ruby/transport/sse"
-require "mcp_ruby/server" # Needed for the mock server
-require "mcp_ruby/definitions" # Corrected require path
-require "mcp_ruby/session" # Needed for mock session
+require "vector_mcp/transport/sse"
+require "vector_mcp/server" # Needed for the mock server
+require "vector_mcp/definitions" # Corrected require path
+require "vector_mcp/session" # Needed for mock session
 
-RSpec.describe MCPRuby::Transport::SSE do
+RSpec.describe VectorMCP::Transport::SSE do
   include Rack::Test::Methods # Include Rack::Test helpers
 
   let(:mock_logger) { instance_double(Logger, info: nil, debug: nil, warn: nil, error: nil, fatal: nil, :<< => nil) }
-  let(:mock_server_info) { instance_double("MCPRuby::ServerInfo", name: "TestServer", version: "0.1") }
-  let(:mock_resource_provider_options) { instance_double("MCPRuby::ResourceProviderOptions") }
-  let(:mock_server_capabilities) { instance_double("MCPRuby::ServerCapabilities", resources: mock_resource_provider_options) }
-  let(:mock_session) { instance_double(MCPRuby::Session) } # Mock session object
+  let(:mock_server_info) { instance_double("VectorMCP::ServerInfo", name: "TestServer", version: "0.1") }
+  let(:mock_resource_provider_options) { instance_double("VectorMCP::ResourceProviderOptions") }
+  let(:mock_server_capabilities) { instance_double("VectorMCP::ServerCapabilities", resources: mock_resource_provider_options) }
+  let(:mock_session) { instance_double(VectorMCP::Session) } # Mock session object
   let(:mock_mcp_server) do
     instance_double(
-      MCPRuby::Server,
+      VectorMCP::Server,
       logger: mock_logger,
       server_info: mock_server_info,
       server_capabilities: mock_server_capabilities,
@@ -72,7 +72,7 @@ RSpec.describe MCPRuby::Transport::SSE do
     it "responds with OK to the root path" do
       get "/"
       expect(last_response).to be_ok
-      expect(last_response.body).to eq("MCPRuby Server OK")
+      expect(last_response.body).to eq("VectorMCP Server OK")
     end
 
     # We won't test the full SSE connection via Rack::Test easily
@@ -205,14 +205,14 @@ RSpec.describe MCPRuby::Transport::SSE do
 
       it "enqueues a Parse Error (-32700) message" do
         # Allow the util to be called
-        allow(MCPRuby::Util).to receive(:extract_id_from_invalid_json).and_return(2)
+        allow(VectorMCP::Util).to receive(:extract_id_from_invalid_json).and_return(2)
         post "/test_mcp/message?session_id=#{session_id}", invalid_request_body, headers
         expect(transport).to have_received(:enqueue_error).with(mock_client_conn, 2, -32_700, "Parse error")
       end
     end
 
     context "when server.handle_message raises a ProtocolError" do
-      let(:protocol_error) { MCPRuby::MethodNotFoundError.new("test/method", request_id: request_id) }
+      let(:protocol_error) { VectorMCP::MethodNotFoundError.new("test/method", request_id: request_id) }
 
       before do
         allow(mock_mcp_server).to receive(:handle_message)

@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe MCPRuby::Session do
+RSpec.describe VectorMCP::Session do
   let(:server_info) { { name: "TestServer", version: "1.0.0" } }
   let(:server_capabilities) { { tools: { listChanged: true }, resources: { subscribe: true } } }
   let(:protocol_version) { "2024-11-05" }
@@ -65,7 +65,7 @@ RSpec.describe MCPRuby::Session do
       let(:client_params) { { "protocolVersion" => different_version } }
 
       it "logs a warning but still initializes" do
-        expect(MCPRuby.logger).to receive(:warn).with(
+        expect(VectorMCP.logger).to receive(:warn).with(
           "Client requested protocol version '#{different_version}', server using '#{protocol_version}'"
         )
 

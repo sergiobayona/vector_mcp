@@ -2,8 +2,8 @@
 
 require "spec_helper"
 
-RSpec.describe MCPRuby::Definitions do
-  describe MCPRuby::Definitions::Tool do
+RSpec.describe VectorMCP::Definitions do
+  describe VectorMCP::Definitions::Tool do
     subject(:tool) do
       described_class.new(tool_name, tool_description, tool_input_schema, tool_handler)
     end
@@ -36,7 +36,7 @@ RSpec.describe MCPRuby::Definitions do
     end
   end
 
-  describe MCPRuby::Definitions::Resource do
+  describe VectorMCP::Definitions::Resource do
     subject(:resource) do
       described_class.new(resource_uri, resource_name, resource_description, resource_mime_type, resource_handler)
     end
@@ -71,7 +71,7 @@ RSpec.describe MCPRuby::Definitions do
     end
   end
 
-  describe MCPRuby::Definitions::Prompt do
+  describe VectorMCP::Definitions::Prompt do
     subject(:prompt) do
       described_class.new(prompt_name, prompt_description, prompt_arguments, prompt_handler)
     end

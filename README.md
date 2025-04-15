@@ -1,13 +1,13 @@
-# MCPRuby
+# VectorMCP
 
 <!-- Badges (Add URLs later) -->
-[![Gem Version](https://badge.fury.io/rb/mcp_ruby.svg)](https://badge.fury.io/rb/mcp_ruby)
-[![Build Status](https://github.com/sergiobayona/mcp_ruby/actions/workflows/ruby.yml/badge.svg)](https://github.com/sergiobayona/mcp_ruby/actions/workflows/ruby.yml)
-[![Maintainability](https://api.codeclimate.com/v1/badges/YOUR_BADGE_ID/maintainability)](https://codeclimate.com/github/sergiobayona/mcp_ruby/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/YOUR_BADGE_ID/test_coverage)](https://codeclimate.com/github/sergiobayona/mcp_ruby/test_coverage)
+[![Gem Version](https://badge.fury.io/rb/vector_mcp.svg)](https://badge.fury.io/rb/vector_mcp)
+[![Build Status](https://github.com/sergiobayona/vector_mcp/actions/workflows/ruby.yml/badge.svg)](https://github.com/sergiobayona/vector_mcp/actions/workflows/ruby.yml)
+[![Maintainability](https://api.codeclimate.com/v1/badges/YOUR_BADGE_ID/maintainability)](https://codeclimate.com/github/sergiobayona/vector_mcp/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/YOUR_BADGE_ID/test_coverage)](https://codeclimate.com/github/sergiobayona/vector_mcp/test_coverage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-MCPRuby provides server-side tools for implementing the [Model Context Protocol (MCP)](https://modelcontext.dev/) in Ruby applications. MCP is a specification for how Large Language Models (LLMs) can discover and interact with external tools, resources, and prompts provided by separate applications (MCP Servers).
+VectorMCP provides server-side tools for implementing the [Model Context Protocol (MCP)](https://modelcontext.dev/) in Ruby applications. MCP is a specification for how Large Language Models (LLMs) can discover and interact with external tools, resources, and prompts provided by separate applications (MCP Servers).
 
 This library allows you to easily create MCP servers that expose your application's capabilities (like functions, data sources, or predefined prompt templates) to compatible LLM clients (e.g., Claude Desktop App, custom clients).
 
@@ -29,7 +29,7 @@ This library allows you to easily create MCP servers that expose your applicatio
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'mcp_ruby'
+gem 'vector_mcp'
 ```
 
 And then execute:
@@ -41,10 +41,10 @@ $ bundle install
 Or install it yourself as:
 
 ```bash
-$ gem install mcp_ruby
+$ gem install vector_mcp
 ```
 
-Note: The SSE transport requires additional gems (`async`, `async-http`, `falcon`, `rack`). These will be installed automatically if you install `mcp_ruby`.
+Note: The SSE transport requires additional gems (`async`, `async-http`, `falcon`, `rack`). These will be installed automatically if you install `vector_mcp`.
 
 ## Quick Start (Stdio Example)
 
@@ -54,13 +54,13 @@ This example creates a simple server that runs over standard input/output and pr
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'mcp_ruby'
+require 'vector_mcp'
 
 # Optional: Set log level (DEBUG, INFO, WARN, ERROR, FATAL)
-MCPRuby.logger.level = Logger::INFO
+VectorMCP.logger.level = Logger::INFO
 
 # 1. Create a server instance
-server = MCPRuby.new_server(name: "MySimpleStdioServer", version: "1.0")
+server = VectorMCP.new_server(name: "MySimpleStdioServer", version: "1.0")
 
 # 2. Register a tool
 server.register_tool(
@@ -86,9 +86,9 @@ end
 begin
   server.run(transport: :stdio)
 rescue Interrupt
-  MCPRuby.logger.info("Server stopped.")
+  VectorMCP.logger.info("Server stopped.")
 rescue StandardError => e
-  MCPRuby.logger.fatal("Server crashed: #{e.message}\n#{e.backtrace.join("\n")}")
+  VectorMCP.logger.fatal("Server crashed: #{e.message}\n#{e.backtrace.join("\n")}")
   exit 1
 end
 ```
@@ -115,7 +115,7 @@ end
     *   **(Server Responds with `simple_echo` tool definition)**
     *   **Call Tool:**
         ```json
-        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"simple_echo","arguments":{"message":"Hello MCPRuby!"}}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"simple_echo","arguments":{"message":"Hello VectorMCP!"}}}
         ```
     *   **(Server Responds with echo result)**
 
@@ -126,9 +126,9 @@ end
 Instantiate the server using the factory method:
 
 ```ruby
-require 'mcp_ruby'
+require 'vector_mcp'
 
-server = MCPRuby.new_server(
+server = VectorMCP.new_server(
   name: "MyAwesomeServer",
   version: "2.1.0",
   log_level: Logger::DEBUG # Optional: Default is INFO
@@ -160,8 +160,8 @@ end
 ```
 
 *   The `input_schema` must be a Hash representing a valid JSON Schema object describing the tool's expected arguments.
-*   The block receives the arguments hash and the `MCPRuby::Session` object.
-*   The block's return value is automatically converted into the MCP `content` array format by `MCPRuby::Util.convert_to_mcp_content`. You can return:
+*   The block receives the arguments hash and the `VectorMCP::Session` object.
+*   The block's return value is automatically converted into the MCP `content` array format by `VectorMCP::Util.convert_to_mcp_content`. You can return:
     *   A `String`: Becomes `{ type: 'text', text: '...' }`.
     *   A `Hash` matching the MCP content structure (`{ type: 'text', ... }`, `{ type: 'image', ... }`, etc.): Used as is.
     *   Other `Hash` objects: JSON-encoded into `{ type: 'text', text: '...', mimeType: 'application/json' }`.
@@ -200,7 +200,7 @@ server.register_resource(
 end
 ```
 
-*   The block receives the `MCPRuby::Session` object.
+*   The block receives the `VectorMCP::Session` object.
 *   Return `String` for text, or a binary `String` (`Encoding::ASCII_8BIT`) for binary data. Other types are generally JSON-encoded.
 
 ### Registering Prompts
@@ -301,13 +301,13 @@ end
 
 ## Architecture
 
-*   **`MCPRuby::Server`:** The main class. Manages registration, state, and dispatches incoming messages to appropriate handlers.
-*   **`MCPRuby::Transport::{Stdio, SSE}`:** Handle the specifics of communication over different channels (stdin/stdout or HTTP SSE). They read raw data, parse JSON, call `Server#handle_message`, and send back formatted JSON-RPC responses/errors.
-*   **`MCPRuby::Session`:** Holds state related to a specific client connection, primarily the initialization status and negotiated capabilities. Passed to handlers.
-*   **`MCPRuby::Definitions::{Tool, Resource, Prompt}`:** Simple structs holding registered capability information and handler blocks.
-*   **`MCPRuby::Handlers::Core`:** Contains default implementations for standard MCP methods.
-*   **`MCPRuby::Errors`:** Custom exception classes mapping to JSON-RPC error codes.
-*   **`MCPRuby::Util`:** Utility functions.
+*   **`VectorMCP::Server`:** The main class. Manages registration, state, and dispatches incoming messages to appropriate handlers.
+*   **`VectorMCP::Transport::{Stdio, SSE}`:** Handle the specifics of communication over different channels (stdin/stdout or HTTP SSE). They read raw data, parse JSON, call `Server#handle_message`, and send back formatted JSON-RPC responses/errors.
+*   **`VectorMCP::Session`:** Holds state related to a specific client connection, primarily the initialization status and negotiated capabilities. Passed to handlers.
+*   **`VectorMCP::Definitions::{Tool, Resource, Prompt}`:** Simple structs holding registered capability information and handler blocks.
+*   **`VectorMCP::Handlers::Core`:** Contains default implementations for standard MCP methods.
+*   **`VectorMCP::Errors`:** Custom exception classes mapping to JSON-RPC error codes.
+*   **`VectorMCP::Util`:** Utility functions.
 
 ## Development
 
@@ -330,11 +330,11 @@ After checking out the repo:
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/mcp_ruby/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/vector_mcp/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at [https://github.com/sergiobayona/mcp_ruby](https://github.com/sergiobayona/mcp_ruby).
+Bug reports and pull requests are welcome on GitHub at [https://github.com/sergiobayona/vector_mcp](https://github.com/sergiobayona/vector_mcp).
 
 ## License
 

@@ -3,10 +3,10 @@
 require "spec_helper"
 require "stringio"
 
-RSpec.describe MCPRuby::Transport::Stdio do
-  let(:server) { instance_double("MCPRuby::Server") }
+RSpec.describe VectorMCP::Transport::Stdio do
+  let(:server) { instance_double("VectorMCP::Server") }
   let(:logger) { instance_double("Logger") }
-  let(:session) { instance_double("MCPRuby::Session") }
+  let(:session) { instance_double("VectorMCP::Session") }
   let(:server_info) { { name: "test", version: "1.0.0" } }
   let(:server_capabilities) { { tools: { listChanged: false } } }
   let(:protocol_version) { "2024-11-05" }
@@ -23,7 +23,7 @@ RSpec.describe MCPRuby::Transport::Stdio do
     allow(server).to receive(:server_info).and_return(server_info)
     allow(server).to receive(:server_capabilities).and_return(server_capabilities)
     allow(server).to receive(:protocol_version).and_return(protocol_version)
-    allow(MCPRuby::Session).to receive(:new).and_return(session)
+    allow(VectorMCP::Session).to receive(:new).and_return(session)
   end
 
   describe "#initialize" do
@@ -233,7 +233,7 @@ RSpec.describe MCPRuby::Transport::Stdio do
 
     it "handles protocol errors" do
       allow(server).to receive(:handle_message).and_raise(
-        MCPRuby::ProtocolError.new("Protocol error", code: -32_600, request_id: "123")
+        VectorMCP::ProtocolError.new("Protocol error", code: -32_600, request_id: "123")
       )
 
       transport.send(:handle_json_message, '{"id": "123", "method": "test"}', session)

@@ -2,14 +2,14 @@
 
 require "spec_helper"
 
-RSpec.describe "MCPRuby Errors" do
-  describe MCPRuby::Error do
+RSpec.describe "VectorMCP Errors" do
+  describe VectorMCP::Error do
     it "is a subclass of StandardError" do
       expect(described_class).to be < StandardError
     end
   end
 
-  describe MCPRuby::ProtocolError do
+  describe VectorMCP::ProtocolError do
     let(:message) { "Test error message" }
     let(:code) { -32_000 }
     let(:request_id) { "123" }
@@ -19,8 +19,8 @@ RSpec.describe "MCPRuby Errors" do
       described_class.new(message, code: code, request_id: request_id, details: details)
     end
 
-    it "is a subclass of MCPRuby::Error" do
-      expect(described_class).to be < MCPRuby::Error
+    it "is a subclass of VectorMCP::Error" do
+      expect(described_class).to be < VectorMCP::Error
     end
 
     it "has the correct attributes" do
@@ -43,12 +43,12 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::ParseError do
+  describe VectorMCP::ParseError do
     let(:request_id) { "123" }
     let(:details) { { line: 42 } }
 
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -69,9 +69,9 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::InvalidRequestError do
+  describe VectorMCP::InvalidRequestError do
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -85,11 +85,11 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::MethodNotFoundError do
+  describe VectorMCP::MethodNotFoundError do
     let(:method_name) { "nonexistent_method" }
 
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -108,9 +108,9 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::InvalidParamsError do
+  describe VectorMCP::InvalidParamsError do
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -124,9 +124,9 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::InternalError do
+  describe VectorMCP::InternalError do
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -140,14 +140,14 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::ServerError do
+  describe VectorMCP::ServerError do
     let(:message) { "Custom server error" }
     let(:code) { -32_000 }
     let(:request_id) { "123" }
     let(:details) { { error: "details" } }
 
     it "is a subclass of ProtocolError" do
-      expect(described_class).to be < MCPRuby::ProtocolError
+      expect(described_class).to be < VectorMCP::ProtocolError
     end
 
     it "has the correct default message" do
@@ -169,9 +169,9 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::InitializationError do
+  describe VectorMCP::InitializationError do
     it "is a subclass of ServerError" do
-      expect(described_class).to be < MCPRuby::ServerError
+      expect(described_class).to be < VectorMCP::ServerError
     end
 
     it "has the correct default message" do
@@ -185,9 +185,9 @@ RSpec.describe "MCPRuby Errors" do
     end
   end
 
-  describe MCPRuby::NotFoundError do
+  describe VectorMCP::NotFoundError do
     it "is a subclass of ServerError" do
-      expect(described_class).to be < MCPRuby::ServerError
+      expect(described_class).to be < VectorMCP::ServerError
     end
 
     it "has the correct default message" do
