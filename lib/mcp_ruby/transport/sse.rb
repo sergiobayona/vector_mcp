@@ -136,17 +136,7 @@ module MCPRuby
             # 1. Send the initial endpoint event
             body.write("event: endpoint\ndata: #{message_post_url}\n\n")
 
-            # 2. Start sending keep-alive comments periodically
-            keep_alive_task = task.async do
-              loop do
-                task.sleep(15) # Send keep-alive every 15 seconds
-                body.write(": keep-alive\n\n")
-              rescue Async::Stop, IOError, Errno::EPIPE
-                break # Stop if the main task stops or connection breaks
-              end
-            end
-
-            # 3. Listen on the client's queue and send messages
+            # 2. Listen on the client's queue and send messages
             while (message = client_queue.dequeue)
               json_message = message.to_json # Expecting fully formed JSON-RPC hash
               logger.debug { "[SSE #{session_id}] Sending message: #{json_message.inspect}" }
@@ -157,7 +147,6 @@ module MCPRuby
           rescue StandardError => e
             logger.error("Error in SSE task for client #{session_id}: #{e.message}\n#{e.backtrace.join("\n")}")
           ensure
-            keep_alive_task&.stop # Stop the keep-alive timer
             body.finish # Signal end of stream to Falcon
             client_queue.close # Close the queue
             # Remove client connection info
