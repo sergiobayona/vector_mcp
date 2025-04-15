@@ -18,8 +18,8 @@ module VectorMCP
         if input[:type] || input["type"] # Already in content format
           [input.transform_keys(&:to_sym)]
         else
-          # Treat as a rich content object
-          [input.transform_keys(&:to_sym)]
+          # Treat as JSON content
+          [{ type: "text", text: input.to_json, mimeType: "application/json" }]
         end
       when Array
         if input.all? { |item| item.is_a?(Hash) && (item[:type] || item["type"]) }
@@ -40,8 +40,14 @@ module VectorMCP
     # Used mainly for reporting errors on parse failures
     def extract_id_from_invalid_json(json_string)
       # Try to find id field with various formats: "id": 123, "id":"abc", "id": "abc", etc.
-      if (match = json_string.match(/"id"\s*:\s*(?:"([^"]+)"|(\d+))/))
-        match[1] || match[2] # Return the string or number match
+      if json_string.match?(/"id"\s*:\s*\d+/)
+        # Handle numeric IDs
+        if (match = json_string.match(/"id"\s*:\s*(\d+)/))
+          match[1].to_i
+        end
+      elsif (match = json_string.match(/"id"\s*:\s*"((?:\\.|[^"])*)"/))
+        # Handle string IDs and preserve escaping
+        match[1]
       else
         nil
       end
