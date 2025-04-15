@@ -7,14 +7,14 @@ RSpec.describe VectorMCP::Util do
     context "with string input" do
       it "converts a single string to text content" do
         result = described_class.convert_to_mcp_content("Hello World")
-        expect(result).to eq([{ type: "text", text: "Hello World" }])
+        expect(result).to eq([{ type: "text", text: "Hello World", mimeType: "text/plain" }])
       end
 
       it "converts an array of strings to text content" do
         result = described_class.convert_to_mcp_content(%w[Hello World])
         expect(result).to eq([
-                               { type: "text", text: "Hello" },
-                               { type: "text", text: "World" }
+                               { type: "text", text: "Hello", mimeType: "text/plain" },
+                               { type: "text", text: "World", mimeType: "text/plain" }
                              ])
       end
     end
@@ -43,25 +43,25 @@ RSpec.describe VectorMCP::Util do
       it "converts binary data to text content" do
         binary_data = String.new("binary\x00data").force_encoding(Encoding::ASCII_8BIT)
         result = described_class.convert_to_mcp_content(binary_data)
-        expect(result).to eq([{ type: "text", text: binary_data }])
+        expect(result).to eq([{ type: "text", text: binary_data, mimeType: "text/plain" }])
       end
     end
 
     context "with other input types" do
       it "converts numbers to text" do
         result = described_class.convert_to_mcp_content(42)
-        expect(result).to eq([{ type: "text", text: "42" }])
+        expect(result).to eq([{ type: "text", text: "42", mimeType: "text/plain" }])
       end
 
       it "converts nil to text" do
         result = described_class.convert_to_mcp_content(nil)
-        expect(result).to eq([{ type: "text", text: "" }])
+        expect(result).to eq([{ type: "text", text: "", mimeType: "text/plain" }])
       end
 
       it "converts custom objects to text" do
         custom_obj = Class.new { def to_s = "custom" }.new
         result = described_class.convert_to_mcp_content(custom_obj)
-        expect(result).to eq([{ type: "text", text: "custom" }])
+        expect(result).to eq([{ type: "text", text: "custom", mimeType: "text/plain" }])
       end
     end
   end
