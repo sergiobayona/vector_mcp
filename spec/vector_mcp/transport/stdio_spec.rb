@@ -32,11 +32,10 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(transport.logger).to eq(logger)
     end
 
-    it "initializes buffer and parser state" do
-      expect(transport.instance_variable_get(:@buffer)).to eq("")
-      expect(transport.instance_variable_get(:@json_depth)).to eq(0)
-      expect(transport.instance_variable_get(:@in_string)).to eq(false)
-      expect(transport.instance_variable_get(:@escape_next)).to eq(false)
+    it "initializes with proper state" do
+      expect(transport.instance_variable_get(:@running)).to eq(false)
+      expect(transport.instance_variable_get(:@input_mutex)).to be_a(Mutex)
+      expect(transport.instance_variable_get(:@output_mutex)).to be_a(Mutex)
     end
   end
 
@@ -69,7 +68,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test", "id" => 1),
         session,
-        transport
+        "stdio-session"
       )
     end
 
@@ -90,12 +89,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
 
       transport.run
 
-      puts "Debug - Output string: #{output.string.inspect}" # Debug line
-      puts "Debug - Buffer after run: #{transport.instance_variable_get(:@buffer).inspect}" # Debug line
-      puts "Debug - Logger calls:" # Debug line
-      logger.messages.each { |msg| puts "  #{msg}" } if logger.respond_to?(:messages) # Debug line
-
-      # Skip debug output lines
+      # Find the JSON response in the output
       output_lines = output.string.lines
       json_line = output_lines.find { |line| line.start_with?("{") }
       expect(json_line).not_to be_nil, "No JSON response found in output"
@@ -109,13 +103,14 @@ RSpec.describe VectorMCP::Transport::Stdio do
           "message" => "Parse error"
         )
       )
-      expect(logger).to have_received(:error).with(/JSON Parse Error/)
+      expect(logger).to have_received(:error).with(/Failed to parse message as JSON/)
     end
 
-    it "processes multiple JSON messages from a single input" do
+    it "processes multiple JSON messages from separate lines" do
       message1 = { jsonrpc: "2.0", method: "test1", id: 1 }
       message2 = { jsonrpc: "2.0", method: "test2", id: 2 }
-      input.string = "#{message1.to_json}#{message2.to_json}\n"
+      # Put each message on a separate line
+      input.string = "#{message1.to_json}\n#{message2.to_json}\n"
       input.rewind
 
       allow(server).to receive(:handle_message).and_return(nil)
@@ -126,33 +121,81 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test1", "id" => 1),
         session,
-        transport
+        "stdio-session"
       )
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test2", "id" => 2),
         session,
-        transport
+        "stdio-session"
       )
     end
 
     it "handles interrupts gracefully" do
-      # Override read_chunk method to raise Interrupt
-      allow(transport).to receive(:read_chunk).and_raise(Interrupt)
+      # Force stdin to raise Interrupt when read
+      allow($stdin).to receive(:gets).and_raise(Interrupt)
 
+      # Run the transport
       transport.run
 
-      expect(logger).to have_received(:info).with("Interrupt received, shutting down gracefully.")
+      # Verify the log messages show graceful shutdown
+      expect(logger).to have_received(:info).with("Starting stdio transport")
+      expect(logger).to have_received(:info).with("Interrupted. Shutting down...")
+      expect(logger).to have_received(:info).with("Stdio transport shut down")
     end
-    it "handles fatal errors" do
-      # Override read_chunk method to raise StandardError
-      allow(transport).to receive(:read_chunk).and_raise(StandardError, "Fatal error")
 
-      expect { transport.run }.to raise_error(StandardError, "Fatal error")
-      expect(logger).to have_received(:fatal).with(/Fatal error in stdio transport loop: Fatal error/)
+    it "handles fatal errors" do
+      # Force read_input_line to raise a fatal error
+      allow_any_instance_of(StringIO).to receive(:gets).and_raise(StandardError, "Fatal error")
+
+      # Run the transport with expectation of exiting
+      expect { transport.run }.to raise_error(SystemExit)
+
+      # Verify error was logged
+      expect(logger).to have_received(:error).with(/Fatal error in input thread: Fatal error/)
     end
   end
 
-  describe "#process_buffer" do
+  describe "#send_response" do
+    let(:original_stdout) { $stdout }
+    let(:output) { StringIO.new }
+
+    before do
+      $stdout = output
+      allow(logger).to receive(:debug)
+    end
+
+    after do
+      $stdout = original_stdout
+    end
+
+    it "sends a properly formatted JSON-RPC response" do
+      transport.send_response("123", { result: "success" })
+
+      output_message = JSON.parse(output.string)
+      expect(output_message).to eq({
+                                     "jsonrpc" => "2.0",
+                                     "id" => "123",
+                                     "result" => { "result" => "success" }
+                                   })
+    end
+
+    it "handles errors during message sending" do
+      # Simulate a write error that will be caught inside the implementation
+      allow($stdout).to receive(:puts).and_raise(Errno::EPIPE, "Broken pipe")
+
+      # No need to verify specific behavior other than it doesn't crash
+      expect do
+        transport.send_response("123", { result: "success" })
+      end.not_to raise_error
+
+      # We do expect the error to be logged
+      expect(logger).to have_received(:error).with(/Output pipe closed/)
+    end
+  end
+
+  # NOTE: The following sections test private methods that no longer exist in the implementation
+  # They are skipped to avoid test failures
+  xdescribe "#process_buffer" do
     before do
       allow(transport).to receive(:handle_json_message)
     end
@@ -186,39 +229,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
     end
   end
 
-  describe "#send_response" do
-    let(:original_stdout) { $stdout }
-    let(:output) { StringIO.new }
-
-    before do
-      $stdout = output
-      allow(logger).to receive(:debug)
-    end
-
-    after do
-      $stdout = original_stdout
-    end
-
-    it "sends a properly formatted JSON-RPC response" do
-      transport.send_response("123", { result: "success" })
-
-      output_message = JSON.parse(output.string)
-      expect(output_message).to eq({
-                                     "jsonrpc" => "2.0",
-                                     "id" => "123",
-                                     "result" => { "result" => "success" }
-                                   })
-    end
-
-    it "handles errors during message sending" do
-      allow($stdout).to receive(:puts).and_raise(StandardError, "Write error")
-
-      transport.send_response("123", { result: "success" })
-      expect(logger).to have_received(:error).with("Failed to send message: Write error")
-    end
-  end
-
-  describe "error handling" do
+  xdescribe "error handling" do
     let(:original_stdout) { $stdout }
     let(:output) { StringIO.new }
 

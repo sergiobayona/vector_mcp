@@ -15,13 +15,17 @@ server = VectorMCP::Server.new(
 
 # Register a tool that echoes back the input
 server.register_tool(
-  name: "ruby_echo",
+  name: "echo",
   description: "Echos back the message that was sent",
-  parameters: {
-    message: { type: :string, description: "Message to echo back" }
+  input_schema: {
+    type: "object",
+    properties: {
+      input: { type: "string", description: "Message to echo back" }
+    },
+    required: ["input"]
   }
 ) do |params|
-  "You said via VectorMCP: #{params[:message]}"
+  "You said via VectorMCP: #{params[:input]}"
 end
 
 # Register an in-memory resource
@@ -37,9 +41,9 @@ end
 server.register_prompt(
   name: "simple_greeting",
   description: "Generates a simple greeting for the given name",
-  parameters: {
-    name: { type: :string, description: "Name to greet" }
-  }
+  arguments: [
+    { name: "name", type: "string", description: "Name to greet" }
+  ]
 ) do |params|
   [
     { role: "system", content: { text: "You are a friendly assistant." } },
@@ -52,7 +56,7 @@ end
 port = ENV["PORT"]&.to_i || 7464
 begin
   puts "Starting VectorMCP HTTP server on port #{port}..."
-  server.start_http(port: port)
+  server.run(transport: :sse, options: { port: port, host: "localhost", path_prefix: "/invoke" })
 rescue Interrupt
   puts "Server interrupted"
   exit 0

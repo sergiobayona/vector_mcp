@@ -168,7 +168,7 @@ module VectorMCP
       end
     end
 
-    def handle_notification(method, params, session, _transport)
+    def handle_notification(method, params, session)
       # Special handling for 'initialized' is now within the handler itself
       unless session.initialized? && method != "initialized"
         # Allow 'initialized' even if session state isn't formally true yet on server-side
