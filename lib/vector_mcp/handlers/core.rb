@@ -85,8 +85,8 @@ module VectorMCP
 
         arguments = params["arguments"] || {}
         begin
-          prompt.handler.call(arguments, server)
-          # Return the prompt result directly - it should conform to the prompt result format
+          # Return the prompt definition
+          prompt.as_mcp_definition
         rescue StandardError => e
           { isError: true, message: "Error processing prompt: #{e.message}" }
         end
