@@ -64,9 +64,8 @@ module VectorMCP
   class ServerError < ProtocolError
     def initialize(message = "Server error", code: -32_000, details: nil, request_id: nil)
       VectorMCP.logger.debug("Initializing ServerError with code: #{code}")
-      # Ensure the code is within the reserved range
-      unless (-32_000..-32_099).cover?(code)
-        warn "Server error code #{code} is outside of the reserved range (-32000 to -32099). Using -32000 instead."
+      unless (-32_099..-32_000).cover?(code)
+        warn "Server error code #{code} is outside of the reserved range (-32099 to -32000). Using -32000 instead."
         code = -32_000
       end
       # Pass all arguments including the (potentially corrected) code to super
