@@ -194,8 +194,8 @@ RSpec.describe VectorMCP::Transport::SSE do
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["code"]).to eq(-32_700) # Parse Error
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Parse error")
-        # The util tries to extract id, might be nil or the extracted value
-        expect(JSON.parse(last_response.body)["id"]).to eq(2)
+        # ID extracted from invalid JSON should be a string
+        expect(JSON.parse(last_response.body)["id"]).to eq("2") # Expect string "2"
       end
 
       it "does not call server handle_message" do

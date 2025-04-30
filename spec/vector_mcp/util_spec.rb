@@ -86,13 +86,13 @@ RSpec.describe VectorMCP::Util do
 
     context "with numeric IDs" do
       it "extracts numeric ID from valid JSON" do
-        json = '{"id": 123, "method": "test"}'
-        expect(described_class.extract_id_from_invalid_json(json)).to eq(123)
+        json = '{"jsonrpc": "2.0", "id": 123, "method": "test"}'
+        expect(described_class.extract_id_from_invalid_json(json)).to eq("123")
       end
 
       it "handles whitespace around numeric ID" do
         json = '{"id" : 123 , "method": "test"}'
-        expect(described_class.extract_id_from_invalid_json(json)).to eq(123)
+        expect(described_class.extract_id_from_invalid_json(json)).to eq("123")
       end
     end
 
