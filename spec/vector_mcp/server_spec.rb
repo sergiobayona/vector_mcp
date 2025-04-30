@@ -354,7 +354,10 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "logs the original error" do
-        expect(server.logger).to receive(:error).with(/Unhandled error during request 'broken_method': #{error_message}/)
+        # Use match to check the beginning of the log message including the ID,
+        # ignoring the potentially long backtrace.
+        log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
+        expect(server.logger).to receive(:error).with(match(log_pattern))
         expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
       end
     end
