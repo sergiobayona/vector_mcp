@@ -149,12 +149,15 @@ module VectorMCP
         logger.error("Error class: #{e.class}")
         logger.error("Error details: #{e.details.inspect}")
         request_id = begin
+          # Prioritize request_id attached to the error, fall back to message id
           e.request_id || message["id"]
         rescue StandardError
-          nil
+          # If message parsing failed AND error has no id, request_id is nil
+          e.request_id
         end
         logger.error("Sending error response with code: #{e.code}")
-        send_error(request_id, e.code, e.message, e.details.empty? ? nil : e.details)
+        # Pass e.details directly; send_error handles nil data correctly
+        send_error(request_id, e.code, e.message, e.details)
       rescue StandardError => e # Catch all other errors
         logger.error("Error handling message: #{e.message}")
         logger.error(e.backtrace.join("\n"))

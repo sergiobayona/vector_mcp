@@ -20,7 +20,9 @@ RSpec.describe VectorMCP::Session do
       expect(session.server_info).to eq(server_info)
       expect(session.server_capabilities).to eq(server_capabilities)
       expect(session.protocol_version).to eq(protocol_version)
-      expect(session.client_capabilities).to eq({})
+      expect(session.initialized?).to be false
+      expect(session.client_info).to be_nil
+      expect(session.client_capabilities).to be_nil
     end
 
     it "starts in uninitialized state" do
