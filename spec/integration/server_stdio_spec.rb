@@ -219,7 +219,8 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       expect(response["id"]).to eq(call_req[:id])
       expect(response["result"]["isError"]).to be false
       expect(response["result"]["content"]).to eq([
-                                                    { "type" => "text", "text" => "You said via VectorMCP: Integration Test!" }
+                                                    { "type" => "text", "text" => "You said via VectorMCP: Integration Test!",
+                                                      "mimeType" => "text/plain" }
                                                   ])
     end
 
