@@ -154,14 +154,15 @@ module VectorMCP
         # Handler is expected to return the result hash
         result = handler.call(params, session, self)
         result # Return the result hash
-      # Catch application-level errors defined in handlers/core or user code
-      rescue VectorMCP::NotFoundError, VectorMCP::InvalidParamsError
-        raise # Re-raise known protocol errors to be handled by caller
+      # Re-raise known protocol errors to be handled by caller
+      rescue VectorMCP::NotFoundError, VectorMCP::InvalidParamsError, VectorMCP::InternalError
+        raise # Re-raise known protocol errors (including those from handlers)
       rescue StandardError => e
-        logger.error("Error executing request '#{method}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
-        # Wrap unexpected errors in InternalError
-        raise VectorMCP::InternalError.new("Request handler failed", request_id: id,
-                                                                     details: { method: method, error: e.message, backtrace: e.backtrace.first(5) })
+        # Log the detailed error for server-side debugging
+        logger.error("Unhandled error during request '#{method}': #{e.message}\n#{e.backtrace.join("\n")}")
+        # Wrap unexpected errors in InternalError, but limit client-facing details
+        raise VectorMCP::InternalError.new("Request handler failed unexpectedly", request_id: id,
+                                                                                  details: { method: method, error: "An internal error occurred" })
       ensure
         # Still remove tracking *after* handler execution (success or raise)
         @in_flight_requests.delete(id)

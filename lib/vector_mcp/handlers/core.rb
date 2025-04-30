@@ -37,10 +37,8 @@ module VectorMCP
             content: VectorMCP::Util.convert_to_mcp_content(result)
           }
         rescue StandardError => e
-          {
-            isError: true,
-            content: [{ type: "text", text: "Error executing tool: #{e.message}" }]
-          }
+          server.logger.error("Error executing tool '#{tool_name}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+          raise VectorMCP::InternalError.new("Tool execution failed", details: { tool: tool_name, error: e.message })
         end
       end
 
@@ -66,7 +64,8 @@ module VectorMCP
           end
           { contents: contents }
         rescue StandardError => e
-          { isError: true, message: "Error reading resource: #{e.message}" }
+          server.logger.error("Error reading resource '#{uri_s}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+          raise VectorMCP::InternalError.new("Resource read failed", details: { uri: uri_s, error: e.message })
         end
       end
 
@@ -88,15 +87,16 @@ module VectorMCP
           # Return the prompt definition
           prompt.as_mcp_definition
         rescue StandardError => e
-          { isError: true, message: "Error processing prompt: #{e.message}" }
+          server.logger.error("Error processing prompt '#{prompt_name}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+          raise VectorMCP::InternalError.new("Prompt processing failed", details: { prompt: prompt_name, error: e.message })
         end
       end
 
       # --- Notification Handlers ---
 
       # Handle initialized notification (mark session as ready)
-      def self.initialized_notification(_params, session, _server)
-        # Additional initialization logic could go here
+      def self.initialized_notification(_params, session, server)
+        server.logger.info("Session initialized")
       end
 
       # Handle cancelation notification
