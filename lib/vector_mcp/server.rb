@@ -155,12 +155,17 @@ module VectorMCP
         result = handler.call(params, session, self)
         result # Return the result hash
       # Re-raise known protocol errors to be handled by caller
+      # Note: InternalError raised *explicitly* within handlers (e.g. for invalid structure)
+      # will also be caught here and re-raised.
       rescue VectorMCP::NotFoundError, VectorMCP::InvalidParamsError, VectorMCP::InternalError
-        raise # Re-raise known protocol errors (including those from handlers)
+        # Ensure request_id is attached if missing (though usually set at source)
+        raise $! if $!.request_id == id
+
+        raise $!.class.new($!.message, details: $!.details, request_id: id)
       rescue StandardError => e
         # Log the detailed error for server-side debugging
-        logger.error("Unhandled error during request '#{method}': #{e.message}\n#{e.backtrace.join("\n")}")
-        # Wrap unexpected errors in InternalError, but limit client-facing details
+        logger.error("Unhandled error during request '#{method}' (ID: #{id}): #{e.message}\n#{e.backtrace.join("\n")}")
+        # Wrap unexpected errors (like those from handlers) in InternalError, including the request_id
         raise VectorMCP::InternalError.new("Request handler failed unexpectedly", request_id: id,
                                                                                   details: { method: method, error: "An internal error occurred" })
       ensure
