@@ -146,11 +146,14 @@ module VectorMCP
         send_error(id, -32_700, "Parse error")
       rescue VectorMCP::ProtocolError => e # Catch specific protocol errors
         logger.error("Protocol error: #{e.message} (code: #{e.code})")
+        logger.error("Error class: #{e.class}")
+        logger.error("Error details: #{e.details.inspect}")
         request_id = begin
           e.request_id || message["id"]
         rescue StandardError
           nil
         end
+        logger.error("Sending error response with code: #{e.code}")
         send_error(request_id, e.code, e.message, e.details.empty? ? nil : e.details)
       rescue StandardError => e # Catch all other errors
         logger.error("Error handling message: #{e.message}")

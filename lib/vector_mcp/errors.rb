@@ -9,11 +9,12 @@ module VectorMCP
     attr_reader :code, :message, :data, :request_id
 
     def initialize(message, code: -32_600, details: nil, request_id: nil)
-      super(message)
+      VectorMCP.logger.debug("Initializing ProtocolError with code: #{code}")
       @code = code
       @message = message
       @details = details
       @request_id = request_id
+      super(message)
     end
 
     def details
@@ -61,6 +62,7 @@ module VectorMCP
   # Server error (-32000 to -32099): Reserved for implementation-defined server-errors.
   class ServerError < ProtocolError
     def initialize(message = "Server error", code: -32_000, details: nil, request_id: nil)
+      VectorMCP.logger.debug("Initializing ServerError with code: #{code}")
       # Ensure the code is within the reserved range
       unless (-32_000..-32_099).cover?(code)
         warn "Server error code #{code} is outside of the reserved range (-32000 to -32099). Using -32000 instead."
@@ -78,8 +80,9 @@ module VectorMCP
   end
 
   # Not Found (-32001): Requested resource not found.
-  class NotFoundError < ServerError
+  class NotFoundError < ProtocolError
     def initialize(message = "Not Found", details: nil, request_id: nil)
+      VectorMCP.logger.debug("Initializing NotFoundError with code: -32001")
       super(message, code: -32_001, details: details, request_id: request_id)
     end
   end

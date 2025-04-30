@@ -41,9 +41,9 @@ module VectorMCP
     def extract_id_from_invalid_json(json_string)
       # Try to find id field with various formats: "id": 123, "id":"abc", "id": "abc", etc.
       if json_string.match?(/"id"\s*:\s*\d+/)
-        # Handle numeric IDs
+        # Handle numeric IDs - preserve as string
         if (match = json_string.match(/"id"\s*:\s*(\d+)/))
-          match[1].to_i
+          match[1]
         end
       elsif (match = json_string.match(/"id"\s*:\s*"((?:\\.|[^"])*)"/))
         # Handle string IDs and preserve escaping
