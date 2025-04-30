@@ -5,13 +5,10 @@ require "securerandom"
 require "async"
 require "async/http/endpoint"
 require "async/http/body/writable"
+require "protocol/http/response"
+require "protocol/http/headers"
 require "falcon/server"
 require "falcon/endpoint"
-# Removed Rack requires
-# require "rack/builder"
-# require "rack/static"
-# require "rack/common_logger"
-# require "rack/lint"
 
 require_relative "../errors"
 require_relative "../util"
@@ -74,8 +71,8 @@ module VectorMCP
           end
 
           logger.info("Falcon server starting on #{endpoint.url}")
-          # Pass the transport instance (self) directly, no middleware wrapper needed
-          falcon_server = Falcon::Server.new(app, endpoint)
+          # Pass the transport instance (self) wrapped in standard middleware
+          falcon_server = Falcon::Server.new(Falcon::Server.middleware(app), endpoint)
           falcon_server.run
           logger.info("Falcon server stopped.")
         ensure
@@ -105,7 +102,7 @@ module VectorMCP
 
         logger.info "Received #{method} request for #{path}"
 
-        status, headers, body =
+        status, headers_hash, body =
           case path
           when @sse_path
             handle_sse_connection(env, @session)
@@ -122,12 +119,17 @@ module VectorMCP
         duration = format("%.4f", Time.now - start_time)
         logger.info "Responded #{status} to #{method} #{path} in #{duration}s"
 
-        # Return the standard Rack triplet
-        [status, headers, body]
+        # Return a Protocol::HTTP::Response object with Protocol::HTTP::Headers
+        Protocol::HTTP::Response.new(status, Protocol::HTTP::Headers.new(headers_hash), body)
       rescue StandardError => e
         # Generic error handler for unexpected issues in routing/handling
         logger.error("Error during SSE request handling for #{method} #{path}: #{e.message}\n#{e.backtrace.join("\n")}")
-        [500, { "Content-Type" => "text/plain" }, ["Internal Server Error"]]
+        # Return a 500 Protocol::HTTP::Response object
+        Protocol::HTTP::Response.new(
+          500,
+          Protocol::HTTP::Headers.new({ "Content-Type" => "text/plain", "connection" => "close" }),
+          ["Internal Server Error"]
+        )
       end
 
       # --- Public methods for Server to call (if needed, though typically handled internally) ---

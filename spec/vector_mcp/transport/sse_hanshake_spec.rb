@@ -33,8 +33,8 @@ RSpec.describe VectorMCP::Transport::SSE do
   # Instantiate the SSE Transport itself
   let(:sse_transport) { described_class.new(mock_mcp_server) }
 
-  # Get the Rack app from the transport
-  let(:rack_app) { sse_transport.send(:build_rack_app, mock_session) }
+  # The Rack app IS the transport instance now
+  let(:rack_app) { sse_transport }
 
   let(:endpoint) { Async::HTTP::Endpoint.parse("http://localhost:9293") }
 
