@@ -379,9 +379,11 @@ RSpec.describe VectorMCP::Server do
           server.handle_message(message, session, session_id)
         end.to raise_error(VectorMCP::InternalError) do |e|
           expect(e.code).to eq(-32_603)
-          expect(e.message).to eq("Tool execution failed")
+          # Error now caught by the generic handler in Server#handle_request
+          expect(e.message).to eq("Request handler failed unexpectedly")
           expect(e.request_id).to eq("t1")
-          expect(e.details).to eq({ tool: tool_name, error: error_message })
+          # Details are now less specific from the generic handler
+          expect(e.details).to eq({ method: message["method"], error: "An internal error occurred" })
         end
       end
 
