@@ -106,7 +106,7 @@ module VectorMCP
       # --- Notification Handlers ---
 
       # Handle initialized notification (mark session as ready)
-      def self.initialized_notification(_params, session, server)
+      def self.initialized_notification(_params, _session, server)
         server.logger.info("Session initialized")
       end
 

@@ -7,10 +7,11 @@ require "async/http/endpoint"
 require "async/http/body/writable"
 require "falcon/server"
 require "falcon/endpoint"
-require "rack/builder"
-require "rack/static"
-require "rack/common_logger"
-require "rack/lint"
+# Removed Rack requires
+# require "rack/builder"
+# require "rack/static"
+# require "rack/common_logger"
+# require "rack/lint"
 
 require_relative "../errors"
 require_relative "../util"
@@ -19,6 +20,7 @@ require_relative "../session" # Make sure session is loaded
 module VectorMCP
   module Transport
     # Server-Sent Events (SSE) transport for MCP using the 'async' ecosystem.
+    # Implements the Rack call interface directly to avoid middleware issues with async env.
     class SSE
       attr_reader :logger, :server, :host, :port, :path_prefix
 
@@ -34,24 +36,28 @@ module VectorMCP
         prefix = options[:path_prefix] || "/mcp"
         @path_prefix = prefix.start_with?("/") ? prefix : "/#{prefix}"
         @path_prefix = @path_prefix.delete_suffix("/")
+        @sse_path = "#{@path_prefix}/sse"
+        @message_path = "#{@path_prefix}/message"
 
         # Thread-safe storage for client connections (maps session_id -> ClientConnection)
         @clients = {}
         @clients_mutex = Mutex.new
+        @session = nil # Will be initialized in run
         logger.debug { "SSE Transport initialized with prefix: #{@path_prefix}" }
       end
 
       def run
         logger.info("Starting server with async SSE transport on #{@host}:#{@port}")
 
-        # Initialize a shared session object (could be per-connection if needed)
-        session = VectorMCP::Session.new(
+        # Initialize a shared session object for this run
+        @session = VectorMCP::Session.new(
           server_info: server.server_info,
           server_capabilities: server.server_capabilities,
           protocol_version: server.protocol_version
         )
 
-        app = build_rack_app(session)
+        # The transport instance itself acts as the app
+        app = self
         endpoint = Falcon::Endpoint.parse("http://#{@host}:#{@port}")
 
         Async do |task|
@@ -68,8 +74,9 @@ module VectorMCP
           end
 
           logger.info("Falcon server starting on #{endpoint.url}")
-          server = Falcon::Server.new(Falcon::Server.middleware(app), endpoint)
-          server.run
+          # Pass the transport instance (self) directly, no middleware wrapper needed
+          falcon_server = Falcon::Server.new(app, endpoint)
+          falcon_server.run
           logger.info("Falcon server stopped.")
         ensure
           # Cleanup: Close all client queues when the server stops
@@ -80,11 +87,47 @@ module VectorMCP
             end
             @clients.clear
           end
+          @session = nil # Clear session
           logger.info("SSE transport shut down.")
         end
       rescue StandardError => e
         logger.fatal("Fatal error starting/running SSE transport: #{e.message}\n#{e.backtrace.join("\n")}")
         exit(1)
+      end
+
+      # --- Rack-compatible call method --- #
+
+      def call(env)
+        start_time = Time.now
+        # env here is typically Async::HTTP::Protocol::HTTP1::Request
+        path = env.path
+        method = env.method
+
+        logger.info "Received #{method} request for #{path}"
+
+        status, headers, body =
+          case path
+          when @sse_path
+            handle_sse_connection(env, @session)
+          when @message_path
+            handle_message_post(env, @session)
+          when "/"
+            # Simple root/health check
+            [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]]
+          else
+            [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+          end
+
+        # Simple logging similar to CommonLogger
+        duration = format("%.4f", Time.now - start_time)
+        logger.info "Responded #{status} to #{method} #{path} in #{duration}s"
+
+        # Return the standard Rack triplet
+        [status, headers, body]
+      rescue StandardError => e
+        # Generic error handler for unexpected issues in routing/handling
+        logger.error("Error during SSE request handling for #{method} #{path}: #{e.message}\n#{e.backtrace.join("\n")}")
+        [500, { "Content-Type" => "text/plain" }, ["Internal Server Error"]]
       end
 
       # --- Public methods for Server to call (if needed, though typically handled internally) ---
@@ -95,10 +138,14 @@ module VectorMCP
         enqueue_message(session_id, message)
       end
 
-      def handle_sse_connection(env, session)
-        request = Rack::Request.new(env)
-        unless request.get?
-          logger.warn("Received non-GET request on SSE endpoint: #{request.request_method}")
+      # --- Internal Handlers (now private) ---
+      private
+
+      def handle_sse_connection(env, _session)
+        # env is Async::HTTP::Request, but Rack::Request can wrap it
+        # However, to avoid potential issues, let's access properties directly if possible
+        unless env.method == "GET"
+          logger.warn("Received non-GET request on SSE endpoint: #{env.method}")
           return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
         end
 
@@ -160,16 +207,18 @@ module VectorMCP
       end
 
       def handle_message_post(env, session)
-        request = Rack::Request.new(env)
-
-        unless request.post?
-          logger.warn("Received non-POST request on message endpoint: #{request.request_method}")
+        unless env.method == "POST"
+          logger.warn("Received non-POST request on message endpoint: #{env.method}")
           return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
         end
 
-        session_id = request.params["session_id"]
+        # Extract query parameters - Async::HTTP::Request doesn't have `params` like Rack::Request
+        # We need to parse the query string from the path/target
+        query_params = URI.decode_www_form(URI(env.path).query || "").to_h
+        session_id = query_params["session_id"]
+
         unless session_id && !session_id.empty?
-          logger.error("Missing session_id query parameter")
+          logger.error("Missing session_id query parameter in path: #{env.path}")
           return error_response(nil, -32_600, "Missing session_id parameter")
         end
 
@@ -180,9 +229,15 @@ module VectorMCP
         end
 
         begin
-          body = request.body.read
-          message = JSON.parse(body)
-          logger.debug { "[POST #{session_id}] Received raw message: #{body.inspect}" }
+          # Read the body - Async::HTTP::Request body might need explicit reading
+          request_body_str = env.body&.read
+          unless request_body_str
+            logger.error("[POST #{session_id}] Request body is empty or could not be read")
+            return error_response(nil, -32_600, "Invalid Request: Empty body")
+          end
+
+          message = JSON.parse(request_body_str)
+          logger.debug { "[POST #{session_id}] Received raw message: #{request_body_str.inspect}" }
 
           # Let the server process the message. It should return the response data hash or raise an error.
           response_data = server.handle_message(message, session, session_id) # Pass session_id for context
@@ -193,9 +248,9 @@ module VectorMCP
           # Immediately return 202 Accepted to the POST request
           [202, { "Content-Type" => "application/json" }, [{ status: "accepted", id: message["id"] }.to_json]]
         rescue JSON::ParserError => e
-          logger.error("[POST #{session_id}] JSON Parse Error: #{e.message}")
+          logger.error("[POST #{session_id}] JSON Parse Error: #{e.message} for body: #{request_body_str.inspect}")
           # Attempt to find ID for error response, enqueue if possible
-          id = VectorMCP::Util.extract_id_from_invalid_json(body)
+          id = VectorMCP::Util.extract_id_from_invalid_json(request_body_str)
           enqueue_error(client_conn, id, -32_700, "Parse error")
           # Return 400 Bad Request to the POST
           [400, { "Content-Type" => "application/json" }, [format_error_body(id, -32_700, "Parse error")]]
@@ -216,36 +271,6 @@ module VectorMCP
           enqueue_error(client_conn, request_id, -32_603, "Internal server error", { details: e.message })
           [500, { "Content-Type" => "application/json" }, [format_error_body(request_id, -32_603, "Internal server error", { details: e.message })]]
         end
-      end
-
-      private
-
-      # --- Rack App Construction ---
-
-      def build_rack_app(session)
-        sse_path = "#{@path_prefix}/sse"
-        message_path = "#{@path_prefix}/message"
-        logger.info("Building Rack app with SSE endpoint: #{sse_path}, Message endpoint: #{message_path}")
-
-        this = self # Capture self for closure
-
-        Rack::Builder.new do
-          use Rack::CommonLogger, this.logger # Log requests using our logger
-          use Rack::Lint # Helps catch Rack specification violations
-
-          map sse_path do
-            run ->(env) { this.handle_sse_connection(env, session) }
-          end
-
-          map message_path do
-            run ->(env) { this.handle_message_post(env, session) }
-          end
-
-          # Optional: Add a root path handler for basic info/health check
-          map "/" do
-            run ->(_env) { [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]] }
-          end
-        end.to_app
       end
 
       # --- Message Enqueuing Helpers ---
@@ -274,6 +299,7 @@ module VectorMCP
       end
 
       # --- HTTP Response Formatting Helpers ---
+
       def format_error_payload(code, message, data = nil)
         payload = { code:, message: }
         payload[:data] = data if data

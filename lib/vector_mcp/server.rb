@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "English"
 require "logger"
 require_relative "definitions"
 require_relative "session"
@@ -159,9 +160,9 @@ module VectorMCP
       # will also be caught here and re-raised.
       rescue VectorMCP::NotFoundError, VectorMCP::InvalidParamsError, VectorMCP::InternalError
         # Ensure request_id is attached if missing (though usually set at source)
-        raise $! if $!.request_id == id
+        raise $ERROR_INFO if $ERROR_INFO.request_id == id
 
-        raise $!.class.new($!.message, details: $!.details, request_id: id)
+        raise $ERROR_INFO.class.new($ERROR_INFO.message, details: $ERROR_INFO.details, request_id: id)
       rescue StandardError => e
         # Log the detailed error for server-side debugging
         logger.error("Unhandled error during request '#{method}' (ID: #{id}): #{e.message}\n#{e.backtrace.join("\n")}")

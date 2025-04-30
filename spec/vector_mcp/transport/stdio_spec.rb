@@ -84,7 +84,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
     end
 
     it "handles JSON parse errors" do
-      input.string = '{"id": "123", invalid json' + "\n"
+      input.string = "{\"id\": \"123\", invalid json\n"
       input.rewind
 
       transport.run
