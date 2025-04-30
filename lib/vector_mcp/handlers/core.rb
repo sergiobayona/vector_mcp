@@ -84,11 +84,38 @@ module VectorMCP
 
         arguments = params["arguments"] || {}
         begin
-          # Return the prompt definition
-          prompt.as_mcp_definition
+          # Call the registered handler, passing the arguments
+          # The handler is expected to return a Hash like { messages: [...], description?: "..." }
+          result_data = prompt.handler.call(arguments)
+
+          # Basic validation of the handler's response
+          unless result_data.is_a?(Hash) && result_data[:messages].is_a?(Array)
+            # Log the invalid structure for debugging
+            server.logger.error("Prompt handler for '#{prompt_name}' returned invalid data structure: #{result_data.inspect}")
+            raise VectorMCP::InternalError.new("Prompt handler returned invalid data structure",
+                                               details: { prompt: prompt_name, error: "Handler must return a Hash with a :messages Array" })
+          end
+
+          # Ensure all message contents are valid (basic check)
+          # A more robust check might involve validating against Content schema
+          result_data[:messages].each do |msg|
+            next if msg.is_a?(Hash) && msg[:role] && msg[:content].is_a?(Hash) && msg[:content][:type]
+
+            server.logger.error("Prompt handler for '#{prompt_name}' returned invalid message structure: #{msg.inspect}")
+            raise VectorMCP::InternalError.new("Prompt handler returned invalid message structure",
+                                               details: { prompt: prompt_name,
+                                                          error: "Messages must be Hashes with :role and :content Hash (with :type)" })
+          end
+
+          # Return the result directly, assuming it matches the GetPromptResult structure
+          # Example: { description: "Optional dynamic description", messages: [{role: "user", content: {type: "text", text: "..."}}] }
+          result_data
+        rescue VectorMCP::ProtocolError
+          raise # Re-raise known protocol errors (like InternalError raised above)
         rescue StandardError => e
-          server.logger.error("Error processing prompt '#{prompt_name}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
-          raise VectorMCP::InternalError.new("Prompt processing failed", details: { prompt: prompt_name, error: e.message })
+          server.logger.error("Error executing prompt handler for '#{prompt_name}': #{e.message}\n#{e.backtrace.first(5).join("\n")}")
+          # Raise InternalError if the prompt's handler itself fails unexpectedly
+          raise VectorMCP::InternalError.new("Prompt handler failed unexpectedly", details: { prompt: prompt_name, error: e.message })
         end
       end
 
