@@ -42,7 +42,12 @@ RSpec.describe VectorMCP::Transport::SSE do
     Async do
       # Use the actual rack_app built by the transport
       server_task = Async do
-        Falcon::Server.new(rack_app, endpoint).run
+        # Wrap the rack_app with Falcon's default middleware so that Rack responses
+        # are converted into Protocol::HTTP::Response objects. Without this,
+        # Falcon would receive the raw Rack triplet which triggers a
+        # `NoMethodError: undefined method `body' for an instance of Array`.
+        server = Falcon::Server.new(Falcon::Server.middleware(rack_app), endpoint)
+        server.run
       end
 
       # Give the server a brief moment to spin up
