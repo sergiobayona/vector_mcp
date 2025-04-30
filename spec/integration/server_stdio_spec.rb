@@ -339,7 +339,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       send_jsonrpc(get_req)
       response = read_jsonrpc
       expect(response["id"]).to eq(get_req[:id])
-      expect(response["result"]["description"]).to eq("Generates a simple greeting.")
+      expect(response["result"]["description"]).to eq("Greeting prepared for RSpec.")
       expect(response["result"]["messages"]).to eq([
                                                      { "role" => "user",
                                                        "content" => { "type" => "text", "text" => "Greet RSpec using VectorMCP style." } },

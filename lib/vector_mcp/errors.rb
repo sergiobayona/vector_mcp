@@ -17,9 +17,8 @@ module VectorMCP
       super(message)
     end
 
-    def details
-      @details || {}
-    end
+    # Return the details hash directly (can be nil)
+    attr_reader :details
   end
 
   # Standard JSON-RPC error classes
@@ -41,6 +40,8 @@ module VectorMCP
   # Method not found (-32601): The method does not exist / is not available.
   class MethodNotFoundError < ProtocolError
     def initialize(method, details: nil, request_id: nil)
+      # Store method name in details if not provided otherwise
+      details ||= { method_name: method }
       super("Method not found: #{method}", code: -32_601, details: details, request_id: request_id)
     end
   end
@@ -68,6 +69,7 @@ module VectorMCP
         warn "Server error code #{code} is outside of the reserved range (-32000 to -32099). Using -32000 instead."
         code = -32_000
       end
+      # Pass all arguments including the (potentially corrected) code to super
       super
     end
   end
@@ -80,6 +82,7 @@ module VectorMCP
   end
 
   # Not Found (-32001): Requested resource not found.
+  # Should inherit from ProtocolError directly, not ServerError
   class NotFoundError < ProtocolError
     def initialize(message = "Not Found", details: nil, request_id: nil)
       VectorMCP.logger.debug("Initializing NotFoundError with code: -32001")

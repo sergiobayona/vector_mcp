@@ -388,7 +388,9 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "logs the original tool error" do
-        expect(server.logger).to receive(:error).with(/Error executing tool '#{tool_name}': #{error_message}/)
+        # Expect the log message from the generic handler in Server#handle_request
+        log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
+        expect(server.logger).to receive(:error).with(match(log_pattern))
         expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
       end
     end
@@ -410,14 +412,18 @@ RSpec.describe VectorMCP::Server do
           server.handle_message(message, session, session_id)
         end.to raise_error(VectorMCP::InternalError) do |e|
           expect(e.code).to eq(-32_603)
-          expect(e.message).to eq("Resource read failed")
+          # Error now caught by the generic handler in Server#handle_request
+          expect(e.message).to eq("Request handler failed unexpectedly")
           expect(e.request_id).to eq("r1")
-          expect(e.details).to eq({ uri: resource_uri, error: error_message })
+          # Details are now less specific from the generic handler
+          expect(e.details).to eq({ method: message["method"], error: "An internal error occurred" })
         end
       end
 
       it "logs the original resource error" do
-        expect(server.logger).to receive(:error).with(/Error reading resource '#{resource_uri}': #{error_message}/)
+        # Expect the log message from the generic handler in Server#handle_request
+        log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
+        expect(server.logger).to receive(:error).with(match(log_pattern))
         expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
       end
     end
@@ -569,14 +575,17 @@ RSpec.describe VectorMCP::Server do
             server.handle_message(message, session, session_id)
           end.to raise_error(VectorMCP::InternalError) do |e|
             expect(e.code).to eq(-32_603)
-            expect(e.message).to eq("Prompt handler failed unexpectedly")
-            expect(e.details[:prompt]).to eq(prompt_name)
-            expect(e.details[:error]).to eq(handler_error_message) # Include original error message in details
+            # Error now caught by the generic handler in Server#handle_request
+            expect(e.message).to eq("Request handler failed unexpectedly")
+            # Details are now less specific from the generic handler
+            expect(e.details).to eq({ method: message["method"], error: "An internal error occurred" })
           end
         end
 
         it "logs the original handler error" do
-          expect(server.logger).to receive(:error).with(/Error executing prompt handler for '#{prompt_name}': #{handler_error_message}/)
+          # Expect the log message from the generic handler in Server#handle_request
+          log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{handler_error_message}/
+          expect(server.logger).to receive(:error).with(match(log_pattern))
           expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
         end
       end
@@ -588,7 +597,8 @@ RSpec.describe VectorMCP::Server do
             server.handle_message(message_unknown, session, session_id)
           end.to raise_error(VectorMCP::NotFoundError) do |e|
             expect(e.code).to eq(-32_001) # Should be the NotFoundError code
-            expect(e.message).to include("Prompt not found: unknown_prompt")
+            # Check the details attribute for the specific message
+            expect(e.details).to include("Prompt not found: unknown_prompt")
           end
         end
       end

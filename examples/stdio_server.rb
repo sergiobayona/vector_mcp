@@ -41,11 +41,17 @@ server.register_prompt(
   arguments: [
     { name: "name", description: "Name to greet", required: true }
   ]
-) do |args, _session|
-  [
+) do |args|
+  # Handler must return a Hash { description?: ..., messages: [...] }
+  greeting_description = "Greeting prepared for #{args["name"]}."
+  greeting_messages = [
     { role: "user", content: { type: "text", text: "Greet #{args["name"]} using VectorMCP style." } },
     { role: "assistant", content: { type: "text", text: "Alright, crafting a greeting for #{args["name"]} now." } }
   ]
+  {
+    description: greeting_description,
+    messages: greeting_messages
+  }
 end
 
 # Start the server!
