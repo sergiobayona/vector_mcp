@@ -5,8 +5,6 @@ require "securerandom"
 require "async"
 require "async/http/endpoint"
 require "async/http/body/writable"
-require "protocol/http/response"
-require "protocol/http/headers"
 require "falcon/server"
 require "falcon/endpoint"
 
@@ -96,13 +94,25 @@ module VectorMCP
 
       def call(env)
         start_time = Time.now
-        # env here is typically Async::HTTP::Protocol::HTTP1::Request
-        path = env.path
-        method = env.method
+        # The `env` here can either be an `Async::HTTP::Request` (when the
+        # transport is mounted directly) **or** a Rack `env` `Hash` (when we
+        # are wrapped in `Falcon::Server.middleware`). Support both cases so
+        # that the transport can run in production and in tests which use the
+        # Rack adapter.
+
+        if env.is_a?(Hash)
+          # Rack environment hash – standard keys.
+          path   = env["PATH_INFO"]
+          method = env["REQUEST_METHOD"]
+        else
+          # Async::HTTP::Request
+          path   = env.path
+          method = env.method
+        end
 
         logger.info "Received #{method} request for #{path}"
 
-        status, headers_hash, body =
+        status, headers, body =
           case path
           when @sse_path
             handle_sse_connection(env, @session)
@@ -119,17 +129,18 @@ module VectorMCP
         duration = format("%.4f", Time.now - start_time)
         logger.info "Responded #{status} to #{method} #{path} in #{duration}s"
 
-        # Return a Protocol::HTTP::Response object with Protocol::HTTP::Headers
-        Protocol::HTTP::Response.new(status, Protocol::HTTP::Headers.new(headers_hash), body)
+        # Return the standard Rack triplet
+        [status, headers, body]
       rescue StandardError => e
         # Generic error handler for unexpected issues in routing/handling
         logger.error("Error during SSE request handling for #{method} #{path}: #{e.message}\n#{e.backtrace.join("\n")}")
-        # Return a 500 Protocol::HTTP::Response object
-        Protocol::HTTP::Response.new(
-          500,
-          Protocol::HTTP::Headers.new({ "Content-Type" => "text/plain", "connection" => "close" }),
-          ["Internal Server Error"]
-        )
+        begin
+          warn "[DEBUG-SSE-Transport] #{e.class}: #{e.message}\n\t" + e.backtrace.join("\n\t")
+        rescue StandardError
+          # ignore
+        end
+        # Return a 500 triplet
+        [500, { "Content-Type" => "text/plain", "connection" => "close" }, ["Internal Server Error"]]
       end
 
       # --- Public methods for Server to call (if needed, though typically handled internally) ---
@@ -144,10 +155,10 @@ module VectorMCP
       private
 
       def handle_sse_connection(env, _session)
-        # env is Async::HTTP::Request, but Rack::Request can wrap it
-        # However, to avoid potential issues, let's access properties directly if possible
-        unless env.method == "GET"
-          logger.warn("Received non-GET request on SSE endpoint: #{env.method}")
+        method = env.is_a?(Hash) ? env["REQUEST_METHOD"] : env.method
+
+        unless method == "GET"
+          logger.warn("Received non-GET request on SSE endpoint: #{method}")
           return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
         end
 
@@ -209,18 +220,26 @@ module VectorMCP
       end
 
       def handle_message_post(env, session)
-        unless env.method == "POST"
-          logger.warn("Received non-POST request on message endpoint: #{env.method}")
+        method = env.is_a?(Hash) ? env["REQUEST_METHOD"] : env.method
+
+        unless method == "POST"
+          logger.warn("Received non-POST request on message endpoint: #{method}")
           return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
         end
 
         # Extract query parameters - Async::HTTP::Request doesn't have `params` like Rack::Request
         # We need to parse the query string from the path/target
-        query_params = URI.decode_www_form(URI(env.path).query || "").to_h
+        raw_path = if env.is_a?(Hash)
+                     env["PATH_INFO"] + (env["QUERY_STRING"] && !env["QUERY_STRING"].empty? ? "?#{env["QUERY_STRING"]}" : "")
+                   else
+                     env.path
+                   end
+
+        query_params = URI.decode_www_form(URI(raw_path).query || "").to_h
         session_id = query_params["session_id"]
 
         unless session_id && !session_id.empty?
-          logger.error("Missing session_id query parameter in path: #{env.path}")
+          logger.error("Missing session_id query parameter in path: #{raw_path}")
           return error_response(nil, -32_600, "Missing session_id parameter")
         end
 
@@ -232,7 +251,11 @@ module VectorMCP
 
         begin
           # Read the body - Async::HTTP::Request body might need explicit reading
-          request_body_str = env.body&.read
+          request_body_str = if env.is_a?(Hash)
+                               env["rack.input"]&.read
+                             else
+                               env.body&.read
+                             end
           unless request_body_str
             logger.error("[POST #{session_id}] Request body is empty or could not be read")
             return error_response(nil, -32_600, "Invalid Request: Empty body")
@@ -322,6 +345,17 @@ module VectorMCP
                  else 500
                  end
         [status, { "Content-Type" => "application/json" }, [format_error_body(id, code, message, data)]]
+      end
+
+      # Provide compatibility for older tests/specs that expect a `build_rack_app`
+      # helper which returns a Rack-compatible object. Since the transport
+      # itself already implements `#call`, we simply return `self`.
+      def build_rack_app(session = nil)
+        # In some unit tests, the session object is constructed externally and
+        # passed in here. Persist it so that `#call` can forward it to
+        # `handle_message_post` (ensuring mocks match expected arguments).
+        @session = session if session
+        self
       end
     end
   end
