@@ -60,7 +60,7 @@ require 'vector_mcp'
 VectorMCP.logger.level = Logger::INFO
 
 # 1. Create a server instance
-server = VectorMCP.new_server(name: "MySimpleStdioServer", version: "1.0")
+server = VectorMCP.new(name: "MySimpleStdioServer", version: "1.0")
 
 # 2. Register a tool
 server.register_tool(
@@ -128,7 +128,7 @@ Instantiate the server using the factory method:
 ```ruby
 require 'vector_mcp'
 
-server = VectorMCP.new_server(
+server = VectorMCP.new(
   name: "MyAwesomeServer",
   version: "2.1.0",
   log_level: Logger::DEBUG # Optional: Default is INFO

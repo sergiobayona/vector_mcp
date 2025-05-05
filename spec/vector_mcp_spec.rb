@@ -25,8 +25,8 @@ RSpec.describe VectorMCP do
     end
   end
 
-  describe ".new_server" do
-    let(:server) { VectorMCP.new_server(name: "test_server") }
+  describe ".new" do
+    let(:server) { VectorMCP.new(name: "test_server") }
 
     it "creates a new server instance" do
       expect(server).to be_a(VectorMCP::Server)
@@ -34,7 +34,7 @@ RSpec.describe VectorMCP do
     end
 
     it "accepts options" do
-      server = VectorMCP.new_server(name: "test_server", version: "1.0.0", log_level: Logger::DEBUG)
+      server = VectorMCP.new(name: "test_server", version: "1.0.0", log_level: Logger::DEBUG)
       expect(server).to be_a(VectorMCP::Server)
       expect(server.version).to eq("1.0.0")
       expect(server.logger.level).to eq(Logger::DEBUG)

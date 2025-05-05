@@ -1,14 +1,15 @@
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 # Example HTTP server implementation using VectorMCP
 
-require "vector_mcp"
+require_relative "../lib/vector_mcp"
 
 # Set debug logging level for development
 VectorMCP.logger.level = Logger::DEBUG
 
 # Create a server instance
-server = VectorMCP::Server.new(
+server = VectorMCP.new(
   name: "VectorMCP::HTTPExampleServer",
   version: "0.0.1"
 )

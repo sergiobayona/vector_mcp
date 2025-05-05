@@ -10,7 +10,7 @@ require_relative "../lib/vector_mcp"
 VectorMCP.logger.level = Logger::DEBUG
 
 # Create a server instance with a name/version
-server = VectorMCP.new_server(name: "VectorMCP::ExampleServer", version: "0.0.1")
+server = VectorMCP.new(name: "VectorMCP::ExampleServer", version: "0.0.1")
 
 # Register a simple echo tool
 server.register_tool(

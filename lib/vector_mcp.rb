@@ -21,7 +21,7 @@ module VectorMCP
     attr_reader :logger
 
     # Convenience method to create a server instance
-    def new_server(**kwargs)
+    def new(**kwargs)
       Server.new(**kwargs)
     end
   end

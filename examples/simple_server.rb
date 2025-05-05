@@ -10,7 +10,7 @@ require "vector_mcp"
 VectorMCP.logger.level = Logger::DEBUG
 
 # Create an instance of the server
-server = VectorMCP.new_server(name: "VectorMCP::ExampleSSE_Server", version: "0.0.1")
+server = VectorMCP.new(name: "VectorMCP::ExampleSSE_Server", version: "0.0.1")
 
 # --- Register Tools, Resources, Prompts (same as before) ---
 # ... (copy the register_tool, register_resource, register_prompt blocks) ...
