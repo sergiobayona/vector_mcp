@@ -3,6 +3,7 @@
 require "json"
 require "securerandom"
 require "async"
+require "async/io"
 require "async/http/endpoint"
 require "async/http/body/writable"
 require "falcon/server"
@@ -58,11 +59,11 @@ module VectorMCP
         Async do |task|
           # Set up signal handling using Async's signal handling
           task.async do
-            Async::IO::Signal.trap(:INT) do
+            trap(:INT) do
               logger.info "SIGINT received, stopping server..."
               task.stop
             end
-            Async::IO::Signal.trap(:TERM) do
+            trap(:TERM) do
               logger.info "SIGTERM received, stopping server..."
               task.stop
             end
