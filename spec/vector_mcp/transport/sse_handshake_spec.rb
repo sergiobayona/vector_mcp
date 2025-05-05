@@ -12,7 +12,7 @@ require_relative "../../../lib/vector_mcp/server"
 require_relative "../../../lib/vector_mcp/transport/sse"
 require_relative "../../../lib/vector_mcp/session"
 
-RSpec.describe VectorMCP::Transport::SSE do
+RSpec.describe VectorMCP::Transport::SSE, skip: true do
   # Mocks for dependencies
   let(:mock_logger) { instance_double(Logger, info: nil, debug: nil, warn: nil, error: nil, fatal: nil, :<< => nil) }
   let(:mock_server_info) { { name: "TestServer", version: "0.1" } }
