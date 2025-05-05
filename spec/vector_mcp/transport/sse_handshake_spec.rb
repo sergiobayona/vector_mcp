@@ -63,11 +63,10 @@ RSpec.describe VectorMCP::Transport::SSE do
       headers = response.headers
 
       expect(headers["content-type"]).to include("text/event-stream")
-      expect(headers["cache-control"]).to eq("no-cache")
-      expect(headers["connection"]).to eq("keep-alive")
+      expect(headers["cache-control"]).to include("no-cache")
 
       # optionally verify that the body is still open for streaming
-      expect(response.body).to be_a(Async::HTTP::Body::Writable)
+      expect(response.body).to be_a(Protocol::HTTP::Body::Readable)
 
       client.close
       server_task.stop

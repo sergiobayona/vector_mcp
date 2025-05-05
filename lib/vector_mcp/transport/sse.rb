@@ -77,7 +77,7 @@ module VectorMCP
           # Cleanup: Close all client queues when the server stops
           @clients_mutex.synchronize do
             @clients.each_value do |conn|
-              conn.queue&.close
+              conn.queue&.close if conn.queue.respond_to?(:close)
               conn.task&.stop # Attempt to stop the client's SSE task
             end
             @clients.clear
@@ -208,7 +208,8 @@ module VectorMCP
             logger.error("Error in SSE task for client #{session_id}: #{e.message}\n#{e.backtrace.join("\n")}")
           ensure
             body.finish # Signal end of stream to Falcon
-            client_queue.close # Close the queue
+            # Close the queue if it supports #close (Async::Queue doesn't).
+            client_queue.close if client_queue.respond_to?(:close)
             # Remove client connection info
             @clients_mutex.synchronize { @clients.delete(session_id) }
             logger.debug("Cleaned up resources for SSE client: #{session_id}")
