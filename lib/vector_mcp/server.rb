@@ -64,6 +64,9 @@ module VectorMCP
       name_s = name.to_s
       raise ArgumentError, "Prompt '#{name_s}' already registered" if @prompts[name_s]
 
+      # Validate arguments schema fidelity
+      validate_prompt_arguments(arguments)
+
       @prompts[name_s] = Prompt.new(name_s, description, arguments, handler)
       # Mark the prompts list as changed so clients know to refresh
       @prompts_list_changed = true
@@ -244,6 +247,37 @@ module VectorMCP
       # Handle multiple potential names for cancellation
       %w[$/cancelRequest $/cancel notifications/cancelled].each do |cancel_method|
         on_notification(cancel_method, &Handlers::Core.method(:cancel_request_notification))
+      end
+    end
+
+    def validate_prompt_arguments(argument_defs)
+      raise ArgumentError, "arguments must be an Array" unless argument_defs.is_a?(Array)
+
+      argument_defs.each_with_index do |arg, idx|
+        raise ArgumentError, "argument definition at index #{idx} must be a Hash" unless arg.is_a?(Hash)
+
+        # Required field :name
+        name_val = arg[:name] || arg["name"]
+        raise ArgumentError, "argument definition at index #{idx} missing :name" if name_val.nil?
+
+        raise ArgumentError, "argument :name at index #{idx} must be String or Symbol" unless name_val.is_a?(String) || name_val.is_a?(Symbol)
+
+        # Optional :description
+        if arg.key?(:description) || arg.key?("description")
+          desc_val = arg[:description] || arg["description"]
+          raise ArgumentError, "argument :description at index #{idx} must be a String" unless desc_val.nil? || desc_val.is_a?(String)
+        end
+
+        # Optional :required boolean
+        if arg.key?(:required) || arg.key?("required")
+          req_val = arg[:required] || arg["required"]
+          raise ArgumentError, "argument :required at index #{idx} must be boolean" unless [true, false].include?(req_val)
+        end
+
+        # Disallow unknown keys
+        allowed_keys = %w[name description required]
+        unknown_keys = arg.keys.map(&:to_s) - allowed_keys
+        raise ArgumentError, "argument definition at index #{idx} has unknown keys: #{unknown_keys.join(",")}" unless unknown_keys.empty?
       end
     end
   end

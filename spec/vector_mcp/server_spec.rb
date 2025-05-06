@@ -124,7 +124,7 @@ RSpec.describe VectorMCP::Server do
   describe "#register_prompt" do
     let(:name) { "test_prompt" }
     let(:description) { "A test prompt" }
-    let(:arguments) { %w[arg1 arg2] }
+    let(:arguments) { [{ name: "arg1" }, { name: "arg2" }] }
     let(:handler) { proc { |_params| "response" } }
 
     it "registers a new prompt" do
@@ -156,6 +156,26 @@ RSpec.describe VectorMCP::Server do
           &handler
         )
       end.to raise_error(ArgumentError, "Prompt '#{name}' already registered")
+    end
+
+    describe "register_prompt argument validation" do
+      it "raises error for invalid argument schema" do
+        expect do
+          server.register_prompt(name: "bad", description: "d", arguments: ["wrong"]) { "x" }
+        end.to raise_error(ArgumentError, /must be a Hash/)
+      end
+
+      it "raises error for missing name" do
+        expect do
+          server.register_prompt(name: "bad", description: "d", arguments: [{}]) { "x" }
+        end.to raise_error(ArgumentError, /missing :name/)
+      end
+
+      it "raises error on unknown keys" do
+        expect do
+          server.register_prompt(name: "bad", description: "d", arguments: [{ name: "a", foo: 1 }]) { "x" }
+        end.to raise_error(ArgumentError, /unknown keys/)
+      end
     end
   end
 
