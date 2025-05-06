@@ -15,7 +15,7 @@ RSpec.describe VectorMCP::Server do
   before do
     # Mock logger to avoid console output during tests
     # Allow :level= to be called during initialization
-    logger_double = instance_double("Logger", info: nil, debug: nil, warn: nil, error: nil)
+    logger_double = instance_double("Logger", info: nil, debug: nil, warn: nil, error: nil, fatal: nil)
     allow(logger_double).to receive(:level=) # Allow the level setter
     allow(VectorMCP).to receive(:logger).and_return(logger_double)
     # Simulate initialization for most tests
@@ -602,6 +602,83 @@ RSpec.describe VectorMCP::Server do
           end
         end
       end
+    end
+  end
+
+  describe "#run" do
+    context "with an unsupported transport" do
+      it "raises ArgumentError" do
+        expect do
+          server.run(transport: :unsupported)
+        end.to raise_error(ArgumentError, /Unsupported transport/)
+      end
+    end
+
+    context "with :sse transport" do
+      let(:sse_instance) { instance_double(VectorMCP::Transport::SSE, run: nil) }
+
+      before do
+        allow(VectorMCP::Transport::SSE).to receive(:new).and_return(sse_instance)
+      end
+
+      it "initializes an SSE transport and calls run" do
+        server.run(transport: :sse, options: { host: "localhost" })
+        expect(VectorMCP::Transport::SSE).to have_received(:new).with(server, hash_including(host: "localhost"))
+        expect(sse_instance).to have_received(:run)
+      end
+    end
+  end
+
+  describe "#handle_request error wrapping" do
+    let(:request_id) { "wrap-1" }
+    let(:method_name) { "failing_not_found" }
+    let(:message) { { "id" => request_id, "method" => method_name, "params" => {} } }
+
+    before do
+      # Register a handler that raises NotFoundError WITHOUT request_id to verify wrapping
+      server.on_request(method_name) do |_params, _sess, _srv|
+        raise VectorMCP::NotFoundError.new("Missing", details: "nothing here")
+      end
+    end
+
+    it "re-raises the protocol error with the correct request_id" do
+      expect do
+        server.handle_message(message, session, session_id)
+      end.to raise_error(VectorMCP::NotFoundError) { |err| expect(err.request_id).to eq(request_id) }
+    end
+  end
+
+  describe "#setup_default_handlers" do
+    let(:request_handlers) { server.instance_variable_get(:@request_handlers) }
+    let(:notification_handlers) { server.instance_variable_get(:@notification_handlers) }
+
+    it "registers all core request handlers" do
+      expected_requests = %w[
+        ping
+        tools/list
+        tools/call
+        resources/list
+        resources/read
+        prompts/list
+        prompts/get
+      ]
+      expect(request_handlers.keys).to include(*expected_requests)
+    end
+
+    it "registers all core notification handlers including cancel aliases" do
+      expected_notifications = %w[
+        initialized
+        $/cancelRequest
+        $/cancel
+        notifications/cancelled
+      ]
+      expect(notification_handlers.keys).to include(*expected_notifications)
+    end
+
+    it "maps ping handler to Handlers::Core.ping" do
+      handler = request_handlers["ping"]
+      # Call the proc and ensure it returns the same result as Handlers::Core.ping
+      expect(handler.call({}, session, server)).to eq(VectorMCP::Handlers::Core.ping({}, session, server))
     end
   end
 end

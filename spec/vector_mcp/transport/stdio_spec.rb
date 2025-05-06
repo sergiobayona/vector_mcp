@@ -155,6 +155,19 @@ RSpec.describe VectorMCP::Transport::Stdio do
     end
   end
 
+  describe "#run cleanup" do
+    it "kills the input_thread in ensure block when still alive" do
+      fake_thread = instance_double(Thread, join: nil, alive?: true, kill: nil)
+      allow(Thread).to receive(:new).and_return(fake_thread)
+      allow($stdin).to receive(:gets).and_raise(Interrupt) # immediately trigger interrupt
+
+      transport.run
+
+      expect(fake_thread).to have_received(:kill)
+      expect(transport.instance_variable_get(:@running)).to eq(false)
+    end
+  end
+
   describe "#send_response" do
     let(:original_stdout) { $stdout }
     let(:output) { StringIO.new }
@@ -190,6 +203,89 @@ RSpec.describe VectorMCP::Transport::Stdio do
 
       # We do expect the error to be logged
       expect(logger).to have_received(:error).with(/Output pipe closed/)
+    end
+  end
+
+  describe "#send_notification" do
+    let(:original_stdout) { $stdout }
+    let(:output) { StringIO.new }
+
+    before { $stdout = output }
+    after { $stdout = original_stdout }
+
+    it "writes a correct JSON-RPC notification" do
+      transport.send_notification("someMethod", { foo: "bar" })
+      json = JSON.parse(output.string)
+      expect(json).to eq({
+                           "jsonrpc" => "2.0",
+                           "method" => "someMethod",
+                           "params" => { "foo" => "bar" }
+                         })
+    end
+  end
+
+  describe "#shutdown" do
+    it "sets @running to false and kills the input thread" do
+      fake_thread = instance_double(Thread, alive?: true, kill: nil)
+      transport.instance_variable_set(:@running, true)
+      transport.instance_variable_set(:@input_thread, fake_thread)
+
+      transport.shutdown
+
+      expect(transport.instance_variable_get(:@running)).to eq(false)
+      expect(fake_thread).to have_received(:kill)
+    end
+  end
+
+  describe "#handle_input_line edge cases" do
+    let(:session_id) { "stdio-session" }
+
+    it "sends parse error with nil id when extract_id_from_invalid_json fails" do
+      allow(VectorMCP::Util).to receive(:extract_id_from_invalid_json).and_raise(StandardError)
+      allow(transport).to receive(:send_error)
+
+      transport.send(:handle_input_line, "{ invalid json", session, session_id)
+
+      expect(transport).to have_received(:send_error).with(nil, -32_700, "Parse error")
+    end
+
+    it "sends internal error with nil id when StandardError occurs and message has no id" do
+      allow(server).to receive(:handle_message).and_raise(StandardError, "boom")
+      allow(transport).to receive(:send_error)
+
+      msg = { jsonrpc: "2.0", method: "foo" }.to_json
+      transport.send(:handle_input_line, msg, session, session_id)
+
+      expect(transport).to have_received(:send_error).with(nil, -32_603, "Internal error", anything)
+    end
+
+    it "does not send a response when message id is nil" do
+      allow(server).to receive(:handle_message).and_return({ result: "ok" })
+      allow(transport).to receive(:send_response)
+
+      msg = { jsonrpc: "2.0", method: "foo" }.to_json
+      transport.send(:handle_input_line, msg, session, session_id)
+
+      expect(transport).not_to have_received(:send_response)
+    end
+  end
+
+  describe "#write_message" do
+    it "flushes $stdout after writing" do
+      original_stdout = $stdout
+      fake_stdout = StringIO.new
+      # Spy on flush to confirm it is called while still preserving original behavior
+      allow(fake_stdout).to receive(:flush).and_call_original
+      # Allow puts to behave normally while still being spy-able
+      allow(fake_stdout).to receive(:puts).and_call_original
+
+      $stdout = fake_stdout
+
+      transport.send(:write_message, { hello: "world" })
+
+      expect(fake_stdout).to have_received(:flush)
+    ensure
+      $stdout = original_stdout
     end
   end
 

@@ -118,6 +118,20 @@ RSpec.describe "VectorMCP Errors" do
     it "includes the method name in details" do
       expect(error.details).to eq({ method_name: method_name })
     end
+
+    context "when custom details provided" do
+      it "uses the provided details when they don't include method_name" do
+        custom_details = { foo: "bar" }
+        error = described_class.new(method_name, details: custom_details)
+        expect(error.details).to eq(custom_details)
+      end
+
+      it "keeps provided method_name when custom details include method_name" do
+        custom_details = { method_name: "different_method", foo: "bar" }
+        error = described_class.new(method_name, details: custom_details)
+        expect(error.details).to eq(custom_details)
+      end
+    end
   end
 
   describe VectorMCP::InvalidParamsError do
@@ -178,6 +192,26 @@ RSpec.describe "VectorMCP Errors" do
       expect(error.code).to eq(code)
       expect(error.request_id).to eq(request_id)
       expect(error.details).to eq(details)
+    end
+
+    context "when provided code outside the reserved range" do
+      it "emits a warning and defaults code to -32000 for code above range" do
+        code = -31_000
+        error = nil
+        expect do
+          error = described_class.new("Bad server error", code: code)
+        end.to output(/Server error code #{code} is outside of the reserved range/).to_stderr
+        expect(error.code).to eq(-32_000)
+      end
+
+      it "emits a warning and defaults code to -32000 for code below range" do
+        code = -32_100
+        error = nil
+        expect do
+          error = described_class.new("Bad server error", code: code)
+        end.to output(/Server error code #{code} is outside of the reserved range/).to_stderr
+        expect(error.code).to eq(-32_000)
+      end
     end
   end
 
