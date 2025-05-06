@@ -15,6 +15,7 @@ RSpec.describe VectorMCP::Handlers::Core do
   before do
     # Stub global logger for methods using VectorMCP.logger
     allow(VectorMCP).to receive(:logger).and_return(logger)
+    allow(logger).to receive(:level=)
   end
 
   describe ".ping" do
@@ -207,6 +208,16 @@ RSpec.describe VectorMCP::Handlers::Core do
         described_class.cancel_request_notification({ "id" => "42" }, session, server)
         expect(logger).to have_received(:info).with("Received cancellation request for ID: 42")
       end
+    end
+  end
+
+  describe ".subscribe_prompts" do
+    it "adds session as subscriber without error" do
+      server_double = VectorMCP::Server.new(name: "s", version: "1")
+      session_double = VectorMCP::Session.new(server_info: {}, server_capabilities: {}, protocol_version: VectorMCP::Server::PROTOCOL_VERSION)
+      expect do
+        described_class.subscribe_prompts({}, session_double, server_double)
+      end.not_to raise_error
     end
   end
 end

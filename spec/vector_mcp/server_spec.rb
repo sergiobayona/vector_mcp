@@ -237,7 +237,14 @@ RSpec.describe VectorMCP::Server do
         )
       end
 
-      it "includes prompts capability" do
+      it "sets listChanged to true after registration" do
+        capabilities = server.server_capabilities
+        expect(capabilities[:prompts]).to eq({ listChanged: true })
+      end
+
+      it "resets listChanged to false after prompts/list" do
+        # Trigger list_prompts handler via Core directly
+        VectorMCP::Handlers::Core.list_prompts({}, session, server)
         capabilities = server.server_capabilities
         expect(capabilities[:prompts]).to eq({ listChanged: false })
       end
@@ -661,6 +668,7 @@ RSpec.describe VectorMCP::Server do
         resources/read
         prompts/list
         prompts/get
+        prompts/subscribe
       ]
       expect(request_handlers.keys).to include(*expected_requests)
     end
@@ -679,6 +687,19 @@ RSpec.describe VectorMCP::Server do
       handler = request_handlers["ping"]
       # Call the proc and ensure it returns the same result as Handlers::Core.ping
       expect(handler.call({}, session, server)).to eq(VectorMCP::Handlers::Core.ping({}, session, server))
+    end
+  end
+
+  describe "dynamic prompt list change notifications" do
+    let(:stdio_transport) { instance_double(VectorMCP::Transport::Stdio, send_notification: nil) }
+
+    before do
+      server.transport = stdio_transport
+    end
+
+    it "sends notifications/prompts/list_changed via stdio transport" do
+      server.register_prompt(name: "notify_prompt", description: "d", arguments: []) { "resp" }
+      expect(stdio_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
     end
   end
 end

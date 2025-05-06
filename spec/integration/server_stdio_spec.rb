@@ -147,7 +147,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
                                               "protocolVersion" => "2024-11-05",
                                               "capabilities" => { "tools" => { "listChanged" => false },
                                                                   "resources" => { "subscribe" => false, "listChanged" => false },
-                                                                  "prompts" => { "listChanged" => false },
+                                                                  "prompts" => { "listChanged" => true },
                                                                   "experimental" => {} },
                                               "serverInfo" => { "name" => "VectorMCP::ExampleServer", "version" => "0.0.1" }
                                             })

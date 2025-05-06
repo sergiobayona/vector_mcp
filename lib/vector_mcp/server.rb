@@ -18,6 +18,7 @@ module VectorMCP
     PROTOCOL_VERSION = "2024-11-05"
 
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :in_flight_requests
+    attr_accessor :transport
 
     def initialize(name:, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION)
       @name = name
@@ -32,6 +33,8 @@ module VectorMCP
       @resources = {}
       @prompts = {}
       @in_flight_requests = {} # Track requests for cancellation
+      @prompts_list_changed = false # Track whether prompts list changed after initialization
+      @prompt_subscribers = []
 
       setup_default_handlers
       logger.info("Server instance '#{name}' v#{version} (using VectorMCP v#{VectorMCP::VERSION}) initialized.")
@@ -62,6 +65,10 @@ module VectorMCP
       raise ArgumentError, "Prompt '#{name_s}' already registered" if @prompts[name_s]
 
       @prompts[name_s] = Prompt.new(name_s, description, arguments, handler)
+      # Mark the prompts list as changed so clients know to refresh
+      @prompts_list_changed = true
+      # If a transport is active, proactively notify clients about the list change.
+      notify_prompts_list_changed
       logger.debug("Registered prompt: #{name_s}")
       self
     end
@@ -84,10 +91,12 @@ module VectorMCP
       case transport
       when :stdio
         transport_instance = VectorMCP::Transport::Stdio.new(self)
+        self.transport = transport_instance
         transport_instance.run
       when :sse
         # Pass options like host, port, path_prefix to the SSE transport
         transport_instance = VectorMCP::Transport::SSE.new(self, options)
+        self.transport = transport_instance
         transport_instance.run
       else
         logger.fatal("Unsupported transport: #{transport}")
@@ -129,12 +138,34 @@ module VectorMCP
       caps = {}
       caps[:tools] = { listChanged: false } unless @tools.empty?
       caps[:resources] = { subscribe: false, listChanged: false } unless @resources.empty?
-      caps[:prompts] = { listChanged: false } unless @prompts.empty?
+      caps[:prompts] = { listChanged: @prompts_list_changed } unless @prompts.empty?
       caps[:experimental] = {}
       caps
     end
 
+    # Clear the prompts listChanged flag (typically called after a client refreshes the list)
+    def clear_prompts_list_changed
+      @prompts_list_changed = false
+    end
+
+    def notify_prompts_list_changed
+      return unless transport
+
+      if transport.respond_to?(:broadcast_notification)
+        transport.broadcast_notification("notifications/prompts/list_changed")
+      elsif transport.respond_to?(:send_notification)
+        transport.send_notification("notifications/prompts/list_changed")
+      end
+    rescue StandardError => e
+      logger.error("Failed to send prompts list changed notification: #{e.message}")
+    end
+
     private
+
+    # Allow Core handler to register a session as subscriber
+    def subscribe_prompts(session)
+      @prompt_subscribers << session unless @prompt_subscribers.include?(session)
+    end
 
     # Returns the result hash or raises a ProtocolError
     def handle_request(id, method, params, session)
@@ -206,6 +237,7 @@ module VectorMCP
       on_request("resources/read", &Handlers::Core.method(:read_resource))
       on_request("prompts/list", &Handlers::Core.method(:list_prompts))
       on_request("prompts/get", &Handlers::Core.method(:get_prompt))
+      on_request("prompts/subscribe", &Handlers::Core.method(:subscribe_prompts))
 
       # Core Notifications
       on_notification("initialized", &Handlers::Core.method(:initialized_notification))

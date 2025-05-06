@@ -63,9 +63,19 @@ module VectorMCP
 
       # List registered prompts
       def self.list_prompts(_params, _session, server)
-        {
+        # Once the list is supplied, clear the listChanged flag
+        result = {
           prompts: server.prompts.values.map(&:as_mcp_definition)
         }
+        server.clear_prompts_list_changed if server.respond_to?(:clear_prompts_list_changed)
+        result
+      end
+
+      # Subscribe for prompt list change notifications (simple ack)
+      def self.subscribe_prompts(_params, session, server)
+        # Use private helper via send to avoid making it public
+        server.send(:subscribe_prompts, session) if server.respond_to?(:send)
+        {}
       end
 
       # Get a prompt by name

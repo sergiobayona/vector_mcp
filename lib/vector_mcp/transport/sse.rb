@@ -152,6 +152,16 @@ module VectorMCP
         enqueue_message(session_id, message)
       end
 
+      # Broadcast a notification to all connected clients
+      def broadcast_notification(method, params = nil)
+        logger.debug { "Broadcasting #{method} to all clients (#{@clients.size})" }
+        @clients_mutex.synchronize do
+          @clients.each_key do |sid|
+            send_notification(sid, method, params)
+          end
+        end
+      end
+
       # --- Internal Handlers (now private) ---
       private
 
