@@ -85,7 +85,26 @@ module VectorMCP
         raise VectorMCP::NotFoundError.new("Not Found", details: "Prompt not found: #{prompt_name}") unless prompt
 
         arguments = params["arguments"] || {}
-        # Call the registered handler, passing the arguments
+        # Validate arguments against prompt definition
+        raise VectorMCP::InvalidParamsError.new("arguments must be an object", details: { prompt: prompt_name }) unless arguments.is_a?(Hash)
+
+        arg_defs = prompt.respond_to?(:arguments) ? (prompt.arguments || []) : []
+        required = arg_defs.select { |a| a[:required] }.map { |a| a[:name].to_s }
+        allowed  = arg_defs.map { |a| a[:name].to_s }
+
+        supplied_keys = arguments.keys.map(&:to_s)
+
+        missing = required - supplied_keys
+        unknown = supplied_keys - allowed
+
+        if missing.any? || unknown.any?
+          details = { prompt: prompt_name }
+          details[:missing] = missing unless missing.empty?
+          details[:unknown] = unknown unless unknown.empty?
+          raise VectorMCP::InvalidParamsError.new("Invalid arguments", details: details)
+        end
+
+        # Call the registered handler, passing the validated arguments
         # The handler is expected to return a Hash like { messages: [...], description?: "..." }
         result_data = prompt.handler.call(arguments)
 

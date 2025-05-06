@@ -232,7 +232,7 @@ RSpec.describe VectorMCP::Server do
         server.register_prompt(
           name: "test_prompt",
           description: "test",
-          arguments: [],
+          arguments: [{ name: "arg1" }],
           &proc { "response" }
         )
       end
@@ -519,7 +519,7 @@ RSpec.describe VectorMCP::Server do
       context "when prompt exists and handler succeeds" do
         before do
           allow(mock_prompt_handler).to receive(:call).with(request_args).and_return(handler_result)
-          server.register_prompt(name: prompt_name, description: "Test", arguments: [], &mock_prompt_handler.method(:call))
+          server.register_prompt(name: prompt_name, description: "Test", arguments: [{ name: "arg1" }], &mock_prompt_handler.method(:call))
         end
 
         it "calls the registered prompt handler with arguments" do
@@ -538,7 +538,7 @@ RSpec.describe VectorMCP::Server do
       context "when prompt exists but handler returns invalid structure" do
         before do
           allow(mock_prompt_handler).to receive(:call).with(request_args).and_return({ wrong_key: [] }) # Missing :messages
-          server.register_prompt(name: prompt_name, description: "Test", arguments: [], &mock_prompt_handler.method(:call))
+          server.register_prompt(name: prompt_name, description: "Test", arguments: [{ name: "arg1" }], &mock_prompt_handler.method(:call))
         end
 
         it "raises InternalError due to invalid structure" do
@@ -556,7 +556,7 @@ RSpec.describe VectorMCP::Server do
         before do
           invalid_messages = [{ role: "user", content: "just a string" }] # Content should be hash
           allow(mock_prompt_handler).to receive(:call).with(request_args).and_return({ messages: invalid_messages })
-          server.register_prompt(name: prompt_name, description: "Test", arguments: [], &mock_prompt_handler.method(:call))
+          server.register_prompt(name: prompt_name, description: "Test", arguments: [{ name: "arg1" }], &mock_prompt_handler.method(:call))
         end
 
         it "raises InternalError due to invalid message structure" do
@@ -574,7 +574,7 @@ RSpec.describe VectorMCP::Server do
         let(:handler_error_message) { "Handler exploded" }
         before do
           allow(mock_prompt_handler).to receive(:call).with(request_args).and_raise(StandardError, handler_error_message)
-          server.register_prompt(name: prompt_name, description: "Test", arguments: [], &mock_prompt_handler.method(:call))
+          server.register_prompt(name: prompt_name, description: "Test", arguments: [{ name: "arg1" }], &mock_prompt_handler.method(:call))
         end
 
         it "raises InternalError" do

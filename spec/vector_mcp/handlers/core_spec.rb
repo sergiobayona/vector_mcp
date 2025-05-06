@@ -140,7 +140,7 @@ RSpec.describe VectorMCP::Handlers::Core do
     let(:handler_proc) do
       proc { { description: "d", messages: [{ role: "user", content: { type: "text", text: "hi" } }] } }
     end
-    let(:prompt) { double("prompt", handler: handler_proc) }
+    let(:prompt) { double("prompt", handler: handler_proc, arguments: []) }
     before { server.prompts[prompt_name] = prompt }
 
     context "when prompt exists and returns valid structure" do
@@ -191,6 +191,25 @@ RSpec.describe VectorMCP::Handlers::Core do
         end.to raise_error(VectorMCP::InternalError) { |err|
           expect(err.message).to eq("Prompt handler returned invalid message structure")
         }
+      end
+    end
+
+    context "argument validation" do
+      let(:prompt_arguments) { [{ name: "req", required: true }, { name: "opt" }] }
+      let(:prompt) { double("prompt", handler: ->(_args) { { messages: [] } }, arguments: prompt_arguments) }
+      before { server.prompts[prompt_name] = prompt }
+
+      it "raises InvalidParamsError when required args missing" do
+        expect do
+          described_class.get_prompt({ "name" => prompt_name, "arguments" => {} }, session, server)
+        end.to raise_error(VectorMCP::InvalidParamsError) { |err| expect(err.details[:missing]).to include("req") }
+      end
+
+      it "raises InvalidParamsError for unknown args" do
+        args = { "req" => "v", "extra" => 1 }
+        expect do
+          described_class.get_prompt({ "name" => prompt_name, "arguments" => args }, session, server)
+        end.to raise_error(VectorMCP::InvalidParamsError) { |err| expect(err.details[:unknown]).to include("extra") }
       end
     end
   end
