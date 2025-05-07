@@ -9,15 +9,44 @@ module VectorMCP
   module Util
     module_function
 
-    # Converts a given Ruby object into an array of MCP content item(s).
-    # This is the primary public method for content conversion.
+    # Converts a given Ruby object into an **array of MCP content items**.
+    # This is the *primary* public helper for transforming arbitrary Ruby values
+    # into the wire-format expected by the MCP spec.
     #
-    # @param input [Object] The Ruby object to convert.
-    #   Can be a String, Hash, Array, or other basic types.
-    # @param mime_type [String] The default MIME type to use for textual content
-    #   if not automatically determined (e.g., for JSON from a Hash).
-    # @return [Array<Hash>] An array of MCP content item hashes.
-    #   Each hash typically has `:type`, `:text`, and `:mimeType` keys.
+    # === Conversion rules
+    # The algorithm is deterministic and can be summarised as follows:
+    #
+    # | Ruby value                                     | Resulting content array |
+    # | ---------------------------------------------- | ----------------------- |
+    # | `String`                                       | `[ {type: "text", text: <string>, mimeType: <mime_type>} ]` |
+    # | `Hash` **with** a `:type`/`"type"` key          | `[ hash.transform_keys(&:to_sym) ]` *(assumed pre-formatted)* |
+    # | `Hash` **without** `:type`                     | `[ {type: "text", text: JSON.dump(hash), mimeType: "application/json"} ]` |
+    # | `Array` where **all** items are pre-formatted  | `array.map { |h| h.transform_keys(&:to_sym) }` |
+    # | `Array` of mixed / non-formatted items         | Recursively flattened via the same algorithm |
+    # | Any other object                               | `[ {type: "text", text: obj.to_s, mimeType: <mime_type>} ]` |
+    #
+    # Keys present in each returned hash:
+    # * **:type**      – Currently always `"text"`; future protocol versions may add rich/binary types.
+    # * **:text**      – UTF-8 encoded payload.
+    # * **:mimeType**  – IANA media-type describing `:text` (`"text/plain"`, `"application/json"`, …).
+    # * **:uri**       – _Optional._  Added downstream (e.g., by {Handlers::Core.read_resource}).
+    #
+    # The method **never** returns `nil` and **always** returns at least one element.
+    #
+    # @param input [Object] The Ruby value to convert. Supported types are
+    #   `String`, `Hash`, `Array`, or any object that responds to `#to_s`.
+    # @param mime_type [String] The fallback MIME type for plain-text conversions
+    #   (defaults to `"text/plain"`).
+    # @return [Array<Hash>] A non-empty array whose hashes conform to the MCP
+    #   `Content` schema.
+    #
+    # @example Simple string
+    #   VectorMCP::Util.convert_to_mcp_content("Hello")
+    #   # => [{type: "text", text: "Hello", mimeType: "text/plain"}]
+    #
+    # @example Complex object
+    #   VectorMCP::Util.convert_to_mcp_content({foo: 1})
+    #   # => [{type: "text", text: "{\"foo\":1}", mimeType: "application/json"}]
     def convert_to_mcp_content(input, mime_type: "text/plain")
       return string_content(input, mime_type) if input.is_a?(String)
       return hash_content(input)             if input.is_a?(Hash)

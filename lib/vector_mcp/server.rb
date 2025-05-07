@@ -94,11 +94,16 @@ module VectorMCP
     #
     # @param name [String, Symbol] The unique name for the tool.
     # @param description [String] A human-readable description of the tool.
-    # @param input_schema [Hash] A JSON Schema definition for the tool's input parameters.
-    # @yield [Hash] A block that implements the tool's logic. It receives a hash of arguments
-    #   conforming to `input_schema` and should return the tool's output.
-    # @return [self] The server instance, allowing for method chaining.
-    # @raise [ArgumentError] if a tool with the same name is already registered.
+    # @param input_schema [Hash] A JSON Schema object that precisely describes the
+    #   structure of the argument hash your tool expects.  The schema **must** be
+    #   compatible with the official MCP JSON-Schema draft so that remote
+    #   validators can verify user input.
+    # @yield [Hash] A block implementing the tool logic.  The yielded argument is
+    #   the user-supplied input hash, already guaranteed (by the caller) to match
+    #   `input_schema`.
+    # @return [self] Returns the server instance so you can chain
+    #   registrations—e.g., `server.register_tool(...).register_resource(...)`.
+    # @raise [ArgumentError] If another tool with the same name is already registered.
     def register_tool(name:, description:, input_schema:, &handler)
       name_s = name.to_s
       raise ArgumentError, "Tool '#{name_s}' already registered" if @tools[name_s]
@@ -116,6 +121,8 @@ module VectorMCP
     # @param mime_type [String] The MIME type of the resource's content (default: "text/plain").
     # @yield [Hash] A block that provides the resource's content. It may receive parameters
     #   from the `resources/read` request (for dynamic resources; for static resources, parameters may be ignored).
+    #   The block should return **any Ruby value**; the value will be normalised
+    #   to MCP `Content[]` via {VectorMCP::Util.convert_to_mcp_content}.
     # @return [self] The server instance, for chaining.
     # @raise [ArgumentError] if a resource with the same URI is already registered.
     def register_resource(uri:, name:, description:, mime_type: "text/plain", &handler)
@@ -134,7 +141,9 @@ module VectorMCP
     # @param arguments [Array<Hash>] An array defining the prompt's arguments.
     #   Each hash should conform to the prompt argument schema (e.g., `{ name:, description:, required: }`).
     # @yield [Hash] A block that generates the prompt. It receives a hash of arguments,
-    #   validated against the prompt's argument definitions.
+    #   validated against the prompt's argument definitions. The block must
+    #   return a hash conforming to the MCP *GetPromptResult* schema—see
+    #   Handlers::Core#get_prompt for the exact contract enforced.
     # @return [self] The server instance, for chaining.
     # @raise [ArgumentError] if a prompt with the same name is already registered, or if
     #   the `arguments` definition is invalid.

@@ -4,7 +4,10 @@ module VectorMCP
   # Base error class for all VectorMCP specific errors.
   class Error < StandardError; end
 
-  # Base class for JSON-RPC 2.0 protocol errors.
+  # Base class for **all** JSON-RPC 2.0 errors that the VectorMCP library can
+  # emit.  It mirrors the structure defined by the JSON-RPC spec and adds a
+  # flexible `details` field that implementers may use to attach structured,
+  # implementation-specific metadata to an error payload.
   #
   # @attr_reader code [Integer] The JSON-RPC error code.
   # @attr_reader message [String] A string providing a short description of the error.
@@ -90,7 +93,9 @@ module VectorMCP
   # Represents a JSON-RPC server-defined error (codes -32000 to -32099).
   class ServerError < ProtocolError
     # @param message [String] The error message.
-    # @param code [Integer] The server-defined error code. Must be between -32099 and -32000.
+    # @param code [Integer] The server-defined error code. Must be between -32099 and -32000. If the
+    #   supplied value falls outside this range it will be coerced to **-32000** in order to comply
+    #   with the JSON-RPC 2.0 specification.
     # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Server error", code: -32_000, details: nil, request_id: nil)
