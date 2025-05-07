@@ -17,9 +17,9 @@ This library allows you to easily create MCP servers that expose your applicatio
 *   **Tools:** Define and register custom tools (functions) that the LLM can invoke.
 *   **Resources:** Expose data sources (files, database results, API outputs) for the LLM to read.
 *   **Prompts:** Provide structured prompt templates the LLM can request and use.
-*   **Multiple Transports:**
-    *   **Stdio:** Simple transport using standard input/output, ideal for process-based servers.
-    *   **SSE (Server-Sent Events):** Asynchronous network transport using the modern [`async`/`falcon`](https://github.com/socketry/async) ecosystem.
+*   **Transport:**
+    *   **Stdio (stable):** Simple transport using standard input/output, ideal for process-based servers.
+    *   **SSE (work-in-progress):** Server-Sent Events support is under active development and currently unavailable.
 *   **Extensible Handlers:** Provides default handlers for core MCP methods, which can be overridden.
 *   **Clear Error Handling:** Custom error classes mapping to JSON-RPC/MCP error codes.
 *   **Ruby-like API:** Uses blocks for registering handlers, following idiomatic Ruby patterns.
@@ -44,7 +44,7 @@ Or install it yourself as:
 $ gem install vector_mcp
 ```
 
-Note: The SSE transport requires additional gems (`async`, `async-http`, `falcon`, `rack`). These will be installed automatically if you install `vector_mcp`.
+> ⚠️  **Heads-up:** SSE transport is not yet supported in the released gem. When it lands it will require additional gems (`async`, `async-http`, `falcon`, `rack`).
 
 ## Quick Start
 
@@ -235,22 +235,7 @@ Use the `run` method, specifying the desired transport.
 server.run(transport: :stdio)
 ```
 
-**SSE:**
-
-Requires the `async`, `falcon`, etc. gems.
-
-```ruby
-server.run(
-  transport: :sse,
-  options: {
-    host: "0.0.0.0",        # Default: 'localhost'
-    port: 8080,             # Default: 8000
-    path_prefix: "/my_mcp"  # Default: '/mcp'. Endpoints become /my_mcp/sse and /my_mcp/message
-  }
-)
-```
-
-The SSE server uses Falcon and runs asynchronously. Use Ctrl+C (SIGINT) or SIGTERM to stop it gracefully.
+**SSE (planned):** Not yet available. Expect a `transport: :sse` option in a future release.
 
 ### Custom Handlers
 
@@ -272,7 +257,7 @@ end
 ## Architecture
 
 *   **`VectorMCP::Server`:** The main class. Manages registration, state, and dispatches incoming messages to appropriate handlers.
-*   **`VectorMCP::Transport::{Stdio, SSE}`:** Handle the specifics of communication over different channels (stdin/stdout or HTTP SSE). They read raw data, parse JSON, call `Server#handle_message`, and send back formatted JSON-RPC responses/errors.
+*   **`VectorMCP::Transport::{Stdio, SSE}`:** `Stdio` is implemented today; `SSE` is planned but not yet released.
 *   **`VectorMCP::Session`:** Holds state related to a specific client connection, primarily the initialization status and negotiated capabilities. Passed to handlers.
 *   **`VectorMCP::Definitions::{Tool, Resource, Prompt}`:** Simple structs holding registered capability information and handler blocks.
 *   **`VectorMCP::Handlers::Core`:** Contains default implementations for standard MCP methods.
@@ -294,9 +279,9 @@ After checking out the repo:
 3.  Run an example server:
     ```bash
     $ bundle exec ruby examples/stdio_server.rb
-    # or
-    $ bundle exec ruby examples/simple_server.rb # For SSE
     ```
+
+    _SSE example will be added when the feature is ready._
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
