@@ -20,6 +20,7 @@ module VectorMCP
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :in_flight_requests
     attr_accessor :transport
 
+    # rubocop:disable Metrics/ParameterLists
     def initialize(name_pos = nil, *, name: nil, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION)
       # Allow specifying the server name either positionally or via the `name:` keyword.
       # If both are provided prefer the positional form but raise if they differ to avoid ambiguity.
@@ -47,6 +48,7 @@ module VectorMCP
       setup_default_handlers
       logger.info("Server instance '#{@name}' v#{version} (using VectorMCP v#{VectorMCP::VERSION}) initialized.")
     end
+    # rubocop:enable Metrics/ParameterLists
 
     # --- Registration Methods ---
 
@@ -98,11 +100,19 @@ module VectorMCP
 
     # --- Server Execution ---
 
-    def run(transport: :stdio, options: {})
+    # Runs the server using the specified transport.
+    # Optional keyword arguments (`**options`) are accepted for future
+    # transport-specific configuration (e.g., host/port for an HTTP transport).
+    # They are currently ignored by the :stdio implementation and will be
+    # forwarded to the appropriate transport once additional transports are
+    # production-ready.
+    # rubocop:disable Lint/UnusedMethodArgument
+    def run(transport: :stdio, **options)
       case transport
       when :stdio
         transport_instance = VectorMCP::Transport::Stdio.new(self)
         self.transport = transport_instance
+        # Stdio transport does not yet make use of additional options.
         transport_instance.run
       when :sse
         # The SSE transport is not production-ready yet.
@@ -113,6 +123,7 @@ module VectorMCP
         raise ArgumentError, "Unsupported transport: #{transport}"
       end
     end
+    # rubocop:enable Lint/UnusedMethodArgument
 
     # --- Message Handling Logic (called by transport) ---
     # Now returns the result/error hash, transport handles sending

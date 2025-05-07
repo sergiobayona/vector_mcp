@@ -23,7 +23,11 @@ Metrics/AbcSize:
 
 # Increase class length limits
 Metrics/ClassLength:
-  Max: 150
+  Max: 200
+
+# Increase module length limits
+Metrics/ModuleLength:
+  Max: 200
 
 # Increase line length
 Layout/LineLength:
@@ -40,3 +44,13 @@ Metrics/PerceivedComplexity:
 # If you're using RSpec and Rake, you might want to include these extensions
 require:
   - rubocop-rake
+
+# Ignore long blocks in tests
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+
+Style/MultilineBlockChain:
+  Exclude:
+    - 'spec/**/*'
+  
