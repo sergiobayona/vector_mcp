@@ -8,17 +8,16 @@ module VectorMCP
   #
   # @attr_reader code [Integer] The JSON-RPC error code.
   # @attr_reader message [String] A string providing a short description of the error.
-  # @attr_reader data [Object, nil] A primitive or structured value that contains additional information about the error. This may be omitted.
   # @attr_reader request_id [String, Integer, nil] The ID of the request that caused this error, if applicable.
-  # @attr_reader details [Hash, nil] Additional implementation-specific details for the error.
+  # @attr_reader details [Hash, nil] Additional implementation-specific details for the error (optional).
   class ProtocolError < Error
-    attr_reader :code, :message, :data, :request_id
+    attr_reader :code, :message, :request_id, :details
 
     # Initializes a new ProtocolError.
     #
     # @param message [String] The error message.
     # @param code [Integer] The JSON-RPC error code.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message, code: -32_600, details: nil, request_id: nil)
       VectorMCP.logger.debug("Initializing ProtocolError with code: #{code}")
@@ -28,8 +27,6 @@ module VectorMCP
       @request_id = request_id
       super(message)
     end
-
-    attr_reader :details
   end
 
   # Standard JSON-RPC error classes
@@ -38,7 +35,7 @@ module VectorMCP
   # Indicates invalid JSON was received by the server.
   class ParseError < ProtocolError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Parse error", details: nil, request_id: nil)
       super(message, code: -32_700, details: details, request_id: request_id)
@@ -49,7 +46,7 @@ module VectorMCP
   # Indicates the JSON sent is not a valid Request object.
   class InvalidRequestError < ProtocolError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Invalid Request", details: nil, request_id: nil)
       super(message, code: -32_600, details: details, request_id: request_id)
@@ -60,7 +57,7 @@ module VectorMCP
   # Indicates the method does not exist or is not available.
   class MethodNotFoundError < ProtocolError
     # @param method [String] The name of the method that was not found.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(method, details: nil, request_id: nil)
       details ||= { method_name: method }
@@ -72,7 +69,7 @@ module VectorMCP
   # Indicates invalid method parameter(s).
   class InvalidParamsError < ProtocolError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Invalid params", details: nil, request_id: nil)
       super(message, code: -32_602, details: details, request_id: request_id)
@@ -83,7 +80,7 @@ module VectorMCP
   # Indicates an internal error in the JSON-RPC server.
   class InternalError < ProtocolError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Internal error", details: nil, request_id: nil)
       super(message, code: -32_603, details: details, request_id: request_id)
@@ -94,7 +91,7 @@ module VectorMCP
   class ServerError < ProtocolError
     # @param message [String] The error message.
     # @param code [Integer] The server-defined error code. Must be between -32099 and -32000.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Server error", code: -32_000, details: nil, request_id: nil)
       VectorMCP.logger.debug("Initializing ServerError with code: #{code}")
@@ -109,7 +106,7 @@ module VectorMCP
   # Represents an error indicating a request was received before server initialization completed (-32002).
   class InitializationError < ServerError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Server not initialized", details: nil, request_id: nil)
       super(message, code: -32_002, details: details, request_id: request_id)
@@ -121,7 +118,7 @@ module VectorMCP
   # but is common in practice for "Not Found" scenarios.
   class NotFoundError < ProtocolError
     # @param message [String] The error message.
-    # @param details [Hash, nil] Additional details for the error.
+    # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Not Found", details: nil, request_id: nil)
       VectorMCP.logger.debug("Initializing NotFoundError with code: -32001")

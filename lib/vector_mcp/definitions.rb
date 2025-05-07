@@ -17,6 +17,7 @@ module VectorMCP
     # @!attribute handler [rw] Proc
     #   A callable (e.g., a Proc or lambda) that executes the tool's logic.
     #   It receives the tool input (a Hash) as its argument.
+    #   The input hash structure should match the input_schema.
     Tool = Struct.new(:name, :description, :input_schema, :handler) do
       # Converts the tool to its MCP definition hash.
       # @return [Hash] A hash representing the tool in MCP format.
@@ -40,7 +41,7 @@ module VectorMCP
     # @!attribute mime_type [rw] String
     #   The MIME type of the resource content (e.g., "text/plain", "application/json").
     # @!attribute handler [rw] Proc
-    #   A callable that returns the content of the resource. It takes no arguments.
+    #   A callable that returns the content of the resource. It may receive parameters from the request (e.g., for dynamic resources).
     Resource = Struct.new(:uri, :name, :description, :mime_type, :handler) do
       # Converts the resource to its MCP definition hash.
       # @return [Hash] A hash representing the resource in MCP format.
@@ -64,7 +65,7 @@ module VectorMCP
     #   An array of argument definitions for the prompt, where each hash can contain
     #   `:name`, `:description`, and `:required` (Boolean).
     # @!attribute handler [rw] Proc
-    #   A callable that generates the prompt content. It receives a hash of arguments.
+    #   A callable that generates the prompt content. It receives a hash of arguments, validated against the prompt's argument definitions.
     Prompt = Struct.new(:name, :description, :arguments, :handler) do
       # Converts the prompt to its MCP definition hash.
       # @return [Hash] A hash representing the prompt in MCP format.

@@ -113,7 +113,7 @@ module VectorMCP
     # @param description [String] A description of the resource.
     # @param mime_type [String] The MIME type of the resource's content (default: "text/plain").
     # @yield [Hash] A block that provides the resource's content. It may receive parameters
-    #   from the `resources/read` request (though often unused for simple resources).
+    #   from the `resources/read` request (for dynamic resources; for static resources, parameters may be ignored).
     # @return [self] The server instance, for chaining.
     # @raise [ArgumentError] if a resource with the same URI is already registered.
     def register_resource(uri:, name:, description:, mime_type: "text/plain", &handler)
@@ -130,8 +130,8 @@ module VectorMCP
     # @param description [String] A human-readable description of the prompt.
     # @param arguments [Array<Hash>] An array defining the prompt's arguments.
     #   Each hash should conform to the prompt argument schema (e.g., `{ name:, description:, required: }`).
-    # @yield [Hash] A block that generates the prompt. It receives a hash of arguments
-    #   supplied by the client, validated against the `arguments` definition.
+    # @yield [Hash] A block that generates the prompt. It receives a hash of arguments,
+    #   validated against the prompt's argument definitions.
     # @return [self] The server instance, for chaining.
     # @raise [ArgumentError] if a prompt with the same name is already registered, or if
     #   the `arguments` definition is invalid.
@@ -179,6 +179,7 @@ module VectorMCP
     #
     # @param transport [:stdio, :sse, VectorMCP::Transport::Base] The transport to use.
     #   Can be a symbol (`:stdio`, `:sse`) or an initialized transport instance.
+    #   If a symbol is provided, the method will instantiate the corresponding transport class.
     #   If `:sse` is chosen, ensure `async` and `falcon` gems are available.
     # @param options [Hash] Transport-specific options (e.g., `:host`, `:port` for SSE).
     #   These are passed to the transport's constructor if a symbol is provided for `transport`.
@@ -214,7 +215,7 @@ module VectorMCP
     # @return [Object, nil] For requests, returns the result data to be sent in the JSON-RPC response.
     #   For notifications, returns `nil`.
     # @raise [VectorMCP::ProtocolError] if the message is invalid or an error occurs during handling
-    #   that should be reported as a JSON-RPC error.
+    #   that should be reported as a JSON-RPC error. May also raise subclasses such as NotFoundError, InvalidParamsError, etc.
     def handle_message(message, session, session_id)
       id = message["id"]
       method = message["method"]
@@ -307,7 +308,7 @@ module VectorMCP
     # @param params [Hash] The request parameters.
     # @param session [VectorMCP::Session] The client session.
     # @return [Object] The result of the request handler.
-    # @raise [VectorMCP::ProtocolError] Propagates errors from handlers or raises new ones (e.g., MethodNotFound).
+    # @raise [VectorMCP::ProtocolError] Propagates errors from handlers or raises new ones (e.g., MethodNotFound, NotFoundError, etc.).
     def handle_request(id, method, params, session)
       unless session.initialized?
         # Allow "initialize" even if not marked initialized yet by server
@@ -345,6 +346,7 @@ module VectorMCP
     # @param params [Hash] The notification parameters.
     # @param session [VectorMCP::Session] The client session.
     # @return [void]
+    # @raise [StandardError] if the notification handler raises an error (errors are logged, not propagated to the client).
     def handle_notification(method, params, session)
       unless session.initialized? || method == "initialized"
         logger.warn("Ignoring notification '#{method}' before session is initialized. Params: #{params.inspect}")
