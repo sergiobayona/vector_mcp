@@ -25,9 +25,6 @@
 
 # Documentation
 /.yardoc/
-/_yardoc/
-/doc/
-/rdoc/
 
 # GEM specific
 Gemfile.lock
