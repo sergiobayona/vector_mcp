@@ -553,10 +553,21 @@ module VectorMCP
         [202, { "Content-Type" => "application/json" }, [{ status: "accepted", id: message["id"] }.to_json]]
       rescue VectorMCP::ProtocolError => e
         # Errors from server.handle_message (application-level protocol errors)
-        handle_protocol_error(e, client_conn, message) # Enqueues and returns Rack error
+        # rubocop:disable Layout/LineLength
+        logger.error("[POST Client: #{client_conn.id}] Protocol Error during message handling: #{e.message} (Code: #{e.code}), Details: #{e.details.inspect}")
+        # rubocop:enable Layout/LineLength
+        request_id = e.request_id || message&.fetch("id", nil)
+        enqueue_error(client_conn, request_id, e.code, e.message, e.details)
+        # Return an appropriate HTTP error response for the POST request itself
+        error_response(request_id, e.code, e.message, e.details)
       rescue StandardError => e
         # Unexpected errors during server.handle_message
-        handle_post_unexpected_error(e, client_conn, message, client_conn.id) # Enqueues and returns Rack error
+        logger.error("[POST Client: #{client_conn.id}] Unhandled Error during message processing: #{e.message}\n#{e.backtrace.join("\n")}")
+        request_id = message&.fetch("id", nil)
+        details = { class: e.class.name, message: e.message } # Avoid sending full backtrace to client
+        enqueue_error(client_conn, request_id, -32_603, "Internal server error", details)
+        # Return a 500 Internal Server Error response for the POST request
+        error_response(request_id, -32_603, "Internal server error", details)
       end
 
       # Parses the JSON body of a POST request. Handles JSON::ParserError by enqueuing an error
@@ -576,29 +587,6 @@ module VectorMCP
         enqueue_error(target_client, malformed_id, -32_700, "Parse error") if target_client
         # Return a Rack error response for the POST itself
         error_response(malformed_id, -32_700, "Parse error")
-      end
-
-      # Handles {VectorMCP::ProtocolError} raised during `server.handle_message`.
-      # Enqueues the error to the client's SSE stream and returns a Rack error response.
-      # @api private
-      def handle_protocol_error(error, client_conn, original_message)
-        logger.error("[POST Client: #{client_conn.id}] Protocol Error during message handling: #{error.message} (Code: #{error.code}), Details: #{error.details.inspect}")
-        request_id = error.request_id || original_message&.fetch("id", nil)
-        enqueue_error(client_conn, request_id, error.code, error.message, error.details)
-        # Return an appropriate HTTP error response for the POST request itself
-        error_response(request_id, error.code, error.message, error.details)
-      end
-
-      # Handles unexpected `StandardError` raised during `server.handle_message`.
-      # Enqueues an InternalError to client's SSE and returns a 500 Rack error response.
-      # @api private
-      def handle_post_unexpected_error(error, client_conn, original_message, client_session_id_for_log)
-        logger.error("[POST Client: #{client_session_id_for_log}] Unhandled Error during message processing: #{error.message}\n#{error.backtrace.join("\n")}")
-        request_id = original_message&.fetch("id", nil)
-        details = { class: error.class.name, message: error.message } # Avoid sending full backtrace to client
-        enqueue_error(client_conn, request_id, -32_603, "Internal server error", details)
-        # Return a 500 Internal Server Error response for the POST request
-        error_response(request_id, -32_603, "Internal server error", details)
       end
 
       # --- Message Enqueuing and Formatting Helpers (Private) ---
