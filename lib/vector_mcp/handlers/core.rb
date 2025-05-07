@@ -81,54 +81,17 @@ module VectorMCP
       # Get a prompt by name
       def self.get_prompt(params, _session, server)
         prompt_name = params["name"]
-        prompt = server.prompts[prompt_name]
-        raise VectorMCP::NotFoundError.new("Not Found", details: "Prompt not found: #{prompt_name}") unless prompt
+        prompt      = fetch_prompt(prompt_name, server)
 
         arguments = params["arguments"] || {}
-        # Validate arguments against prompt definition
-        raise VectorMCP::InvalidParamsError.new("arguments must be an object", details: { prompt: prompt_name }) unless arguments.is_a?(Hash)
+        validate_arguments!(prompt_name, prompt, arguments)
 
-        arg_defs = prompt.respond_to?(:arguments) ? (prompt.arguments || []) : []
-        required = arg_defs.select { |a| a[:required] }.map { |a| a[:name].to_s }
-        allowed  = arg_defs.map { |a| a[:name].to_s }
-
-        supplied_keys = arguments.keys.map(&:to_s)
-
-        missing = required - supplied_keys
-        unknown = supplied_keys - allowed
-
-        if missing.any? || unknown.any?
-          details = { prompt: prompt_name }
-          details[:missing] = missing unless missing.empty?
-          details[:unknown] = unknown unless unknown.empty?
-          raise VectorMCP::InvalidParamsError.new("Invalid arguments", details: details)
-        end
-
-        # Call the registered handler, passing the validated arguments
-        # The handler is expected to return a Hash like { messages: [...], description?: "..." }
+        # Call the registered handler after arguments were validated
         result_data = prompt.handler.call(arguments)
 
-        # Basic validation of the handler's response
-        unless result_data.is_a?(Hash) && result_data[:messages].is_a?(Array)
-          # Log the invalid structure for debugging
-          server.logger.error("Prompt handler for '#{prompt_name}' returned invalid data structure: #{result_data.inspect}")
-          raise VectorMCP::InternalError.new("Prompt handler returned invalid data structure",
-                                             details: { prompt: prompt_name, error: "Handler must return a Hash with a :messages Array" })
-        end
+        validate_prompt_response!(prompt_name, result_data, server)
 
-        # Ensure all message contents are valid (basic check)
-        # A more robust check might involve validating against Content schema
-        result_data[:messages].each do |msg|
-          next if msg.is_a?(Hash) && msg[:role] && msg[:content].is_a?(Hash) && msg[:content][:type]
-
-          server.logger.error("Prompt handler for '#{prompt_name}' returned invalid message structure: #{msg.inspect}")
-          raise VectorMCP::InternalError.new("Prompt handler returned invalid message structure",
-                                             details: { prompt: prompt_name,
-                                                        error: "Messages must be Hashes with :role and :content Hash (with :type)" })
-        end
-
-        # Return the result directly, assuming it matches the GetPromptResult structure
-        # Example: { description: "Optional dynamic description", messages: [{role: "user", content: {type: "text", text: "..."}}] }
+        # Return the handler response directly (must match GetPromptResult schema)
         result_data
       end
 
@@ -146,6 +109,76 @@ module VectorMCP
         # Application-specific cancellation logic would go here
         # Access in-flight requests via server.in_flight_requests[request_id]
       end
+
+      # --- Helper methods (internal) ---
+
+      def self.fetch_prompt(prompt_name, server)
+        prompt = server.prompts[prompt_name]
+        return prompt if prompt
+
+        raise VectorMCP::NotFoundError.new("Not Found", details: "Prompt not found: #{prompt_name}")
+      end
+      private_class_method :fetch_prompt
+
+      def self.validate_arguments!(prompt_name, prompt, arguments)
+        ensure_hash!(prompt_name, arguments)
+
+        arg_defs = prompt.respond_to?(:arguments) ? (prompt.arguments || []) : []
+        missing, unknown = argument_diffs(arg_defs, arguments)
+
+        return if missing.empty? && unknown.empty?
+
+        raise VectorMCP::InvalidParamsError.new("Invalid arguments",
+                                                details: build_invalid_arg_details(prompt_name, missing, unknown))
+      end
+      private_class_method :validate_arguments!
+
+      # Ensure arguments is a Hash
+      def self.ensure_hash!(prompt_name, arguments)
+        return if arguments.is_a?(Hash)
+
+        raise VectorMCP::InvalidParamsError.new("arguments must be an object", details: { prompt: prompt_name })
+      end
+      private_class_method :ensure_hash!
+
+      # Compute lists of missing and unknown keys
+      def self.argument_diffs(arg_defs, arguments)
+        required = arg_defs.select { |a| a[:required] }.map { |a| a[:name].to_s }
+        allowed  = arg_defs.map { |a| a[:name].to_s }
+
+        supplied_keys = arguments.keys.map(&:to_s)
+
+        [required - supplied_keys, supplied_keys - allowed]
+      end
+      private_class_method :argument_diffs
+
+      # Build error details hash for invalid arguments
+      def self.build_invalid_arg_details(prompt_name, missing, unknown)
+        {}.tap do |details|
+          details[:prompt]  = prompt_name
+          details[:missing] = missing unless missing.empty?
+          details[:unknown] = unknown unless unknown.empty?
+        end
+      end
+      private_class_method :build_invalid_arg_details
+
+      def self.validate_prompt_response!(prompt_name, result_data, server)
+        unless result_data.is_a?(Hash) && result_data[:messages].is_a?(Array)
+          server.logger.error("Prompt handler for '#{prompt_name}' returned invalid data structure: #{result_data.inspect}")
+          raise VectorMCP::InternalError.new("Prompt handler returned invalid data structure",
+                                             details: { prompt: prompt_name, error: "Handler must return a Hash with a :messages Array" })
+        end
+
+        result_data[:messages].each do |msg|
+          next if msg.is_a?(Hash) && msg[:role] && msg[:content].is_a?(Hash) && msg[:content][:type]
+
+          server.logger.error("Prompt handler for '#{prompt_name}' returned invalid message structure: #{msg.inspect}")
+          raise VectorMCP::InternalError.new("Prompt handler returned invalid message structure",
+                                             details: { prompt: prompt_name,
+                                                        error: "Messages must be Hashes with :role and :content Hash (with :type)" })
+        end
+      end
+      private_class_method :validate_prompt_response!
     end
   end
 end
