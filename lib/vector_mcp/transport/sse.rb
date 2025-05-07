@@ -45,102 +45,68 @@ module VectorMCP
       def run
         logger.info("Starting server with async SSE transport on #{@host}:#{@port}")
 
-        # Initialize a shared session object for this run
-        @session = VectorMCP::Session.new(
-          server_info: server.server_info,
-          server_capabilities: server.server_capabilities,
-          protocol_version: server.protocol_version
-        )
-
-        # The transport instance itself acts as the app
-        app = self
-        endpoint = Falcon::Endpoint.parse("http://#{@host}:#{@port}")
-
-        Async do |task|
-          # Set up signal handling using Async's signal handling
-          task.async do
-            trap(:INT) do
-              logger.info "SIGINT received, stopping server..."
-              task.stop
-            end
-            trap(:TERM) do
-              logger.info "SIGTERM received, stopping server..."
-              task.stop
-            end
-          end
-
-          logger.info("Falcon server starting on #{endpoint.url}")
-          # Pass the transport instance (self) wrapped in standard middleware
-          falcon_server = Falcon::Server.new(Falcon::Server.middleware(app), endpoint)
-          falcon_server.run
-          logger.info("Falcon server stopped.")
-        ensure
-          # Cleanup: Close all client queues when the server stops
-          @clients_mutex.synchronize do
-            @clients.each_value do |conn|
-              conn.queue&.close if conn.queue.respond_to?(:close)
-              conn.task&.stop # Attempt to stop the client's SSE task
-            end
-            @clients.clear
-          end
-          @session = nil # Clear session
-          logger.info("SSE transport shut down.")
-        end
+        create_session
+        start_async_server
       rescue StandardError => e
-        logger.fatal("Fatal error starting/running SSE transport: #{e.message}\n#{e.backtrace.join("\n")}")
-        exit(1)
+        handle_fatal_error(e)
       end
 
       # --- Rack-compatible call method --- #
 
       def call(env)
         start_time = Time.now
-        # The `env` here can either be an `Async::HTTP::Request` (when the
-        # transport is mounted directly) **or** a Rack `env` `Hash` (when we
-        # are wrapped in `Falcon::Server.middleware`). Support both cases so
-        # that the transport can run in production and in tests which use the
-        # Rack adapter.
+        path = http_method = nil
+        path, http_method = extract_path_and_method(env)
 
-        if env.is_a?(Hash)
-          # Rack environment hash – standard keys.
-          path   = env["PATH_INFO"]
-          method = env["REQUEST_METHOD"]
-        else
-          # Async::HTTP::Request
-          path   = env.path
-          method = env.method
-        end
+        logger.info "Received #{http_method} request for #{path}"
 
-        logger.info "Received #{method} request for #{path}"
+        status, headers, body = route_request(path, env)
 
-        status, headers, body =
-          case path
-          when @sse_path
-            handle_sse_connection(env, @session)
-          when @message_path
-            handle_message_post(env, @session)
-          when "/"
-            # Simple root/health check
-            [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]]
-          else
-            [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
-          end
+        log_response(http_method, path, start_time, status)
 
-        # Simple logging similar to CommonLogger
-        duration = format("%.4f", Time.now - start_time)
-        logger.info "Responded #{status} to #{method} #{path} in #{duration}s"
-
-        # Return the standard Rack triplet
         [status, headers, body]
       rescue StandardError => e
-        # Generic error handler for unexpected issues in routing/handling
-        logger.error("Error during SSE request handling for #{method} #{path}: #{e.message}\n#{e.backtrace.join("\n")}")
-        begin
-          warn "[DEBUG-SSE-Transport] #{e.class}: #{e.message}\n\t" + e.backtrace.join("\n\t")
-        rescue StandardError
-          # ignore
+        handle_call_error(http_method, path, e)
+      end
+
+      # --- Call helpers ---
+
+      def extract_path_and_method(env)
+        if env.is_a?(Hash)
+          [env["PATH_INFO"], env["REQUEST_METHOD"]]
+        else
+          [env.path, env.method]
         end
-        # Return a 500 triplet
+      end
+
+      def route_request(path, env)
+        case path
+        when @sse_path
+          handle_sse_connection(env, @session)
+        when @message_path
+          handle_message_post(env, @session)
+        when "/"
+          [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]]
+        else
+          [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+        end
+      end
+
+      def log_response(method, path, start_time, status)
+        duration = format("%.4f", Time.now - start_time)
+        logger.info "Responded #{status} to #{method} #{path} in #{duration}s"
+      end
+
+      def handle_call_error(method, path, error)
+        error_context = method || "UNKNOWN"
+        path_context  = path   || "UNKNOWN"
+        backtrace = error.backtrace.join("\n")
+        logger.error("Error during SSE request handling for #{error_context} #{path_context}: #{error.message}\n#{backtrace}")
+        begin
+          warn "[DEBUG-SSE-Transport] #{error.class}: #{error.message}\n\t" + error.backtrace.join("\n\t")
+        rescue StandardError
+          nil
+        end
         [500, { "Content-Type" => "text/plain", "connection" => "close" }, ["Internal Server Error"]]
       end
 
@@ -165,149 +131,248 @@ module VectorMCP
       # --- Internal Handlers (now private) ---
       private
 
-      def handle_sse_connection(env, _session)
-        method = env.is_a?(Hash) ? env["REQUEST_METHOD"] : env.method
+      def create_session
+        @session = VectorMCP::Session.new(
+          server_info: server.server_info,
+          server_capabilities: server.server_capabilities,
+          protocol_version: server.protocol_version
+        )
+      end
 
-        unless method == "GET"
-          logger.warn("Received non-GET request on SSE endpoint: #{method}")
-          return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
+      def start_async_server
+        endpoint = Falcon::Endpoint.parse("http://#{@host}:#{@port}")
+        app      = self
+
+        Async do |task|
+          setup_signal_traps(task)
+
+          logger.info("Falcon server starting on #{endpoint.url}")
+          falcon_server = Falcon::Server.new(Falcon::Server.middleware(app), endpoint)
+          falcon_server.run
+          logger.info("Falcon server stopped.")
+        ensure
+          cleanup_clients
+          @session = nil
+          logger.info("SSE transport shut down.")
         end
+      end
 
-        session_id = SecureRandom.uuid
+      def setup_signal_traps(task)
+        task.async do
+          trap(:INT) do
+            logger.info("SIGINT received, stopping server...")
+            task.stop
+          end
+          trap(:TERM) do
+            logger.info("SIGTERM received, stopping server...")
+            task.stop
+          end
+        end
+      end
+
+      def cleanup_clients
+        @clients_mutex.synchronize do
+          @clients.each_value do |conn|
+            conn.queue&.close if conn.queue.respond_to?(:close)
+            conn.task&.stop
+          end
+          @clients.clear
+        end
+      end
+
+      def handle_fatal_error(error)
+        logger.fatal("Fatal error starting/running SSE transport: #{error.message}\n#{error.backtrace.join("\n")}")
+        exit(1)
+      end
+
+      def handle_sse_connection(env, _session)
+        return invalid_method_response(env) unless get_request?(env)
+
+        session_id   = SecureRandom.uuid
         client_queue = Async::Queue.new
 
-        headers = {
-          "Content-Type" => "text/event-stream",
-          "Cache-Control" => "no-cache",
-          "Connection" => "keep-alive",
-          "X-Accel-Buffering" => "no" # Useful for nginx proxying
-        }
-
-        # Create the unique URL for the client to POST messages back to
-        message_post_url = "#{@path_prefix}/message?session_id=#{session_id}"
+        headers          = default_sse_headers
+        message_post_url = build_post_url(session_id)
 
         logger.info("SSE client connected: #{session_id}")
         logger.debug("Sending endpoint URL: #{message_post_url}")
 
-        # Create a ClientConnection object but don't register it yet
-        client_conn = ClientConnection.new(session_id, client_queue, nil)
+        client_conn, body = create_client_connection(session_id, client_queue)
 
-        # Use Async::HTTP::Body::Writable for the response body
-        body = Async::HTTP::Body::Writable.new
+        stream_client_messages(client_conn, client_queue, body, message_post_url)
 
-        # Create and launch the client task directly with a variable to hold the reference
-        Async do |task|
-          # Set the task reference immediately
-          client_conn.task = task
-
-          # NOW register the client with complete information
-          @clients_mutex.synchronize { @clients[session_id] = client_conn }
-
-          begin
-            # 1. Send the initial endpoint event
-            body.write("event: endpoint\ndata: #{message_post_url}\n\n")
-
-            # 2. Listen on the client's queue and send messages
-            while (message = client_queue.dequeue)
-              json_message = message.to_json # Expecting fully formed JSON-RPC hash
-              logger.debug { "[SSE #{session_id}] Sending message: #{json_message.inspect}" }
-              body.write("event: message\ndata: #{json_message}\n\n")
-            end
-          rescue Async::Stop, IOError, Errno::EPIPE => e
-            logger.info("SSE client disconnected: #{session_id} (#{e.class})")
-          rescue StandardError => e
-            logger.error("Error in SSE task for client #{session_id}: #{e.message}\n#{e.backtrace.join("\n")}")
-          ensure
-            body.finish # Signal end of stream to Falcon
-            # Close the queue if it supports #close (Async::Queue doesn't).
-            client_queue.close if client_queue.respond_to?(:close)
-            # Remove client connection info
-            @clients_mutex.synchronize { @clients.delete(session_id) }
-            logger.debug("Cleaned up resources for SSE client: #{session_id}")
-          end
-        end
-
-        # Return the Rack response triplet
         [200, headers, body]
       end
 
-      def handle_message_post(env, session)
-        method = env.is_a?(Hash) ? env["REQUEST_METHOD"] : env.method
+      # --- SSE helpers ---
 
-        unless method == "POST"
-          logger.warn("Received non-POST request on message endpoint: #{method}")
-          return [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
-        end
+      def request_method(env)
+        env.is_a?(Hash) ? env["REQUEST_METHOD"] : env.method
+      end
 
-        # Extract query parameters - Async::HTTP::Request doesn't have `params` like Rack::Request
-        # We need to parse the query string from the path/target
-        raw_path = if env.is_a?(Hash)
-                     env["PATH_INFO"] + (env["QUERY_STRING"] && !env["QUERY_STRING"].empty? ? "?#{env["QUERY_STRING"]}" : "")
-                   else
-                     env.path
-                   end
+      def get_request?(env)
+        request_method(env) == "GET"
+      end
 
-        query_params = URI.decode_www_form(URI(raw_path).query || "").to_h
-        session_id = query_params["session_id"]
+      def invalid_method_response(env)
+        method = request_method(env)
+        logger.warn("Received non-GET request on SSE endpoint: #{method}")
+        [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
+      end
 
-        unless session_id && !session_id.empty?
-          logger.error("Missing session_id query parameter in path: #{raw_path}")
-          return error_response(nil, -32_600, "Missing session_id parameter")
-        end
+      def default_sse_headers
+        {
+          "Content-Type" => "text/event-stream",
+          "Cache-Control" => "no-cache",
+          "Connection" => "keep-alive",
+          "X-Accel-Buffering" => "no"
+        }
+      end
 
-        client_conn = @clients_mutex.synchronize { @clients[session_id] }
-        unless client_conn
-          logger.error("Invalid or expired session_id: #{session_id}")
-          return error_response(nil, -32_001, "Invalid session_id") # Use a custom server error
-        end
+      def build_post_url(session_id)
+        "#{@path_prefix}/message?session_id=#{session_id}"
+      end
 
-        begin
-          # Read the body - Async::HTTP::Request body might need explicit reading
-          request_body_str = if env.is_a?(Hash)
-                               env["rack.input"]&.read
-                             else
-                               env.body&.read
-                             end
-          unless request_body_str
-            logger.error("[POST #{session_id}] Request body is empty or could not be read")
-            return error_response(nil, -32_600, "Invalid Request: Empty body")
+      def create_client_connection(session_id, client_queue)
+        client_conn = ClientConnection.new(session_id, client_queue, nil)
+        body        = Async::HTTP::Body::Writable.new
+        [client_conn, body]
+      end
+
+      def stream_client_messages(client_conn, queue, body, post_url)
+        Async do |task|
+          prepare_client_stream(client_conn, task)
+
+          begin
+            send_endpoint_event(body, post_url)
+            stream_queue_messages(queue, body, client_conn)
+          rescue Async::Stop, IOError, Errno::EPIPE => e
+            logger.info("SSE client disconnected: #{client_conn.id} (#{e.class})")
+          rescue StandardError => e
+            logger.error("Error in SSE task for client #{client_conn.id}: #{e.message}\n#{e.backtrace.join("\n")}")
+          ensure
+            finalize_client_stream(body, queue, client_conn)
           end
-
-          message = JSON.parse(request_body_str)
-          logger.debug { "[POST #{session_id}] Received raw message: #{request_body_str.inspect}" }
-
-          # Let the server process the message. It should return the response data hash or raise an error.
-          response_data = server.handle_message(message, session, session_id) # Pass session_id for context
-
-          # Enqueue the formatted response/error to be sent over SSE
-          enqueue_formatted_response(client_conn, message["id"], response_data)
-
-          # Immediately return 202 Accepted to the POST request
-          [202, { "Content-Type" => "application/json" }, [{ status: "accepted", id: message["id"] }.to_json]]
-        rescue JSON::ParserError => e
-          logger.error("[POST #{session_id}] JSON Parse Error: #{e.message} for body: #{request_body_str.inspect}")
-          # Attempt to find ID for error response, enqueue if possible
-          id = VectorMCP::Util.extract_id_from_invalid_json(request_body_str)
-          enqueue_error(client_conn, id, -32_700, "Parse error")
-          # Return 400 Bad Request to the POST
-          [400, { "Content-Type" => "application/json" }, [format_error_body(id, -32_700, "Parse error")]]
-        rescue VectorMCP::ProtocolError => e
-          logger.error("[POST #{session_id}] Protocol Error: #{e.message} (Code: #{e.code}) #{e.details.inspect}")
-          request_id = e.request_id || message&.fetch("id", nil)
-          enqueue_error(client_conn, request_id, e.code, e.message, e.details)
-          # Return appropriate status code based on error type
-          status_code = case e.code
-                        when -32_600, -32_602 then 400 # Bad Request for Invalid Request/Params
-                        when -32_601 then 404 # Not Found for Method Not Found
-                        else 500 # Internal Server Error for others
-                        end
-          [status_code, { "Content-Type" => "application/json" }, [format_error_body(request_id, e.code, e.message, e.details)]]
-        rescue StandardError => e
-          logger.error("[POST #{session_id}] Unhandled Error: #{e.message}\n#{e.backtrace.join("\n")}")
-          request_id = message&.fetch("id", nil)
-          enqueue_error(client_conn, request_id, -32_603, "Internal server error", { details: e.message })
-          [500, { "Content-Type" => "application/json" }, [format_error_body(request_id, -32_603, "Internal server error", { details: e.message })]]
         end
+      end
+
+      def prepare_client_stream(client_conn, task)
+        client_conn.task = task
+        @clients_mutex.synchronize { @clients[client_conn.id] = client_conn }
+      end
+
+      def send_endpoint_event(body, post_url)
+        body.write("event: endpoint\ndata: #{post_url}\n\n")
+      end
+
+      def stream_queue_messages(queue, body, client_conn)
+        while (message = queue.dequeue)
+          json_message = message.to_json
+          logger.debug { "[SSE #{client_conn.id}] Sending message: #{json_message.inspect}" }
+          body.write("event: message\ndata: #{json_message}\n\n")
+        end
+      end
+
+      def finalize_client_stream(body, queue, client_conn)
+        body.finish
+        queue.close if queue.respond_to?(:close)
+        @clients_mutex.synchronize { @clients.delete(client_conn.id) }
+        logger.debug("Cleaned up resources for SSE client: #{client_conn.id}")
+      end
+
+      def handle_message_post(env, session)
+        return invalid_post_method_response(env) unless post_request?(env)
+
+        raw_path   = build_raw_path(env)
+        session_id = extract_session_id(raw_path)
+        return error_response(nil, -32_600, "Missing session_id parameter") unless session_id
+
+        client_conn = fetch_client_connection(session_id)
+        return error_response(nil, -32_001, "Invalid session_id") unless client_conn
+
+        request_body_str = read_request_body(env, session_id)
+        return error_response(nil, -32_600, "Invalid Request: Empty body") unless request_body_str
+
+        process_post_message(request_body_str, client_conn, session, session_id)
+      end
+
+      # --- POST helpers ---
+
+      def post_request?(env)
+        request_method(env) == "POST"
+      end
+
+      def invalid_post_method_response(env)
+        method = request_method(env)
+        logger.warn("Received non-POST request on message endpoint: #{method}")
+        [405, { "Content-Type" => "text/plain" }, ["Method Not Allowed"]]
+      end
+
+      def build_raw_path(env)
+        if env.is_a?(Hash)
+          query = env["QUERY_STRING"]
+          suffix = query && !query.empty? ? "?#{query}" : ""
+          env["PATH_INFO"] + suffix
+        else
+          env.path
+        end
+      end
+
+      def extract_session_id(raw_path)
+        URI.decode_www_form(URI(raw_path).query || "").to_h["session_id"]
+      end
+
+      def fetch_client_connection(session_id)
+        @clients_mutex.synchronize { @clients[session_id] }
+      end
+
+      def read_request_body(env, session_id)
+        source = env.is_a?(Hash) ? env["rack.input"] : env.body
+        body   = source&.read
+        logger.error("[POST #{session_id}] Request body is empty or could not be read") unless body
+        body
+      end
+
+      def process_post_message(body_str, client_conn, session, session_id)
+        message = parse_json_body(body_str, session_id)
+        return message if message.is_a?(Array) # Early return triplet from error
+
+        response_data = server.handle_message(message, session, session_id)
+        enqueue_formatted_response(client_conn, message["id"], response_data)
+        [202, { "Content-Type" => "application/json" }, [{ status: "accepted", id: message["id"] }.to_json]]
+      rescue VectorMCP::ProtocolError => e
+        handle_protocol_error(e, client_conn, message)
+      rescue StandardError => e
+        handle_post_unexpected_error(e, client_conn, message, session_id)
+      end
+
+      def parse_json_body(body_str, session_id)
+        JSON.parse(body_str)
+      rescue JSON::ParserError => e
+        logger.error("[POST #{session_id}] JSON Parse Error: #{e.message} for body: #{body_str.inspect}")
+        id = VectorMCP::Util.extract_id_from_invalid_json(body_str)
+        enqueue_error(fetch_client_connection(session_id), id, -32_700, "Parse error")
+        [400, { "Content-Type" => "application/json" }, [format_error_body(id, -32_700, "Parse error")]]
+      end
+
+      def handle_protocol_error(error, client_conn, message)
+        logger.error("[POST #{client_conn.id}] Protocol Error: #{error.message} (Code: #{error.code}) #{error.details.inspect}")
+        request_id = error.request_id || message&.fetch("id", nil)
+        enqueue_error(client_conn, request_id, error.code, error.message, error.details)
+
+        status_code = case error.code
+                      when -32_600, -32_602 then 400
+                      when -32_601 then 404
+                      else 500
+                      end
+        [status_code, { "Content-Type" => "application/json" }, [format_error_body(request_id, error.code, error.message, error.details)]]
+      end
+
+      def handle_post_unexpected_error(error, client_conn, message, session_id)
+        logger.error("[POST #{session_id}] Unhandled Error: #{error.message}\n#{error.backtrace.join("\n")}")
+        request_id = message&.fetch("id", nil)
+        enqueue_error(client_conn, request_id, -32_603, "Internal server error", { details: error.message })
+        [500, { "Content-Type" => "application/json" }, [format_error_body(request_id, -32_603, "Internal server error", { details: error.message })]]
       end
 
       # --- Message Enqueuing Helpers ---
@@ -352,8 +417,7 @@ module VectorMCP
         # Utility to create a full Rack error response triplet
         status = case code
                  when -32_700, -32_600, -32_602 then 400
-                 when -32_601 then 404
-                 when -32_001 then 404 # NotFoundError
+                 when -32_601, -32_001 then 404
                  else 500
                  end
         [status, { "Content-Type" => "application/json" }, [format_error_body(id, code, message, data)]]
