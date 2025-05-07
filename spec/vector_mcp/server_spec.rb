@@ -642,16 +642,10 @@ RSpec.describe VectorMCP::Server do
     end
 
     context "with :sse transport" do
-      let(:sse_instance) { instance_double(VectorMCP::Transport::SSE, run: nil) }
-
-      before do
-        allow(VectorMCP::Transport::SSE).to receive(:new).and_return(sse_instance)
-      end
-
-      it "initializes an SSE transport and calls run" do
-        server.run(transport: :sse, options: { host: "localhost" })
-        expect(VectorMCP::Transport::SSE).to have_received(:new).with(server, hash_including(host: "localhost"))
-        expect(sse_instance).to have_received(:run)
+      it "raises NotImplementedError" do
+        expect do
+          server.run(transport: :sse, options: { host: "localhost" })
+        end.to raise_error(NotImplementedError, /SSE transport is not yet supported/i)
       end
     end
   end

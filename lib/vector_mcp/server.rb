@@ -97,10 +97,9 @@ module VectorMCP
         self.transport = transport_instance
         transport_instance.run
       when :sse
-        # Pass options like host, port, path_prefix to the SSE transport
-        transport_instance = VectorMCP::Transport::SSE.new(self, options)
-        self.transport = transport_instance
-        transport_instance.run
+        # The SSE transport is not production-ready yet.
+        # Raise a clear error so callers know it cannot be used for now.
+        raise NotImplementedError, "The SSE transport is not yet supported."
       else
         logger.fatal("Unsupported transport: #{transport}")
         raise ArgumentError, "Unsupported transport: #{transport}"
