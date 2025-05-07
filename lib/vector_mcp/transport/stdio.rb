@@ -21,34 +21,17 @@ module VectorMCP
       end
 
       def run
-        # Initialize a session for this connection
-        session = VectorMCP::Session.new(
-          server_info: server.server_info,
-          server_capabilities: server.server_capabilities,
-          protocol_version: server.protocol_version
-        )
-
+        session = create_session
         logger.info("Starting stdio transport")
         @running = true
 
         begin
-          # Start reading from stdin in a separate thread
-          @input_thread = Thread.new do
-            read_input_loop(session)
-          rescue StandardError => e
-            logger.error("Fatal error in input thread: #{e.message}")
-            logger.error(e.backtrace.join("\n"))
-            exit(1) # Exit the process in case of a fatal error
-          end
-
-          # Join the input thread (wait for it to complete)
+          launch_input_thread(session)
           @input_thread.join
         rescue Interrupt
           logger.info("Interrupted. Shutting down...")
         ensure
-          @running = false
-          @input_thread&.kill if @input_thread&.alive?
-          logger.info("Stdio transport shut down")
+          shutdown_transport
         end
       end
 
@@ -126,16 +109,47 @@ module VectorMCP
 
       # Process a single input line as a JSON-RPC message
       def handle_input_line(line, session, session_id)
-        # Parse the message as JSON
-        message = JSON.parse(line.strip)
-        logger.debug { "Received message: #{message.inspect}" }
+        message = parse_json(line)
+        return if message.is_a?(Array) # Already handled error triplet
 
-        # Use the server to handle the message and get a response
         response_data = server.handle_message(message, session, session_id)
+        send_response(message["id"], response_data) if message["id"] && response_data
+      rescue VectorMCP::ProtocolError => e
+        handle_protocol_error(e, message)
+      rescue StandardError => e
+        handle_unexpected_error(e, message)
+      end
 
-        # If there's a response (i.e., it was a request, not a notification), send it
-        request_id = message["id"]
-        send_response(request_id, response_data) if request_id && response_data
+      # --- Run helpers ---
+
+      def create_session
+        VectorMCP::Session.new(
+          server_info: server.server_info,
+          server_capabilities: server.server_capabilities,
+          protocol_version: server.protocol_version
+        )
+      end
+
+      def launch_input_thread(session)
+        @input_thread = Thread.new do
+          read_input_loop(session)
+        rescue StandardError => e
+          logger.error("Fatal error in input thread: #{e.message}")
+          logger.error(e.backtrace.join("\n"))
+          exit(1)
+        end
+      end
+
+      def shutdown_transport
+        @running = false
+        @input_thread&.kill if @input_thread&.alive?
+        logger.info("Stdio transport shut down")
+      end
+
+      # --- Input helpers ---
+
+      def parse_json(line)
+        JSON.parse(line.strip)
       rescue JSON::ParserError => e
         logger.error("Failed to parse message as JSON: #{e.message}")
         id = begin
@@ -144,29 +158,21 @@ module VectorMCP
           nil
         end
         send_error(id, -32_700, "Parse error")
-      rescue VectorMCP::ProtocolError => e # Catch specific protocol errors
-        logger.error("Protocol error: #{e.message} (code: #{e.code})")
-        logger.error("Error class: #{e.class}")
-        logger.error("Error details: #{e.details.inspect}")
-        request_id = begin
-          # Prioritize request_id attached to the error, fall back to message id
-          e.request_id || message["id"]
-        rescue StandardError
-          # If message parsing failed AND error has no id, request_id is nil
-          e.request_id
-        end
-        logger.error("Sending error response with code: #{e.code}")
-        # Pass e.details directly; send_error handles nil data correctly
-        send_error(request_id, e.code, e.message, e.details)
-      rescue StandardError => e # Catch all other errors
-        logger.error("Error handling message: #{e.message}")
-        logger.error(e.backtrace.join("\n"))
-        request_id = begin
-          message["id"]
-        rescue StandardError
-          nil
-        end
-        send_error(request_id, -32_603, "Internal error", { details: e.message })
+        []
+      end
+
+      def handle_protocol_error(error, message)
+        logger.error("Protocol error: #{error.message} (code: #{error.code})")
+        logger.error("Error details: #{error.details.inspect}")
+        request_id = error.request_id || message&.fetch("id", nil)
+        send_error(request_id, error.code, error.message, error.details)
+      end
+
+      def handle_unexpected_error(error, message)
+        logger.error("Error handling message: #{error.message}")
+        logger.error(error.backtrace.join("\n"))
+        request_id = message&.fetch("id", nil)
+        send_error(request_id, -32_603, "Internal error", { details: error.message })
       end
 
       # Write a message to stdout with locking
