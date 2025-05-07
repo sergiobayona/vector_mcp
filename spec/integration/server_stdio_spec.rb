@@ -391,7 +391,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       expect(response["id"]).to eq(req[:id])
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_600)
-      expect(response["error"]["message"]).to eq("Request object must include a 'method' member") # Updated expected message
+      expect(response["error"]["message"]).to eq("Request object must include a 'method' member.")
     end
   end
 end

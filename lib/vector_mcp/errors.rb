@@ -11,10 +11,11 @@ module VectorMCP
   #
   # @attr_reader code [Integer] The JSON-RPC error code.
   # @attr_reader message [String] A string providing a short description of the error.
-  # @attr_reader request_id [String, Integer, nil] The ID of the request that caused this error, if applicable.
+  # @attr_accessor request_id [String, Integer, nil] The ID of the request that caused this error, if applicable.
   # @attr_reader details [Hash, nil] Additional implementation-specific details for the error (optional).
   class ProtocolError < Error
-    attr_reader :code, :message, :request_id, :details
+    attr_accessor :request_id
+    attr_reader :code, :message, :details
 
     # Initializes a new ProtocolError.
     #

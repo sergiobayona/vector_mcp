@@ -250,7 +250,7 @@ module VectorMCP
         when @message_path
           handle_message_post(env, @session)
         when "/" # Root path, useful for health checks
-          [200, { "Content-Type" => "text/plain" }, ["VectorMCP SSE Server OK"]]
+          [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]]
         else
           [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
         end
@@ -427,7 +427,7 @@ module VectorMCP
       # @api private
       def finalize_client_stream(body, queue, client_conn)
         body.finish unless body.finished?
-        queue.close if queue.respond_to?(:close) && !queue.closed?
+        queue.close if queue.respond_to?(:close) && (!queue.respond_to?(:closed?) || !queue.closed?)
         @clients_mutex.synchronize { @clients.delete(client_conn.id) }
         logger.info("SSE client stream finalized and resources cleaned for #{client_conn.id}")
       end
@@ -450,7 +450,7 @@ module VectorMCP
         end
 
         client_conn = fetch_client_connection(session_id)
-        return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id: #{session_id}") unless client_conn
+        return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id") unless client_conn
 
         request_body_str = read_request_body(env, session_id)
         if request_body_str.nil? || request_body_str.empty?
@@ -480,7 +480,7 @@ module VectorMCP
         rescue StandardError
           ""
         end}")
-        [405, { "Content-Type" => "text/plain", "Allow" => "POST" }, ["Method Not Allowed. Only POST is supported for message endpoint."]]
+        [405, { "Content-Type" => "text/plain", "Allow" => "POST" }, ["Method Not Allowed"]]
       end
 
       # Builds the full raw path including query string from the request environment.
@@ -564,7 +564,7 @@ module VectorMCP
         # Unexpected errors during server.handle_message
         logger.error("[POST Client: #{client_conn.id}] Unhandled Error during message processing: #{e.message}\n#{e.backtrace.join("\n")}")
         request_id = message&.fetch("id", nil)
-        details = { class: e.class.name, message: e.message } # Avoid sending full backtrace to client
+        details = { details: e.message }
         enqueue_error(client_conn, request_id, -32_603, "Internal server error", details)
         # Return a 500 Internal Server Error response for the POST request
         error_response(request_id, -32_603, "Internal server error", details)
@@ -598,7 +598,7 @@ module VectorMCP
       # @return [Boolean] True if enqueued, false if client not found.
       def enqueue_message(session_id, message_hash)
         client_conn = @clients_mutex.synchronize { @clients[session_id] }
-        if client_conn&.queue && !client_conn.queue.closed?
+        if client_conn&.queue && (!client_conn.queue.respond_to?(:closed?) || !client_conn.queue.closed?)
           logger.debug { "[SSE Enqueue Client: #{session_id}] Queuing message: #{message_hash.inspect}" }
           client_conn.queue.enqueue(message_hash)
           true

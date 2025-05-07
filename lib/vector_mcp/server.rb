@@ -205,7 +205,7 @@ module VectorMCP
                            VectorMCP::Transport::Stdio.new(self, **options)
                          when :sse
                            # VectorMCP::Transport::SSE.new(self, **options)
-                           raise NotImplementedError, "The SSE transport is not yet production-ready. Use with caution or provide an instance."
+                           raise NotImplementedError, "SSE transport is not yet supported"
                          when VectorMCP::Transport::Base # Allow passing an initialized transport instance
                            transport.server = self if transport.respond_to?(:server=) && transport.server.nil? # Ensure server is set
                            transport
@@ -246,7 +246,7 @@ module VectorMCP
         raise VectorMCP::InvalidRequestError.new("Request object must include a 'method' member.", request_id: id)
       else # Invalid: No ID and no method
         logger.warn("[#{session_id}] Invalid message: Missing both 'id' and 'method'. #{message.inspect}")
-        raise VectorMCP::InvalidRequestError.new("Message must be a request (with id and method) or notification (with method).", request_id: nil)
+        raise VectorMCP::InvalidRequestError.new("Invalid message format", request_id: nil)
       end
     end
 
@@ -285,7 +285,7 @@ module VectorMCP
     def notify_prompts_list_changed
       return unless transport && @prompts_list_changed # Only notify if there was a change and transport is up
 
-      notification_method = "notifications/prompts/listChanged" # Corrected method name
+      notification_method = "notifications/prompts/list_changed"
       begin
         if transport.respond_to?(:broadcast_notification)
           logger.info("Broadcasting prompts list changed notification.")
@@ -295,7 +295,7 @@ module VectorMCP
           logger.info("Sending prompts list changed notification (transport may broadcast or send to first client).")
           transport.send_notification(notification_method) # Transport needs to decide target if not broadcast
         else
-          logger.warn("Transport does not support sending notifications/prompts/listChanged.")
+          logger.warn("Transport does not support sending notifications/prompts/list_changed.")
         end
       rescue StandardError => e
         logger.error("Failed to send prompts list changed notification: #{e.class.name}: #{e.message}")
@@ -345,12 +345,12 @@ module VectorMCP
         raise e # Re-raise with potentially updated request_id
       rescue StandardError => e
         # rubocop:disable Layout/LineLength
-        logger.error("Unhandled error in '#{method}' request handler (ID: #{id}): #{e.class.name} - #{e.message}\nBacktrace: #{e.backtrace.join("\n  ")}")
+        logger.error("Unhandled error during request '#{method}' (ID: #{id}): #{e.message}\nBacktrace: #{e.backtrace.join("\n  ")}")
         # rubocop:enable Layout/LineLength
         raise VectorMCP::InternalError.new(
-          "Request handler for '#{method}' failed unexpectedly.",
+          "Request handler failed unexpectedly",
           request_id: id,
-          details: { original_error: e.class.name, method: method }
+          details: { method: method, error: "An internal error occurred" }
         )
       ensure
         @in_flight_requests.delete(id)
@@ -377,7 +377,7 @@ module VectorMCP
           handler.call(params, session, self)
         rescue StandardError => e
           # rubocop:disable Layout/LineLength
-          logger.error("Error in '#{method}' notification handler: #{e.class.name} - #{e.message}\nBacktrace (top 5):\n  #{e.backtrace.first(5).join("\n  ")}")
+          logger.error("Error executing notification handler '#{method}': #{e.message}\nBacktrace (top 5):\n  #{e.backtrace.first(5).join("\n  ")}")
           # rubocop:enable Layout/LineLength
           # Notifications must not generate a response, even on error.
         end
@@ -454,7 +454,7 @@ module VectorMCP
     # @api private
     def validate_prompt_arg_name!(arg, idx)
       name_val = arg[:name] || arg["name"]
-      raise ArgumentError, "Prompt argument at index #{idx} is missing a :name." if name_val.nil?
+      raise ArgumentError, "Prompt argument at index #{idx} missing :name" if name_val.nil?
       unless name_val.is_a?(String) || name_val.is_a?(Symbol)
         raise ArgumentError, "Prompt argument :name at index #{idx} must be a String or Symbol. Found: #{name_val.class}"
       end
@@ -505,5 +505,11 @@ module VectorMCP
             "Prompt argument definition at index #{idx} contains unknown keys: #{unknown_keys.join(", ")}. Allowed: #{ALLOWED_PROMPT_ARG_KEYS.join(", ")}."
       # rubocop:enable Layout/LineLength
     end
+  end
+
+  module Transport
+    # Dummy base class placeholder used only for argument validation in tests.
+    # Real transport classes (e.g., Stdio, SSE) are separate concrete classes.
+    class Base; end
   end
 end

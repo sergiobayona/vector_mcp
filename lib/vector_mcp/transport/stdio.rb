@@ -177,7 +177,7 @@ module VectorMCP
         @input_thread = Thread.new do
           read_input_loop(session)
         rescue StandardError => e
-          logger.fatal("Fatal error in stdio input thread: #{e.message}\n#{e.backtrace.join("\n")}")
+          logger.error("Fatal error in input thread: #{e.message}")
           exit(1) # Critical failure, exit the server process
         end
       end
@@ -188,7 +188,7 @@ module VectorMCP
       def shutdown_transport
         @running = false
         @input_thread&.kill if @input_thread&.alive?
-        logger.info("Stdio transport shut down gracefully.")
+        logger.info("Stdio transport shut down")
       end
 
       # --- Input helpers (private) ---
@@ -249,7 +249,7 @@ module VectorMCP
             $stdout.flush
           end
         rescue Errno::EPIPE
-          logger.error("Output pipe ($stdout) closed. Cannot send message. Shutting down stdio transport.")
+          logger.error("Output pipe closed. Cannot send message. Shutting down stdio transport.")
           shutdown # Initiate shutdown as we can no longer communicate
         end
       end
