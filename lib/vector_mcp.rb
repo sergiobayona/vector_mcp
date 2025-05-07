@@ -13,14 +13,24 @@ require_relative "vector_mcp/transport/stdio"
 require_relative "vector_mcp/transport/sse"
 require_relative "vector_mcp/server"
 
+# The VectorMCP module provides a Ruby implementation of the Model Context Protocol.
+# It allows for building servers that can communicate with MCP clients,
+# offering resources, tools, and prompts.
 module VectorMCP
-  # Shared logger instance for the library
+  # @return [Logger] the shared logger instance for the library.
   @logger = Logger.new($stderr, level: Logger::INFO, progname: "VectorMCP")
 
   class << self
+    # @!attribute [r] logger
+    #   @return [Logger] the shared logger instance for the library.
     attr_reader :logger
 
-    # Convenience method to create a server instance
+    # Creates a new VectorMCP::Server instance.
+    # This is a convenience method that delegates to {VectorMCP::Server.new}.
+    #
+    # @param args [Array] arguments to pass to the Server constructor.
+    # @param kwargs [Hash] keyword arguments to pass to the Server constructor.
+    # @return [VectorMCP::Server] a new server instance.
     def new(*args, **kwargs)
       Server.new(*args, **kwargs)
     end
