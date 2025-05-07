@@ -8,48 +8,54 @@ module VectorMCP
   module Util
     module_function
 
-    # Helper to convert tool/resource results into MCP 'content' array
+    # Public: Convert various Ruby values into the MCP `content` array format.
+    # Splits responsibilities across small helpers to keep complexity low.
     def convert_to_mcp_content(input, mime_type: "text/plain")
-      case input
-      when String
-        [{ type: "text", text: input, mimeType: mime_type }]
-      when Hash
-        if input[:type] || input["type"] # Already in content format
-          [input.transform_keys(&:to_sym)]
-        else
-          # Treat as JSON content
-          [{ type: "text", text: input.to_json, mimeType: "application/json" }]
-        end
-      when Array
-        if input.all? { |item| item.is_a?(Hash) && (item[:type] || item["type"]) }
-          # Already an array of content items
-          input.map { |item| item.transform_keys(&:to_sym) }
-        else
-          # Convert each item to text
-          input.map { |item| { type: "text", text: item.to_s, mimeType: mime_type } }
-        end
+      return string_content(input, mime_type) if input.is_a?(String)
+      return hash_content(input)             if input.is_a?(Hash)
+      return array_content(input, mime_type) if input.is_a?(Array)
+
+      fallback_content(input, mime_type)
+    end
+
+    # --- Conversion helpers (module_function provides public access) ---
+
+    def string_content(str, mime_type)
+      [{ type: "text", text: str, mimeType: mime_type }]
+    end
+
+    def hash_content(hash)
+      if hash[:type] || hash["type"]
+        [hash.transform_keys(&:to_sym)]
       else
-        # Convert to string for everything else
-        [{ type: "text", text: input.to_s, mimeType: mime_type }]
+        [{ type: "text", text: hash.to_json, mimeType: "application/json" }]
       end
     end
 
-    # Extract ID from invalid JSON string using regex
-    # This is a best-effort attempt to extract an ID from a malformed JSON string
-    # Used mainly for reporting errors on parse failures
-    def extract_id_from_invalid_json(json_string)
-      # Try to find id field with various formats: "id": 123, "id":"abc", "id": "abc", etc.
-      if json_string.match?(/"id"\s*:\s*\d+/)
-        # Handle numeric IDs - preserve as string
-        if (match = json_string.match(/"id"\s*:\s*(\d+)/))
-          match[1]
-        end
-      elsif (match = json_string.match(/"id"\s*:\s*"((?:\\.|[^"])*)"/))
-        # Handle string IDs and preserve escaping
-        match[1]
+    def array_content(arr, mime_type)
+      if arr.all? { |item| item.is_a?(Hash) && (item[:type] || item["type"]) }
+        arr.map { |item| item.transform_keys(&:to_sym) }
       else
-        nil
+        arr.flat_map { |item| convert_to_mcp_content(item, mime_type:) }
       end
+    end
+
+    def fallback_content(obj, mime_type)
+      [{ type: "text", text: obj.to_s, mimeType: mime_type }]
+    end
+
+    module_function :string_content, :hash_content, :array_content, :fallback_content
+
+    # Extract an ID from malformed JSON for error reporting purposes.
+    # Returns the ID as a String, or nil when unavailable.
+    def extract_id_from_invalid_json(json_string)
+      numeric_match = json_string.match(/"id"\s*:\s*(\d+)/)
+      return numeric_match[1] if numeric_match
+
+      string_match = json_string.match(/"id"\s*:\s*"((?:\\.|[^"])*)"/)
+      return string_match[1] if string_match
+
+      nil
     end
   end
 end
