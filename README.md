@@ -46,51 +46,29 @@ $ gem install vector_mcp
 
 Note: The SSE transport requires additional gems (`async`, `async-http`, `falcon`, `rack`). These will be installed automatically if you install `vector_mcp`.
 
-## Quick Start (Stdio Example)
+## Quick Start
 
 This example creates a simple server that runs over standard input/output and provides one tool.
 
 ```ruby
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
 require 'vector_mcp'
 
-# Optional: Set log level (DEBUG, INFO, WARN, ERROR, FATAL)
-VectorMCP.logger.level = Logger::INFO
+# Create a server
+server = VectorMCP.new('Echo Server')
 
-# 1. Create a server instance
-server = VectorMCP.new(name: "MySimpleStdioServer", version: "1.0")
-
-# 2. Register a tool
+# Register a single "echo" tool
 server.register_tool(
-  name: "simple_echo",
-  description: "Echoes back the provided message.",
-  # Define expected input using JSON Schema format
+  name: 'echo',
+  description: 'Returns whatever message you send.',
   input_schema: {
-    type: "object",
-    properties: {
-      message: { type: "string", description: "The message to echo." }
-    },
-    required: ["message"]
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message']
   }
-  # The block receives arguments (hash) and the session object
-) do |args, _session|
-  input = args["message"] || args[:message] # Handle string/symbol keys
-  server.logger.info "Echoing: #{input}"
-  # The return value will be converted to MCP 'content' format
-  "You sent: #{input}"
-end
+) { |args, _session| args['message'] }
 
-# 3. Run the server using the stdio transport
-begin
-  server.run(transport: :stdio)
-rescue Interrupt
-  VectorMCP.logger.info("Server stopped.")
-rescue StandardError => e
-  VectorMCP.logger.fatal("Server crashed: #{e.message}\n#{e.backtrace.join("\n")}")
-  exit 1
-end
+# Start listening on STDIN/STDOUT (default transport)
+server.run
 ```
 
 **To run this:**
@@ -112,10 +90,10 @@ end
         ```json
         {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
         ```
-    *   **(Server Responds with `simple_echo` tool definition)**
+    *   **(Server Responds with `echo` tool definition)**
     *   **Call Tool:**
         ```json
-        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"simple_echo","arguments":{"message":"Hello VectorMCP!"}}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}
         ```
     *   **(Server Responds with echo result)**
 
@@ -159,8 +137,15 @@ server.register_tool(
 end
 ```
 
-*   The `input_schema` must be a Hash representing a valid JSON Schema object describing the tool's expected arguments.
-*   The block receives the arguments hash and the `VectorMCP::Session` object.
+*   The input_schema must be a Hash representing a valid JSON Schema object describing the tool's expected arguments.
+*   The block receives the arguments hash and the VectorMCP::Session object.
+*   The **session** object represents the client connection that invoked the tool. It lets you:
+    * Inspect the client's `clientInfo` and declared `capabilities` (e.g. `session.client_info['name']`).
+    * Store or look up per-connection state (authentication, rate-limiting, feature flags).
+    * Send follow-up notifications or streaming updates back only to that client.
+    * Check whether the session is already `initialized?` before doing expensive work.
+
+    Passing `session` up-front means tool authors can make use of this context today; if you don't need it, simply ignore the parameter (Ruby will accept extra block parameters).
 *   The block's return value is automatically converted into the MCP `content` array format by `VectorMCP::Util.convert_to_mcp_content`. You can return:
     *   A `String`: Becomes `{ type: 'text', text: '...' }`.
     *   A `Hash` matching the MCP content structure (`{ type: 'text', ... }`, `{ type: 'image', ... }`, etc.): Used as is.
@@ -227,24 +212,9 @@ server.register_prompt(
       role: "user",
       content: { type: "text", text: "Please summarize the following document.#{length_hint}" }
     },
-    # You might read the resource here to include its content, or let the client do it
-    # Example: Reading resource inside prompt handler (use with caution for large files)
-    # begin
-    #   # Note: read_resource handler itself runs in the server context
-    #   # Accessing it directly here might block if not careful.
-    #   # A better pattern might be to just reference the URI.
-    #   resource_content = server.resources[doc_uri]&.handler&.call(session) || "[Document content not found]"
-    #   {
-    #     role: "user",
-    #     content: { type: "text", text: "Document Content:\n#{resource_content}" }
-    #   }
-    # rescue => e
-    #   { role: "user", content: { type: "text", text: "[Error reading document: #{e.message}]"} }
-    # end
     # Example: Referencing the resource URI (preferred)
     {
       role: "user",
-      # This assumes the client understands how to fetch and include the resource content
       content: { type: "text", text: "Document to Summarize URI: #{doc_uri}" }
     }
   ]
@@ -330,13 +300,12 @@ After checking out the repo:
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/vector_mcp/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/vector_mcp/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to https://rubygems.org.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at [https://github.com/sergiobayona/vector_mcp](https://github.com/sergiobayona/vector_mcp).
+Bug reports and pull requests are welcome on GitHub at https://github.com/sergiobayona/vector_mcp.
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
+The gem is available as open source under the terms of the MIT License: https://opensource.org/licenses/MIT.
