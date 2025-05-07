@@ -312,7 +312,7 @@ module VectorMCP
       return unless arg.key?(:required) || arg.key?("required")
 
       req_val = arg[:required] || arg["required"]
-      return if req_val == true || req_val == false
+      return if [true, false].include?(req_val)
 
       raise ArgumentError, "argument :required at index #{idx} must be boolean"
     end
@@ -321,7 +321,7 @@ module VectorMCP
       unknown_keys = arg.keys.map(&:to_s) - ALLOWED_PROMPT_ARG_KEYS
       return if unknown_keys.empty?
 
-      raise ArgumentError, "argument definition at index #{idx} has unknown keys: #{unknown_keys.join(',')}"
+      raise ArgumentError, "argument definition at index #{idx} has unknown keys: #{unknown_keys.join(",")}"
     end
   end
 end
