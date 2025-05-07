@@ -322,6 +322,7 @@ module VectorMCP
     # @param session [VectorMCP::Session] The client session.
     # @return [Object] The result of the request handler.
     # @raise [VectorMCP::ProtocolError] Propagates errors from handlers or raises new ones (e.g., MethodNotFound, NotFoundError, etc.).
+    # rubocop:disable Metrics/MethodLength
     def handle_request(id, method, params, session)
       unless session.initialized?
         # Allow "initialize" even if not marked initialized yet by server
@@ -343,7 +344,9 @@ module VectorMCP
         e.request_id = id unless e.request_id && e.request_id == id
         raise e # Re-raise with potentially updated request_id
       rescue StandardError => e
+        # rubocop:disable Layout/LineLength
         logger.error("Unhandled error in '#{method}' request handler (ID: #{id}): #{e.class.name} - #{e.message}\nBacktrace: #{e.backtrace.join("\n  ")}")
+        # rubocop:enable Layout/LineLength
         raise VectorMCP::InternalError.new(
           "Request handler for '#{method}' failed unexpectedly.",
           request_id: id,
@@ -353,6 +356,7 @@ module VectorMCP
         @in_flight_requests.delete(id)
       end
     end
+    # rubocop:enable Metrics/MethodLength
 
     # Internal handler for JSON-RPC notifications.
     # @api private
@@ -372,7 +376,9 @@ module VectorMCP
         begin
           handler.call(params, session, self)
         rescue StandardError => e
+          # rubocop:disable Layout/LineLength
           logger.error("Error in '#{method}' notification handler: #{e.class.name} - #{e.message}\nBacktrace (top 5):\n  #{e.backtrace.first(5).join("\n  ")}")
+          # rubocop:enable Layout/LineLength
           # Notifications must not generate a response, even on error.
         end
       else
@@ -494,8 +500,10 @@ module VectorMCP
       unknown_keys = arg.transform_keys(&:to_s).keys - ALLOWED_PROMPT_ARG_KEYS
       return if unknown_keys.empty?
 
+      # rubocop:disable Layout/LineLength
       raise ArgumentError,
             "Prompt argument definition at index #{idx} contains unknown keys: #{unknown_keys.join(", ")}. Allowed: #{ALLOWED_PROMPT_ARG_KEYS.join(", ")}."
+      # rubocop:enable Layout/LineLength
     end
   end
 end
