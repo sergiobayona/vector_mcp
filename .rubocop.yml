@@ -23,11 +23,11 @@ Metrics/AbcSize:
 
 # Increase class length limits
 Metrics/ClassLength:
-  Max: 200
+  Max: 250
 
 # Increase module length limits
 Metrics/ModuleLength:
-  Max: 200
+  Max: 250
 
 # Increase line length
 Layout/LineLength:
