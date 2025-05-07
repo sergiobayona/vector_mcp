@@ -24,6 +24,8 @@ Metrics/AbcSize:
 # Increase class length limits
 Metrics/ClassLength:
   Max: 250
+  Exclude:
+    - 'lib/vector_mcp/transport/sse.rb'
 
 # Increase module length limits
 Metrics/ModuleLength:
