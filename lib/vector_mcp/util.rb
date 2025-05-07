@@ -13,18 +13,6 @@ module VectorMCP
     # This is the *primary* public helper for transforming arbitrary Ruby values
     # into the wire-format expected by the MCP spec.
     #
-    # === Conversion rules
-    # The algorithm is deterministic and can be summarised as follows:
-    #
-    # | Ruby value                                     | Resulting content array |
-    # | ---------------------------------------------- | ----------------------- |
-    # | `String`                                       | `[ {type: "text", text: <string>, mimeType: <mime_type>} ]` |
-    # | `Hash` **with** a `:type`/`"type"` key          | `[ hash.transform_keys(&:to_sym) ]` *(assumed pre-formatted)* |
-    # | `Hash` **without** `:type`                     | `[ {type: "text", text: JSON.dump(hash), mimeType: "application/json"} ]` |
-    # | `Array` where **all** items are pre-formatted  | `array.map { |h| h.transform_keys(&:to_sym) }` |
-    # | `Array` of mixed / non-formatted items         | Recursively flattened via the same algorithm |
-    # | Any other object                               | `[ {type: "text", text: obj.to_s, mimeType: <mime_type>} ]` |
-    #
     # Keys present in each returned hash:
     # * **:type**      – Currently always `"text"`; future protocol versions may add rich/binary types.
     # * **:text**      – UTF-8 encoded payload.
