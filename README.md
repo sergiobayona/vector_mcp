@@ -75,27 +75,48 @@ server.run
 
 1.  Save it as `my_server.rb`.
 2.  Run `ruby my_server.rb`.
-3.  The server is now listening on stdin/stdout. You can interact with it by sending JSON-RPC messages (see MCP specification):
+3.  The server now waits for **newline-delimited JSON-RPC objects** on **STDIN** and writes responses to **STDOUT**.
 
-    *   **Send Initialize:**
-        ```json
-        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ManualClient","version":"0.1"}}}
-        ```
-    *   **(Server Responds)**
-    *   **Send Initialized:**
-        ```json
-        {"jsonrpc":"2.0","method":"initialized","params":{}}
-        ```
-    *   **List Tools:**
-        ```json
-        {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
-        ```
-    *   **(Server Responds with `echo` tool definition)**
-    *   **Call Tool:**
-        ```json
-        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}
-        ```
-    *   **(Server Responds with echo result)**
+   You have two easy ways to talk to it:
+
+   **a. Interactive (paste a line, press Enter)**
+
+   ```bash
+   $ ruby my_server.rb
+   # paste the JSON below, press ↵, observe the response
+   {"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}
+   {"jsonrpc":"2.0","method":"initialized"}
+   # etc.
+   ```
+
+   **b. Scripted (pipe a series of echo / printf commands)**
+
+   ```bash
+   { 
+     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"CLI","version":"0.1"}}}';
+     printf '%s\n' '{"jsonrpc":"2.0","method":"initialized"}';
+     printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
+     printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}';
+   } | ruby my_server.rb | jq  # jq formats the JSON responses
+   ```
+
+   Each request **must be on a single line and terminated by a newline** so the server knows where the message ends.
+
+   Below are the same requests shown individually:
+
+```jsonc
+// 1. Initialize (client → server)
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ManualClient","version":"0.1"}}}
+
+// 2. Initialized notification (client → server, no id)
+{"jsonrpc":"2.0","method":"initialized"}
+
+// 3. List available tools (client → server)
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+
+// 4. Call the echo tool (client → server)
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}
+```
 
 ## Usage
 
@@ -186,111 +207,4 @@ end
 ```
 
 *   The block receives the `VectorMCP::Session` object.
-*   Return `String` for text, or a binary `String` (`Encoding::ASCII_8BIT`) for binary data. Other types are generally JSON-encoded.
-
-### Registering Prompts
-
-Prompts provide templates for the client/LLM.
-
-```ruby
-server.register_prompt(
-  name: "summarize_document",
-  description: "Creates a prompt to summarize a document.",
-  # Define arguments the client can provide
-  arguments: [
-    { name: "doc_uri", description: "URI of the document resource to summarize.", required: true },
-    { name: "length", description: "Desired summary length (e.g., 'short', 'medium', 'long').", required: false }
-  ]
-) do |args, session|
-  # args is a hash like { "doc_uri" => "file://...", "length" => "short" }
-  doc_uri = args["doc_uri"]
-  length_hint = args["length"] ? " Keep the summary #{args['length']}." : ""
-
-  # Handler must return an array of message hashes
-  [
-    {
-      role: "user",
-      content: { type: "text", text: "Please summarize the following document.#{length_hint}" }
-    },
-    # Example: Referencing the resource URI (preferred)
-    {
-      role: "user",
-      content: { type: "text", text: "Document to Summarize URI: #{doc_uri}" }
-    }
-  ]
-end
-```
-
-*   The `arguments` array describes parameters the client can pass when requesting the prompt.
-*   The block receives the arguments hash and the session.
-*   The block **must** return an Array of Hashes, where each hash conforms to the MCP `PromptMessage` structure (`{ role: 'user'|'assistant', content: { type: 'text'|'image'|'resource', ... } }`).
-
-### Running the Server
-
-Use the `run` method, specifying the desired transport.
-
-**Stdio:**
-
-```ruby
-server.run(transport: :stdio)
-```
-
-**SSE (planned):** Not yet available. Expect a `transport: :sse` option in a future release.
-
-### Custom Handlers
-
-You can override default handlers or add handlers for non-standard methods:
-
-```ruby
-# Override default ping
-server.on_request("ping") do |_params, _session, _server|
-  { received_ping_at: Time.now }
-end
-
-# Handle a custom notification
-server.on_notification("custom/my_event") do |params, session, server|
-  server.logger.info "Received my_event: #{params.inspect}"
-  # Do something...
-end
-```
-
-## Architecture
-
-*   **`VectorMCP::Server`:** The main class. Manages registration, state, and dispatches incoming messages to appropriate handlers.
-*   **`VectorMCP::Transport::{Stdio, SSE}`:** `Stdio` is implemented today; `SSE` is planned but not yet released.
-*   **`VectorMCP::Session`:** Holds state related to a specific client connection, primarily the initialization status and negotiated capabilities. Passed to handlers.
-*   **`VectorMCP::Definitions::{Tool, Resource, Prompt}`:** Simple structs holding registered capability information and handler blocks.
-*   **`VectorMCP::Handlers::Core`:** Contains default implementations for standard MCP methods.
-*   **`VectorMCP::Errors`:** Custom exception classes mapping to JSON-RPC error codes.
-*   **`VectorMCP::Util`:** Utility functions.
-
-## Development
-
-After checking out the repo:
-
-1.  Install dependencies:
-    ```bash
-    $ bundle install
-    ```
-2.  Run tests:
-    ```bash
-    $ bundle exec rspec
-    ```
-3.  Run an example server:
-    ```bash
-    $ bundle exec ruby examples/stdio_server.rb
-    ```
-
-    _SSE example will be added when the feature is ready._
-
-You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/vector_mcp/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to https://rubygems.org.
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/sergiobayona/vector_mcp.
-
-## License
-
-The gem is available as open source under the terms of the MIT License: https://opensource.org/licenses/MIT.
+*   Return `String` for text, or a binary `
