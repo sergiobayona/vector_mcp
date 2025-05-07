@@ -9,10 +9,14 @@ module VectorMCP
   # flexible `details` field that implementers may use to attach structured,
   # implementation-specific metadata to an error payload.
   #
-  # @attr_reader code [Integer] The JSON-RPC error code.
-  # @attr_reader message [String] A string providing a short description of the error.
-  # @attr_accessor request_id [String, Integer, nil] The ID of the request that caused this error, if applicable.
-  # @attr_reader details [Hash, nil] Additional implementation-specific details for the error (optional).
+  # @!attribute [r] code
+  #   @return [Integer] The JSON-RPC error code.
+  # @!attribute [r] message
+  #   @return [String] A short description of the error.
+  # @!attribute [rw] request_id
+  #   @return [String, Integer, nil] The ID of the request that caused this error, if applicable.
+  # @!attribute [r] details
+  #   @return [Hash, nil] Additional implementation-specific details for the error (optional).
   class ProtocolError < Error
     attr_accessor :request_id
     attr_reader :code, :message, :details

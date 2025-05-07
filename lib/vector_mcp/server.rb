@@ -30,15 +30,24 @@ module VectorMCP
   #
   #   server.run(transport: :stdio) # Runs with Stdio transport by default
   #
-  # @attr_reader logger [Logger] The logger instance for this server.
-  # @attr_reader name [String] The name of the server.
-  # @attr_reader version [String] The version of the server software.
-  # @attr_reader protocol_version [String] The MCP protocol version this server implements.
-  # @attr_reader tools [Hash<String, VectorMCP::Definitions::Tool>] Registered tools, keyed by name.
-  # @attr_reader resources [Hash<String, VectorMCP::Definitions::Resource>] Registered resources, keyed by URI string.
-  # @attr_reader prompts [Hash<String, VectorMCP::Definitions::Prompt>] Registered prompts, keyed by name.
-  # @attr_reader in_flight_requests [Hash] A hash tracking currently processing requests, for cancellation purposes.
-  # @attr_accessor transport [VectorMCP::Transport::Base, nil] The active transport instance, if any.
+  # @!attribute [r] logger
+  #   @return [Logger] The logger instance for this server.
+  # @!attribute [r] name
+  #   @return [String] The name of the server.
+  # @!attribute [r] version
+  #   @return [String] The version of the server software.
+  # @!attribute [r] protocol_version
+  #   @return [String] The MCP protocol version this server implements.
+  # @!attribute [r] tools
+  #   @return [Hash<String, VectorMCP::Definitions::Tool>] Registered tools, keyed by name.
+  # @!attribute [r] resources
+  #   @return [Hash<String, VectorMCP::Definitions::Resource>] Registered resources, keyed by URI string.
+  # @!attribute [r] prompts
+  #   @return [Hash<String, VectorMCP::Definitions::Prompt>] Registered prompts, keyed by name.
+  # @!attribute [r] in_flight_requests
+  #   @return [Hash] A hash tracking currently processing requests, for cancellation purposes.
+  # @!attribute [rw] transport
+  #   @return [VectorMCP::Transport::Base, nil] The active transport instance, if any.
   class Server
     include Definitions # Make Tool, Resource, Prompt structs easily available
 
