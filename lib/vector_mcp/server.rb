@@ -268,35 +268,60 @@ module VectorMCP
       end
     end
 
+    # Validate the structure of the `arguments:` array supplied to #register_prompt.
+    # Each item must be a Hash with at minimum a :name key and may include
+    # :description and :required. Any other keys are rejected.
     def validate_prompt_arguments(argument_defs)
       raise ArgumentError, "arguments must be an Array" unless argument_defs.is_a?(Array)
 
-      argument_defs.each_with_index do |arg, idx|
-        raise ArgumentError, "argument definition at index #{idx} must be a Hash" unless arg.is_a?(Hash)
+      argument_defs.each_with_index { |arg, idx| validate_prompt_argument(arg, idx) }
+    end
 
-        # Required field :name
-        name_val = arg[:name] || arg["name"]
-        raise ArgumentError, "argument definition at index #{idx} missing :name" if name_val.nil?
+    ALLOWED_PROMPT_ARG_KEYS = %w[name description required].freeze
+    private_constant :ALLOWED_PROMPT_ARG_KEYS
 
-        raise ArgumentError, "argument :name at index #{idx} must be String or Symbol" unless name_val.is_a?(String) || name_val.is_a?(Symbol)
+    # Perform validation for a single prompt argument definition.
+    def validate_prompt_argument(arg, idx)
+      raise ArgumentError, "argument definition at index #{idx} must be a Hash" unless arg.is_a?(Hash)
 
-        # Optional :description
-        if arg.key?(:description) || arg.key?("description")
-          desc_val = arg[:description] || arg["description"]
-          raise ArgumentError, "argument :description at index #{idx} must be a String" unless desc_val.nil? || desc_val.is_a?(String)
-        end
+      check_name!(arg, idx)
+      check_description!(arg, idx)
+      check_required_flag!(arg, idx)
+      check_unknown_keys!(arg, idx)
+    end
 
-        # Optional :required boolean
-        if arg.key?(:required) || arg.key?("required")
-          req_val = arg[:required] || arg["required"]
-          raise ArgumentError, "argument :required at index #{idx} must be boolean" unless [true, false].include?(req_val)
-        end
+    def check_name!(arg, idx)
+      name_val = arg[:name] || arg["name"]
+      raise ArgumentError, "argument definition at index #{idx} missing :name" if name_val.nil?
 
-        # Disallow unknown keys
-        allowed_keys = %w[name description required]
-        unknown_keys = arg.keys.map(&:to_s) - allowed_keys
-        raise ArgumentError, "argument definition at index #{idx} has unknown keys: #{unknown_keys.join(",")}" unless unknown_keys.empty?
-      end
+      return if name_val.is_a?(String) || name_val.is_a?(Symbol)
+
+      raise ArgumentError, "argument :name at index #{idx} must be String or Symbol"
+    end
+
+    def check_description!(arg, idx)
+      return unless arg.key?(:description) || arg.key?("description")
+
+      desc_val = arg[:description] || arg["description"]
+      return if desc_val.nil? || desc_val.is_a?(String)
+
+      raise ArgumentError, "argument :description at index #{idx} must be a String"
+    end
+
+    def check_required_flag!(arg, idx)
+      return unless arg.key?(:required) || arg.key?("required")
+
+      req_val = arg[:required] || arg["required"]
+      return if req_val == true || req_val == false
+
+      raise ArgumentError, "argument :required at index #{idx} must be boolean"
+    end
+
+    def check_unknown_keys!(arg, idx)
+      unknown_keys = arg.keys.map(&:to_s) - ALLOWED_PROMPT_ARG_KEYS
+      return if unknown_keys.empty?
+
+      raise ArgumentError, "argument definition at index #{idx} has unknown keys: #{unknown_keys.join(',')}"
     end
   end
 end
