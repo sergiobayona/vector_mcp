@@ -23,7 +23,7 @@ module VectorMCP
       VectorMCP.logger.debug("Initializing ProtocolError with code: #{code}")
       @code = code
       @message = message
-      @details = details # Note: `data` in JSON-RPC is often used for this purpose.
+      @details = details # NOTE: `data` in JSON-RPC is often used for this purpose.
       @request_id = request_id
       super(message)
     end

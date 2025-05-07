@@ -65,6 +65,7 @@ module VectorMCP
       if name_pos && name && name_pos != name
         raise ArgumentError, "Specify the server name either positionally or with the `name:` keyword (not both)."
       end
+
       @name = name_pos || name
       raise ArgumentError, "Server name is required" if @name.nil? || @name.to_s.strip.empty?
 
@@ -101,6 +102,7 @@ module VectorMCP
     def register_tool(name:, description:, input_schema:, &handler)
       name_s = name.to_s
       raise ArgumentError, "Tool '#{name_s}' already registered" if @tools[name_s]
+
       @tools[name_s] = Tool.new(name_s, description, input_schema, handler)
       logger.debug("Registered tool: #{name_s}")
       self
@@ -119,6 +121,7 @@ module VectorMCP
     def register_resource(uri:, name:, description:, mime_type: "text/plain", &handler)
       uri_s = uri.to_s
       raise ArgumentError, "Resource '#{uri_s}' already registered" if @resources[uri_s]
+
       @resources[uri_s] = Resource.new(uri, name, description, mime_type, handler)
       logger.debug("Registered resource: #{uri_s}")
       self
@@ -138,6 +141,7 @@ module VectorMCP
     def register_prompt(name:, description:, arguments: [], &handler)
       name_s = name.to_s
       raise ArgumentError, "Prompt '#{name_s}' already registered" if @prompts[name_s]
+
       validate_prompt_arguments(arguments)
       @prompts[name_s] = Prompt.new(name_s, description, arguments, handler)
       @prompts_list_changed = true
@@ -313,6 +317,7 @@ module VectorMCP
       unless session.initialized?
         # Allow "initialize" even if not marked initialized yet by server
         return session.initialize!(params) if method == "initialize"
+
         # For any other method, session must be initialized
         raise VectorMCP::InitializationError.new("Session not initialized. Client must send 'initialize' first.", request_id: id)
       end
@@ -406,6 +411,7 @@ module VectorMCP
     # @raise [ArgumentError] if `argument_defs` is not an Array or if any definition is invalid.
     def validate_prompt_arguments(argument_defs)
       raise ArgumentError, "Prompt arguments definition must be an Array of Hashes." unless argument_defs.is_a?(Array)
+
       argument_defs.each_with_index { |arg, idx| validate_single_prompt_argument(arg, idx) }
     end
 
@@ -420,9 +426,7 @@ module VectorMCP
     # @return [void]
     # @raise [ArgumentError] if the argument definition is invalid.
     def validate_single_prompt_argument(arg, idx)
-      unless arg.is_a?(Hash)
-        raise ArgumentError, "Prompt argument definition at index #{idx} must be a Hash. Found: #{arg.class}"
-      end
+      raise ArgumentError, "Prompt argument definition at index #{idx} must be a Hash. Found: #{arg.class}" unless arg.is_a?(Hash)
 
       validate_prompt_arg_name!(arg, idx)
       validate_prompt_arg_description!(arg, idx)
@@ -446,8 +450,10 @@ module VectorMCP
     # @api private
     def validate_prompt_arg_description!(arg, idx)
       return unless arg.key?(:description) || arg.key?("description") # Optional field
+
       desc_val = arg[:description] || arg["description"]
       return if desc_val.nil? || desc_val.is_a?(String) # Allow nil or String
+
       raise ArgumentError, "Prompt argument :description at index #{idx} must be a String if provided. Found: #{desc_val.class}"
     end
 
@@ -455,8 +461,10 @@ module VectorMCP
     # @api private
     def validate_prompt_arg_required_flag!(arg, idx)
       return unless arg.key?(:required) || arg.key?("required") # Optional field
+
       req_val = arg[:required] || arg["required"]
       return if [true, false].include?(req_val)
+
       raise ArgumentError, "Prompt argument :required at index #{idx} must be true or false if provided. Found: #{req_val.inspect}"
     end
 
@@ -464,8 +472,10 @@ module VectorMCP
     # @api private
     def validate_prompt_arg_type!(arg, idx)
       return unless arg.key?(:type) || arg.key?("type") # Optional field
+
       type_val = arg[:type] || arg["type"]
       return if type_val.nil? || type_val.is_a?(String) # Allow nil or String (e.g., "string", "number", "boolean")
+
       raise ArgumentError, "Prompt argument :type at index #{idx} must be a String if provided (e.g., JSON schema type). Found: #{type_val.class}"
     end
 
@@ -474,7 +484,9 @@ module VectorMCP
     def validate_prompt_arg_unknown_keys!(arg, idx)
       unknown_keys = arg.transform_keys(&:to_s).keys - ALLOWED_PROMPT_ARG_KEYS
       return if unknown_keys.empty?
-      raise ArgumentError, "Prompt argument definition at index #{idx} contains unknown keys: #{unknown_keys.join(", ")}. Allowed: #{ALLOWED_PROMPT_ARG_KEYS.join(", ")}."
+
+      raise ArgumentError,
+            "Prompt argument definition at index #{idx} contains unknown keys: #{unknown_keys.join(", ")}. Allowed: #{ALLOWED_PROMPT_ARG_KEYS.join(", ")}."
     end
   end
 end

@@ -280,7 +280,11 @@ module VectorMCP
         backtrace = error.backtrace.join("\n")
         logger.error("Error during SSE request processing for #{error_context} #{path_context}: #{error.message}\n#{backtrace}")
         # Optional: for local debugging, print to console too
-        warn "[DEBUG-SSE-Transport] Exception in #call: #{error.class}: #{error.message}\n\t#{error.backtrace.join("\n\t")}" rescue nil
+        begin
+          warn "[DEBUG-SSE-Transport] Exception in #call: #{error.class}: #{error.message}\n\t#{error.backtrace.join("\n\t")}"
+        rescue StandardError
+          nil
+        end
         [500, { "Content-Type" => "text/plain", "connection" => "close" }, ["Internal Server Error"]]
       end
 
@@ -292,7 +296,8 @@ module VectorMCP
       # @param env [Hash, Async::HTTP::Request] The request environment.
       # @param _session [VectorMCP::Session] The shared server session (currently unused by this method but passed for consistency).
       # @return [Array] A Rack response triplet for the SSE stream (200 OK with SSE headers).
-      def handle_sse_connection(env, _session) # session is the shared server session, not a per-client one here
+      # session is the shared server session, not a per-client one here
+      def handle_sse_connection(env, _session)
         return invalid_method_response(env) unless get_request?(env)
 
         session_id   = SecureRandom.uuid # This is the *client's* unique session ID for this SSE connection
@@ -320,7 +325,15 @@ module VectorMCP
       # @api private
       def invalid_method_response(env)
         method = request_method(env)
-        logger.warn("Received non-GET request on SSE endpoint from #{env["REMOTE_ADDR"] rescue "unknown"}: #{method} #{env["PATH_INFO"] rescue ""}")
+        logger.warn("Received non-GET request on SSE endpoint from #{begin
+          env["REMOTE_ADDR"]
+        rescue StandardError
+          "unknown"
+        end}: #{method} #{begin
+          env["PATH_INFO"]
+        rescue StandardError
+          ""
+        end}")
         [405, { "Content-Type" => "text/plain", "Allow" => "GET" }, ["Method Not Allowed. Only GET is supported for SSE endpoint."]]
       end
 
@@ -431,13 +444,19 @@ module VectorMCP
 
         raw_path   = build_raw_path(env)
         session_id = extract_session_id(raw_path)
-        return error_response(nil, VectorMCP::InvalidRequestError.new("Missing session_id parameter").code, "Missing session_id parameter") unless session_id
+        unless session_id
+          return error_response(nil, VectorMCP::InvalidRequestError.new("Missing session_id parameter").code,
+                                "Missing session_id parameter")
+        end
 
         client_conn = fetch_client_connection(session_id)
         return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id: #{session_id}") unless client_conn
 
         request_body_str = read_request_body(env, session_id)
-        return error_response(nil, VectorMCP::InvalidRequestError.new("Request body is empty or unreadable").code, "Request body is empty or unreadable") if request_body_str.nil? || request_body_str.empty?
+        if request_body_str.nil? || request_body_str.empty?
+          return error_response(nil, VectorMCP::InvalidRequestError.new("Request body is empty or unreadable").code,
+                                "Request body is empty or unreadable")
+        end
 
         process_post_message(request_body_str, client_conn, session, session_id)
       end
@@ -452,7 +471,15 @@ module VectorMCP
       # @api private
       def invalid_post_method_response(env)
         method = request_method(env)
-        logger.warn("Received non-POST request on message endpoint from #{env["REMOTE_ADDR"] rescue "unknown"}: #{method} #{env["PATH_INFO"] rescue ""}")
+        logger.warn("Received non-POST request on message endpoint from #{begin
+          env["REMOTE_ADDR"]
+        rescue StandardError
+          "unknown"
+        end}: #{method} #{begin
+          env["PATH_INFO"]
+        rescue StandardError
+          ""
+        end}")
         [405, { "Content-Type" => "text/plain", "Allow" => "POST" }, ["Method Not Allowed. Only POST is supported for message endpoint."]]
       end
 
@@ -477,6 +504,7 @@ module VectorMCP
       def extract_session_id(raw_path)
         query_str = URI(raw_path).query
         return nil unless query_str
+
         URI.decode_www_form(query_str).to_h["session_id"]
       end
 
@@ -504,7 +532,7 @@ module VectorMCP
       # Parses, handles via server, and enqueues response/error to the client's SSE stream.
       # @api private
       # @return [Array] A Rack response triplet (typically 202 Accepted).
-      def process_post_message(body_str, client_conn, session, session_id)
+      def process_post_message(body_str, client_conn, session, _session_id)
         message = parse_json_body(body_str, client_conn.id) # Use client_conn.id for logging consistency
         # parse_json_body returns an error triplet if parsing fails and error was enqueued
         return message if message.is_a?(Array) && message.size == 3
@@ -629,7 +657,7 @@ module VectorMCP
       def error_response(id, code, message, data = nil)
         status = case code
                  when -32_700, -32_600, -32_602 then 400 # ParseError, InvalidRequest, InvalidParams
-                 when -32_601, -32_001         then 404 # MethodNotFound, NotFoundError (custom)
+                 when -32_601, -32_001 then 404 # MethodNotFound, NotFoundError (custom)
                  else 500 # InternalError, ServerError, or any other
                  end
         [status, { "Content-Type" => "application/json" }, [format_error_body(id, code, message, data)]]

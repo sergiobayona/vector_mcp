@@ -122,6 +122,7 @@ module VectorMCP
             break
           end
           next if line.strip.empty?
+
           handle_input_line(line, session, session_id)
         end
       end
