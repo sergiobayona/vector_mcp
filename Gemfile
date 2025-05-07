@@ -16,4 +16,5 @@ group :development, :test do
   gem "rubocop", "~> 1.21"
   gem "rubocop-rake", "~> 0.6"
   gem "ruby-lsp"
+  gem "yard", "~> 0.9"
 end

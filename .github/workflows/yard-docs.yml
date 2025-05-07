@@ -1,0 +1,52 @@
+name: "Deploy YARD Docs"
+
+on:
+  push:
+    branches:
+      - main # Adjust if your default branch is different
+  workflow_dispatch:
+
+# Grant the permissions required to deploy to GitHub Pages
+permissions:
+  contents: write        # needed for actions/checkout to push to gh-pages
+  pages: write           # to deploy to GitHub Pages
+  id-token: write        # to verify the deployment originates from this workflow
+
+jobs:
+  build:
+    name: "Build YARD documentation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2 # use any version >= the gemspec requirement
+          bundler-cache: true
+
+      - name: Install dependencies (including YARD)
+        run: |
+          bundle install --jobs 4 --retry 3
+
+      - name: Generate YARD documentation
+        run: |
+          bundle exec yard doc --quiet
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./doc
+
+  deploy:
+    name: "Deploy to GitHub Pages"
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v2 
