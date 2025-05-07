@@ -39,6 +39,12 @@ RSpec.describe VectorMCP::Server do
       expect(server.prompts).to be_empty
       expect(server.in_flight_requests).to be_empty
     end
+
+    it "allows positional name argument" do
+      positional_server = VectorMCP::Server.new("PositionalServer", version: server_version)
+      expect(positional_server.name).to eq("PositionalServer")
+      expect(positional_server.version).to eq(server_version)
+    end
   end
 
   describe "#register_tool" do

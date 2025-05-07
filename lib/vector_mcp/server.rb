@@ -20,8 +20,16 @@ module VectorMCP
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :in_flight_requests
     attr_accessor :transport
 
-    def initialize(name:, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION)
-      @name = name
+    def initialize(name_pos = nil, *, name: nil, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION)
+      # Allow specifying the server name either positionally or via the `name:` keyword.
+      # If both are provided prefer the positional form but raise if they differ to avoid ambiguity.
+      if name_pos && name && name_pos != name
+        raise ArgumentError, "Specify the server name either positionally or with the `name:` keyword (not both)."
+      end
+
+      @name = name_pos || name
+      raise ArgumentError, "name is required" if @name.nil? || @name.to_s.strip.empty?
+
       @version = version
       @protocol_version = protocol_version
       @logger = VectorMCP.logger # Use the shared logger instance
@@ -37,7 +45,7 @@ module VectorMCP
       @prompt_subscribers = []
 
       setup_default_handlers
-      logger.info("Server instance '#{name}' v#{version} (using VectorMCP v#{VectorMCP::VERSION}) initialized.")
+      logger.info("Server instance '#{@name}' v#{version} (using VectorMCP v#{VectorMCP::VERSION}) initialized.")
     end
 
     # --- Registration Methods ---
