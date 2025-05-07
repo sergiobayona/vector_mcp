@@ -56,3 +56,5 @@ Style/MultilineBlockChain:
   Exclude:
     - 'spec/**/*'
   
+Lint/EmptyClass:
+  Enabled: false

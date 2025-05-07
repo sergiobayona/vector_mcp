@@ -344,9 +344,7 @@ module VectorMCP
         e.request_id = id unless e.request_id && e.request_id == id
         raise e # Re-raise with potentially updated request_id
       rescue StandardError => e
-        # rubocop:disable Layout/LineLength
         logger.error("Unhandled error during request '#{method}' (ID: #{id}): #{e.message}\nBacktrace: #{e.backtrace.join("\n  ")}")
-        # rubocop:enable Layout/LineLength
         raise VectorMCP::InternalError.new(
           "Request handler failed unexpectedly",
           request_id: id,
@@ -376,9 +374,7 @@ module VectorMCP
         begin
           handler.call(params, session, self)
         rescue StandardError => e
-          # rubocop:disable Layout/LineLength
           logger.error("Error executing notification handler '#{method}': #{e.message}\nBacktrace (top 5):\n  #{e.backtrace.first(5).join("\n  ")}")
-          # rubocop:enable Layout/LineLength
           # Notifications must not generate a response, even on error.
         end
       else
@@ -510,6 +506,7 @@ module VectorMCP
   module Transport
     # Dummy base class placeholder used only for argument validation in tests.
     # Real transport classes (e.g., Stdio, SSE) are separate concrete classes.
-    class Base; end
+    class Base # :nodoc:
+    end
   end
 end

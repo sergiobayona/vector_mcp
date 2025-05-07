@@ -532,6 +532,7 @@ module VectorMCP
       # Parses, handles via server, and enqueues response/error to the client's SSE stream.
       # @api private
       # @return [Array] A Rack response triplet (typically 202 Accepted).
+      # rubocop:disable Metrics/AbcSize
       def process_post_message(body_str, client_conn, session, _session_id)
         message = parse_json_body(body_str, client_conn.id) # Use client_conn.id for logging consistency
         # parse_json_body returns an error triplet if parsing fails and error was enqueued
@@ -569,6 +570,7 @@ module VectorMCP
         # Return a 500 Internal Server Error response for the POST request
         error_response(request_id, -32_603, "Internal server error", details)
       end
+      # rubocop:enable Metrics/AbcSize
 
       # Parses the JSON body of a POST request. Handles JSON::ParserError by enqueuing an error
       # to the client and returning a Rack error response triplet.
