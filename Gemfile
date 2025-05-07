@@ -12,6 +12,7 @@ group :development, :test do
   gem "pry-byebug"
   gem "rack-test", "~> 2.1"
   gem "rake", "~> 13.0"
+  gem "redcarpet", "~> 3.5"
   gem "rspec", "~> 3.12"
   gem "rubocop", "~> 1.21"
   gem "rubocop-rake", "~> 0.6"

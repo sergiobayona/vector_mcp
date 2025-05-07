@@ -3,14 +3,13 @@ name: "Deploy YARD Docs"
 on:
   push:
     branches:
-      - main # Adjust if your default branch is different
+      - main 
   workflow_dispatch:
 
-# Grant the permissions required to deploy to GitHub Pages
 permissions:
-  contents: write        # needed for actions/checkout to push to gh-pages
-  pages: write           # to deploy to GitHub Pages
-  id-token: write        # to verify the deployment originates from this workflow
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:

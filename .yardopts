@@ -2,9 +2,3 @@
 --markup markdown
 --markup-provider redcarpet
 --title "VectorMCP Documentation"
-
-# Files / directories to document
-lib/**/*.rb
-README.md
-LICENSE.txt
-CHANGELOG.md 
