@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 require "vector_mcp/handlers/core"
 
@@ -39,7 +41,7 @@ RSpec.describe VectorMCP::Handlers::Core do
 
   describe ".call_tool" do
     let(:tool) { double("tool", handler: handler) }
-    let(:handler) { proc { |args| "raw_result" } }
+    let(:handler) { proc { |_args| "raw_result" } }
 
     before do
       server.tools["my_tool"] = tool

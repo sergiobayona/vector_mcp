@@ -196,7 +196,7 @@ module VectorMCP
         body = Async::HTTP::Body::Writable.new
 
         # Create and launch the client task directly with a variable to hold the reference
-        client_task = Async do |task|
+        Async do |task|
           # Set the task reference immediately
           client_conn.task = task
 
