@@ -32,12 +32,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-io", "~> 1.36"
   spec.add_dependency "falcon", "~> 0.42"
 
-  # Development dependencies
-  spec.add_development_dependency "bundler", "~> 2.0"
-  spec.add_development_dependency "rake", "~> 13.0"
-  spec.add_development_dependency "rspec", "~> 3.12"
-  spec.add_development_dependency "rubocop", "~> 1.21"
-  spec.add_development_dependency "rubocop-rake", "~> 0.6"
-  spec.add_development_dependency "rubocop-rspec", "~> 2.25"
   spec.metadata["rubygems_mfa_required"] = "true"
 end
