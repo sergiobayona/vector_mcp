@@ -19,6 +19,6 @@ YARD::Rake::YardocTask.new(:yard) do |t|
 end
 
 desc "Generate YARD documentation"
-task :doc => :yard
+task doc: :yard
 
 task default: %i[spec rubocop]
