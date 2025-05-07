@@ -23,7 +23,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.2 # use any version >= the gemspec requirement
+          ruby-version: 3.4.2 # use any version >= the gemspec requirement
           bundler-cache: true
 
       - name: Install dependencies (including YARD)
@@ -35,7 +35,7 @@ jobs:
           bundle exec yard doc --quiet
 
       - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./doc
 
@@ -49,4 +49,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v2 
+        uses: actions/deploy-pages@v4
