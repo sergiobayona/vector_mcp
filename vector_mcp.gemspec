@@ -3,20 +3,20 @@
 require_relative "lib/vector_mcp/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "VectorMCP"
+  spec.name = "vector_mcp"
   spec.version = VectorMCP::VERSION
   spec.authors = ["Sergio Bayona"]
   spec.email = ["bayona.sergio@gmail.com"]
 
   spec.summary = "Ruby implementation of the Model Context Protocol (MCP)"
   spec.description = "Server-side tools for implementing the Model Context Protocol in Ruby applications"
-  spec.homepage = "https://github.com/sergiobayona/VectorMCP"
+  spec.homepage = "https://github.com/sergiobayona/vector_mcp"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/sergiobayona/VectorMCP"
-  spec.metadata["changelog_uri"] = "https://github.com/sergiobayona/VectorMCP/blob/main/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = "https://github.com/sergiobayona/vector_mcp"
+  spec.metadata["changelog_uri"] = "https://github.com/sergiobayona/vector_mcp/blob/main/CHANGELOG.md"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
