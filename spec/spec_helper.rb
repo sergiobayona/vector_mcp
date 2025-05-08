@@ -6,6 +6,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "pry-byebug"
 require "vector_mcp"
 require "async/rspec"
+require "simplecov"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -18,3 +19,5 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 end
+
+SimpleCov.start
