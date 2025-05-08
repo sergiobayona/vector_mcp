@@ -7,6 +7,7 @@ require "pry-byebug"
 require "vector_mcp"
 require "async/rspec"
 require "simplecov"
+require "simplecov_json_formatter"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -20,4 +21,7 @@ RSpec.configure do |config|
   end
 end
 
-SimpleCov.start
+SimpleCov.start do
+  formatter SimpleCov::Formatter::JSONFormatter
+  add_filter "/spec/"
+end
