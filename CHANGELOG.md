@@ -1,2 +1,3 @@
-## [Unreleased]
-
+## [0.1.0] – 2025-05-08
+### Added
+* First public release: stdio transport, tool/resource registration, JSON-RPC layer…
