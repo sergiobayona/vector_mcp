@@ -208,3 +208,180 @@ end
 
 *   The block receives the `VectorMCP::Session` object.
 *   Return `String` for text, or a binary `
+
+### Registering Prompts
+
+Prompts are pre-defined templates or workflows that your server can offer to clients. These can guide users or LLMs in specific interactions. Use `register_prompt` with a block to define them. The server validates the `arguments` definition upon registration.
+
+```ruby
+server.register_prompt(
+  name: "project_summary_generator", # Unique name (identifier) for this prompt.
+  description: "Creates a concise summary for a project given its key details.",
+  arguments: [ # Defines the arguments this prompt template expects.
+    { name: "project_name", description: "The name of the project.", type: "string", required: true },
+    { name: "project_goal", description: "The primary objective of the project.", type: "string", required: true },
+    { name: "project_deadline", description: "The deadline for the project (e.g., YYYY-MM-DD).", type: "string", required: false } # 'type' can be 'string', 'number', 'boolean' etc.
+  ]
+) do |invocation_args, session|
+  # This block is called when a client requests this prompt (e.g., via "prompts/get").
+  # - invocation_args: A Hash of arguments provided by the client for this specific call,
+  #                    validated against the 'arguments' definition above.
+  #                    Example: { "project_name" => "Phoenix Initiative", "project_goal" => "Revitalize core systems" }
+  # - session: The VectorMCP::Session object for context (client info, etc.).
+
+  client_name = session.client_info&.dig('name') || "Valued User"
+  project_name = invocation_args["project_name"]
+  project_goal = invocation_args["project_goal"]
+  deadline_info = invocation_args["project_deadline"] ? " by #{invocation_args["project_deadline"]}" : ""
+
+  # The block must return a Hash conforming to the MCP GetPromptResult schema.
+  # This typically includes a 'messages' array.
+  # The 'description' field here describes the *result* of this prompt generation.
+  # The 'template' and 'instructions' from the previous example are now combined into the message content.
+  {
+    description: "Generated prompt to create a project summary for '#{project_name}'. Instructions: Use a professional and concise tone.",
+    messages: [
+      {
+        role: "user", # Or "assistant" if the server is priming the conversation
+        content: {
+          type: "text",
+          text: "Dear #{client_name},\n\nPlease generate a summary for the project '#{project_name}'. " \
+                "The main goal is '#{project_goal}'#{deadline_info}. " \
+                "Focus on key deliverables and expected outcomes."
+        }
+      }
+      # You could add more messages here to form a multi-turn conversation starter.
+      # For example, an assistant message with instructions:
+      # {
+      #   role: "assistant",
+      #   content: { type: "text", text: "Understood. I will use a professional and concise tone." }
+      # }
+    ]
+  }
+end
+```
+
+*   `name`: A `String` or `Symbol` providing the unique identifier for the prompt. This is used by clients to request the prompt.
+*   `description`: A `String` offering details about the prompt's purpose or usage (this is the description of the prompt *definition*).
+*   `arguments`: An `Array` of `Hash`es, where each hash defines an expected argument for the prompt template. Each argument definition hash can include:
+    *   `:name` (`String` or `Symbol`, required): The name of the argument/placeholder.
+    *   `:description` (`String`, optional): A description of the argument.
+    *   `:required` (`Boolean`, optional, defaults to `false` if not specified): Whether the argument must be provided by the client.
+    *   `:type` (`String`, optional): The expected type of the argument (e.g., "string", "number", "boolean"). This helps clients understand what kind of input is expected.
+*   The block (handler) is invoked when a client requests the prompt (e.g., via the `prompts/get` MCP method). It receives:
+    *   `invocation_args`: A `Hash` containing the arguments supplied by the client for that specific request, already validated against the prompt's `arguments` definition.
+    *   `session`: The `VectorMCP::Session` object, allowing access to client information (`session.client_info`) or other session-specific state.
+*   The block's return value **must be a Hash** that conforms to the MCP `GetPromptResult` schema (as seen in `prompts.mdc`). This hash typically includes:
+    *   `messages` (`Array<Hash>`): An array of message objects, each with `role` (e.g., "user", "assistant") and `content` (which itself is a hash, commonly `{ type: "text", text: "..." }`). This forms the actual prompt or conversation starter.
+    *   `description` (`String`, optional): A description for the *generated prompt result*. This can be different from the main prompt definition's description.
+    The definitions of placeholders/arguments are taken from the `arguments` parameter of `register_prompt`; this block constructs the final prompt content (the `messages` array) using the values provided for those arguments.
+
+### Working with the Session Object
+
+The `session` object, passed to tool, resource, and prompt handler blocks, provides crucial context about the connected client and the state of the connection.
+
+```ruby
+# Example in a tool handler
+server.register_tool(name: "user_info", description: "Gets client info", input_schema: {}) do |_args, session|
+  if session.initialized?
+    client_name = session.client_info&.dig('name') || "Unknown Client"
+    client_version = session.client_info&.dig('version') || "N/A"
+    client_capabilities = session.client_capabilities || {} # Hash of capabilities client declared
+
+    # You can use this info to tailor responses or behavior
+    "Hello #{client_name} v#{client_version}! Your capabilities: #{client_capabilities.inspect}"
+  else
+    # Should ideally not happen if handlers are called after initialization, but good for defense
+    raise VectorMCP::InitializationError, "Session not yet initialized."
+  end
+end
+```
+
+Key `session` attributes and methods:
+*   `session.initialized?`: Returns `true` if the client has successfully completed the MCP initialization handshake. Most handlers should only perform significant work if this is true.
+*   `session.client_info`: A `Hash` containing information about the client (e.g., `name`, `version`), as provided in the `initialize` request.
+*   `session.client_capabilities`: A `Hash` outlining the capabilities declared by the client during initialization.
+*   **Storing Session-Specific State**: The `session` object itself doesn't have a built-in store for arbitrary data, but you can use its `object_id` or manage a separate hash/store keyed by session if you need to maintain state across multiple requests from the same client connection (e.g., for authentication status, user preferences loaded from a database).
+
+### Customizing Request and Notification Handlers
+
+While `VectorMCP` provides default handlers for standard MCP methods (like `tools/list`, `resources/read`, etc.), you can override these or add handlers for custom methods specific to your server.
+
+Use `on_request(method_name, &block)` and `on_notification(method_name, &block)`:
+
+```ruby
+# Override the default 'ping' handler
+server.on_request("ping") do |_params, _session, _server_instance|
+  { message: "Custom pong!", timestamp: Time.now.iso8601 }
+end
+
+# Add a handler for a custom request
+server.on_request("my_server/get_status") do |_params, session, server_instance|
+  # _params: The parameters sent with the request
+  # session: The VectorMCP::Session object
+  # server_instance: The VectorMCP::Server instance itself
+  {
+    status: "All systems nominal",
+    server_name: server_instance.name,
+    client_name: session.client_info&.dig('name'),
+    active_tools: server_instance.tools.keys
+  }
+end
+
+# Add a handler for a custom notification
+server.on_notification("my_server/log_event") do |params, _session, _server_instance|
+  server.logger.info("Custom event logged via MCP: #{params.inspect}")
+  # Notifications do not return a value to the client
+end
+```
+*   The block for `on_request` receives `params`, `session`, and the `server` instance. It **must** return a JSON-serializable object that will form the `result` part of the JSON-RPC response.
+*   The block for `on_notification` also receives `params`, `session`, and `server`. It should **not** return a value.
+*   You can see the default handlers in `lib/vector_mcp/handlers/core.rb` for reference.
+
+### Error Handling in Handlers
+
+When writing custom handlers (for tools, resources, prompts, or custom requests), you might encounter situations where you need to signal an error to the client according to JSON-RPC and MCP conventions. `VectorMCP` provides a set_of custom error classes that map directly to MCP/JSON-RPC error codes.
+
+If you raise an instance of these error classes (or their subclasses) from your handler, the server will catch it and automatically format a correct JSON-RPC error response.
+
+```ruby
+server.register_tool(
+  name: "risky_operation",
+  description: "An operation that might fail with specific errors.",
+  input_schema: { type: "object", properties: { magic_word: { type: "string" } }, required: ["magic_word"] }
+) do |args, session|
+  unless session.client_capabilities&.dig(:experimental, :can_do_risky_stuff)
+    # Example of a server-defined error, will map to a generic JSON-RPC internal error
+    # unless you define a specific error code mapping.
+    raise VectorMCP::ServerError.new("Client not authorized for risky operations.", code: -32000)
+  end
+
+  if args["magic_word"] != "please"
+    # This is a standard MCP error type
+    raise VectorMCP::InvalidParamsError.new("The magic_word parameter was incorrect.")
+  end
+
+  # ... perform operation ...
+  "Risky operation successful!"
+rescue VectorMCP::ProtocolError => e
+  # You can catch and re-raise if needed, or let the server handle it.
+  raise e
+rescue StandardError => e
+  # For unexpected errors, wrap them in a standard MCP error.
+  # This ensures the client gets a well-formed JSON-RPC error response.
+  server.logger.error("Unexpected error in risky_operation: #{e.message}")
+  raise VectorMCP::InternalError.new("An unexpected error occurred during the risky operation.")
+end
+```
+
+Common error classes from `vector_mcp/errors.rb` include:
+*   `VectorMCP::InvalidRequestError`
+*   `VectorMCP::MethodNotFoundError`
+*   `VectorMCP::InvalidParamsError`
+*   `VectorMCP::InternalError`
+*   `VectorMCP::ServerError` (for other server-side issues, can take a custom code)
+*   `VectorMCP::NotFoundError` (useful in `resources/read` or `prompts/get` if an item isn't found)
+
+Consult `lib/vector_mcp/errors.rb` for the full list and their default MCP error codes. Using these helps maintain consistent error reporting to clients.
+
+## Development
