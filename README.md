@@ -223,6 +223,21 @@ Common error classes:
 - `VectorMCP::NotFoundError`
 - `VectorMCP::InternalError`
 
+## Example Implementations
+
+These projects demonstrate real-world implementations of VectorMCP servers:
+
+### [file_system_mcp](https://github.com/sergiobayona/file_system_mcp)
+
+A complete MCP server providing filesystem operations:
+- Read/write files
+- Create/list/delete directories
+- Move files/directories
+- Search files
+- Get file metadata
+
+Works with Claude Desktop and other MCP clients.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
