@@ -27,6 +27,6 @@ jobs:
         run: bundle exec rake
       - uses: qltysh/qlty-action/coverage@v1
         with:
-          oidc: true
+          oidc: false
           token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
           files: coverage/.resultset.json
