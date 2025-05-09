@@ -223,6 +223,55 @@ Common error classes:
 - `VectorMCP::NotFoundError`
 - `VectorMCP::InternalError`
 
+### Sampling (LLM completions)
+
+VectorMCP servers can ask the connected client to run an LLM completion and return the result. This allows servers to leverage LLMs for tasks like content generation, analysis, or decision-making, while keeping the user in control of the final interaction with the LLM (as mediated by the client).
+
+The `session.sample` method sends a `sampling/createMessage` request to the client and waits for the response.
+
+```ruby
+# Inside a tool, resource, or prompt handler block:
+tool_input = args["topic"] # Assuming 'args' are the input to your handler
+
+begin
+  sampling_result = session.sample(
+    messages: [
+      { role: "user", content: { type: "text", text: "Generate a short, catchy tagline for: #{tool_input}" } }
+    ],
+    max_tokens: 25,
+    temperature: 0.8,
+    model_preferences: { # Optional: guide client on model selection
+      hints: [{ name: "claude-3-haiku" }, { name: "gpt-3.5-turbo" }], # Preferred models
+      intelligence_priority: 0.5, # Balance between capability, speed, and cost
+      speed_priority: 0.8
+    }
+    # timeout: 15 # Optional: per-request timeout in seconds
+  )
+
+  if sampling_result.text?
+    tagline = sampling_result.text_content
+    # Use the tagline...
+    "Generated tagline: #{tagline}"
+  else
+    "LLM did not return text content."
+  end
+rescue VectorMCP::SamplingTimeoutError => e
+  server.logger.warn("Sampling request timed out: #{e.message}")
+  "Sorry, the request for a tagline timed out."
+rescue VectorMCP::SamplingError => e
+  server.logger.error("Sampling request failed: #{e.message} Details: #{e.details.inspect}")
+  "Sorry, couldn't generate a tagline due to an error."
+rescue ArgumentError => e # e.g. invalid params for session.sample itself
+  server.logger.error("Invalid arguments for sampling: #{e.message}")
+  "Internal error: Invalid arguments for tagline generation."
+end
+```
+
+- The `session.sample` method takes a hash conforming to the `VectorMCP::Sampling::Request` structure.
+- It returns a `VectorMCP::Sampling::Result` object.
+- It can raise `VectorMCP::SamplingTimeoutError` if the client doesn't respond in time, or other `VectorMCP::SamplingError` subclasses if the client returns an error or other issues occur (e.g., `SamplingRejectedError` if the user/client denies the request).
+- Refer to `lib/vector_mcp/sampling/request.rb` and `lib/vector_mcp/sampling/result.rb` for detailed parameter and result structures, and `lib/vector_mcp/errors.rb` for specific error types.
+
 ## Example Implementations
 
 These projects demonstrate real-world implementations of VectorMCP servers:

@@ -35,6 +35,9 @@ module VectorMCP
       @request_id = request_id
       super(message)
     end
+
+    # Allows setting the request_id after initialization if it wasn't known at first.
+    attr_writer :request_id
   end
 
   # Standard JSON-RPC error classes
@@ -135,4 +138,43 @@ module VectorMCP
       super(message, code: -32_001, details: details, request_id: request_id)
     end
   end
+
+  # --- Sampling Specific Errors ---
+  # These are errors that can occur when a server initiates a `sampling/createMessage` request.
+
+  # Base class for sampling-related errors originating from client or transport during a server-initiated sample request.
+  class SamplingError < ProtocolError
+    # @param message [String] The error message.
+    # @param code [Integer] JSON-RPC error code (typically from client response, or server defined for timeouts etc).
+    # @param details [Object, nil] Optional additional error data from client or transport.
+    # @param request_id [String, Integer, nil] The ID of the `sampling/createMessage` request.
+    def initialize(message = "An error occurred during sampling.", code: -32_050, details: nil, request_id: nil)
+      # Using -32050 as a generic base for sampling errors from server's perspective.
+      # Specific errors from client might have different codes.
+      super
+    end
+  end
+
+  # Raised when a server-initiated sampling request times out waiting for a client response.
+  class SamplingTimeoutError < SamplingError
+    def initialize(message = "Timeout waiting for client response to sampling request.", details: nil, request_id: nil)
+      super(message, code: -32_051, details: details, request_id: request_id) # Server-defined code for this timeout
+    end
+  end
+
+  # Raised if the client explicitly rejects or denies the sampling request (e.g., user vetoed).
+  # This would typically correspond to a specific error response from the client.
+  class SamplingRejectedError < SamplingError
+    def initialize(message = "Client rejected the sampling request.", code: -32_052, details: nil, request_id: nil)
+      # This code might be overridden by the actual error code from the client if available.
+      super
+    end
+  end
+
+  # Placeholder for other specific sampling errors that might be defined based on client responses.
+  # class SpecificSamplingClientError < SamplingError
+  #   def initialize(message, client_code:, client_details:, request_id: nil)
+  #     super(message, code: client_code, details: client_details, request_id: request_id)
+  #   end
+  # end
 end

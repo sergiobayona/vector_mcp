@@ -274,8 +274,8 @@ module VectorMCP
       caps[:tools] = { listChanged: false } unless @tools.empty? # `listChanged` for tools is not standard but included for symmetry
       caps[:resources] = { subscribe: false, listChanged: false } unless @resources.empty?
       caps[:prompts] = { listChanged: @prompts_list_changed } unless @prompts.empty?
+      caps[:sampling] = {} # Advertise that the server can initiate sampling requests
       # `experimental` is a defined field in MCP capabilities, can be used for non-standard features.
-      caps[:experimental] = {}
       caps
     end
 
