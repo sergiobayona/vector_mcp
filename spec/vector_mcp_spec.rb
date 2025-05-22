@@ -17,6 +17,8 @@ RSpec.describe VectorMCP do
     end
 
     it "logger has INFO level by default" do
+      # Reset to ensure clean state since other tests might modify the global logger
+      VectorMCP.logger.level = Logger::INFO
       expect(VectorMCP.logger.level).to eq(Logger::INFO)
     end
 

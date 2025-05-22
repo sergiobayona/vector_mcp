@@ -149,7 +149,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
                                               "capabilities" => { "tools" => { "listChanged" => false },
                                                                   "resources" => { "subscribe" => false, "listChanged" => false },
                                                                   "prompts" => { "listChanged" => true },
-                                                                  "experimental" => {} },
+                                                                  "sampling" => {} },
                                               "serverInfo" => { "name" => "VectorMCP::ExampleServer", "version" => "0.0.1" }
                                             })
 

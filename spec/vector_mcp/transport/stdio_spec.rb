@@ -24,6 +24,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
     allow(server).to receive(:server_capabilities).and_return(server_capabilities)
     allow(server).to receive(:protocol_version).and_return(protocol_version)
     allow(VectorMCP::Session).to receive(:new).and_return(session)
+    allow(session).to receive(:id).and_return("mock_session_id")
   end
 
   describe "#initialize" do
@@ -68,7 +69,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test", "id" => 1),
         session,
-        "stdio-session"
+        "mock_session_id"
       )
     end
 
@@ -121,12 +122,12 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test1", "id" => 1),
         session,
-        "stdio-session"
+        "mock_session_id"
       )
       expect(server).to have_received(:handle_message).with(
         hash_including("method" => "test2", "id" => 2),
         session,
-        "stdio-session"
+        "mock_session_id"
       )
     end
 
@@ -286,6 +287,42 @@ RSpec.describe VectorMCP::Transport::Stdio do
       expect(fake_stdout).to have_received(:flush)
     ensure
       $stdout = original_stdout
+    end
+  end
+
+  describe "#send_request" do
+    let(:method_name) { "test/echo" }
+    let(:params) { { "message" => "hello" } }
+
+    context "with invalid arguments" do
+      it "raises ArgumentError if method is blank" do
+        expect { transport.send_request("", params) }.to raise_error(ArgumentError, "Method cannot be blank")
+        expect { transport.send_request("   ", params) }.to raise_error(ArgumentError, "Method cannot be blank")
+        expect { transport.send_request(nil, params) }.to raise_error(ArgumentError, "Method cannot be blank")
+      end
+    end
+
+    context "when timeout occurs" do
+      it "raises a SamplingTimeoutError" do
+        # Mock the condition variable and timeout behavior
+        original_stdout = $stdout
+        mock_stdout = StringIO.new
+        $stdout = mock_stdout
+
+        begin
+          expect do
+            transport.send_request(method_name, params, timeout: 0.001) # Very short timeout
+          end.to raise_error(VectorMCP::SamplingTimeoutError, /Timeout waiting for client response to '#{method_name}' request/)
+
+          # Verify that a request was written to stdout
+          output = JSON.parse(mock_stdout.string)
+          expect(output["method"]).to eq(method_name)
+          expect(output["params"]).to eq(params)
+          expect(logger).to have_received(:warn).with(/Timeout waiting for response to request ID/)
+        ensure
+          $stdout = original_stdout
+        end
+      end
     end
   end
 

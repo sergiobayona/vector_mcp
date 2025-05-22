@@ -7,8 +7,7 @@ RSpec.describe VectorMCP::Server do
   let(:server_version) { "1.0.0" }
   let(:server) { VectorMCP::Server.new(name: server_name, version: server_version) }
   let(:session) do
-    VectorMCP::Session.new(server_info: server.server_info, server_capabilities: server.server_capabilities,
-                           protocol_version: server.protocol_version)
+    VectorMCP::Session.new(server)
   end
   let(:session_id) { "test-session-123" }
 
@@ -217,7 +216,7 @@ RSpec.describe VectorMCP::Server do
     context "when no tools, resources, or prompts are registered" do
       it "returns empty capabilities" do
         capabilities = server.server_capabilities
-        expect(capabilities).to eq({ experimental: {} })
+        expect(capabilities).to eq({ sampling: {} })
       end
     end
 

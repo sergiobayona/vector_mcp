@@ -137,7 +137,9 @@ module VectorMCP
 
         @mutex.synchronize do
           Timeout.timeout(timeout) do
-            condition.wait(@mutex) # Releases mutex and waits, reacquires on signal or timeout
+            until @outgoing_request_responses.key?(request_id) # Guard against spurious wake-ups
+              condition.wait(@mutex) # Releases mutex and waits, reacquires on signal or timeout
+            end
             response = @outgoing_request_responses.delete(request_id)
           end
         rescue Timeout::Error
@@ -215,6 +217,12 @@ module VectorMCP
         message = parse_json(line)
         return if message.is_a?(Array) && message.empty? # Error handled in parse_json, indicated by empty array
 
+        # Check if this is a response to an outgoing request (has id but no method)
+        if message["id"] && !message["method"] && (message.key?("result") || message.key?("error"))
+          handle_outgoing_response(message)
+          return
+        end
+
         # Ensure a session object exists for this stdio transport if it's a single, persistent connection.
         # For stdio, we can treat the entire duration of the transport as a single session.
         @current_session ||= VectorMCP::Session.new(@server, self, id: "stdio_global_session")
@@ -236,11 +244,7 @@ module VectorMCP
       # @api private
       # @return [VectorMCP::Session] The newly created session.
       def create_session
-        VectorMCP::Session.new(
-          server_info: server.server_info,
-          server_capabilities: server.server_capabilities,
-          protocol_version: server.protocol_version
-        )
+        VectorMCP::Session.new(@server, self)
       end
 
       # Launches the input reading loop in a new thread.
@@ -267,6 +271,30 @@ module VectorMCP
       end
 
       # --- Input helpers (private) ---
+
+      # Handles responses to outgoing requests (like sampling requests).
+      # @api private
+      # @param message [Hash] The parsed response message.
+      # @return [void]
+      def handle_outgoing_response(message)
+        request_id = message["id"]
+        logger.debug "[Stdio Transport] Received response for outgoing request ID #{request_id}"
+
+        @mutex.synchronize do
+          # Store the response (convert keys to symbols for consistency)
+          response_data = deep_transform_keys(message, &:to_sym)
+          @outgoing_request_responses[request_id] = response_data
+
+          # Signal any thread waiting for this response
+          condition = @outgoing_request_conditions[request_id]
+          if condition
+            condition.signal
+            logger.debug "[Stdio Transport] Signaled condition for request ID #{request_id}"
+          else
+            logger.warn "[Stdio Transport] Received response for request ID #{request_id} but no thread is waiting"
+          end
+        end
+      end
 
       # Parses a line of text as JSON.
       # If parsing fails, sends a JSON-RPC ParseError and returns an empty array
@@ -307,6 +335,21 @@ module VectorMCP
         logger.error("Unexpected error handling message: #{error.message}\n#{error.backtrace.join("\n")}")
         request_id = message&.fetch("id", nil)
         send_error(request_id, -32_603, "Internal error", { details: error.message })
+      end
+
+      # Recursively transforms hash keys using the given block.
+      # @api private
+      # @param obj [Object] The object to transform (Hash, Array, or other).
+      # @return [Object] The transformed object.
+      def deep_transform_keys(obj, &block)
+        case obj
+        when Hash
+          obj.transform_keys(&block).transform_values { |v| deep_transform_keys(v, &block) }
+        when Array
+          obj.map { |v| deep_transform_keys(v, &block) }
+        else
+          obj
+        end
       end
 
       # Writes a message hash to `$stdout` as a JSON string, followed by a newline.
