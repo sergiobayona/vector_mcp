@@ -865,4 +865,205 @@ RSpec.describe VectorMCP::Server do
       expect(stdio_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
     end
   end
+
+  describe "#roots" do
+    it "is initially empty" do
+      expect(server.roots).to be_empty
+    end
+  end
+
+  describe "#register_root" do
+    let(:test_dir) { Dir.mktmpdir }
+
+    after { FileUtils.rm_rf(test_dir) }
+
+    it "registers a root with valid URI and name" do
+      uri = "file://#{test_dir}"
+      name = "Test Project"
+
+      result = server.register_root(uri: uri, name: name)
+
+      expect(result).to eq(server) # Returns self for chaining
+      expect(server.roots).to have_key(uri)
+
+      root = server.roots[uri]
+      expect(root.uri).to eq(uri)
+      expect(root.name).to eq(name)
+    end
+
+    it "validates the root during registration" do
+      invalid_uri = "file:///non/existent/path"
+
+      expect do
+        server.register_root(uri: invalid_uri, name: "Invalid")
+      end.to raise_error(ArgumentError, /Root directory does not exist/)
+    end
+
+    it "prevents duplicate registration" do
+      uri = "file://#{test_dir}"
+
+      server.register_root(uri: uri, name: "First")
+
+      expect do
+        server.register_root(uri: uri, name: "Second")
+      end.to raise_error(ArgumentError, /Root '#{Regexp.escape(uri)}' already registered/)
+    end
+
+    it "sets the roots_list_changed flag" do
+      # Reset flag first
+      server.instance_variable_set(:@roots_list_changed, false)
+
+      server.register_root(uri: "file://#{test_dir}", name: "Test")
+
+      expect(server.instance_variable_get(:@roots_list_changed)).to be true
+    end
+
+    it "can chain registrations" do
+      subdir1 = File.join(test_dir, "project1")
+      subdir2 = File.join(test_dir, "project2")
+      Dir.mkdir(subdir1)
+      Dir.mkdir(subdir2)
+
+      result = server.register_root(uri: "file://#{subdir1}", name: "Project 1")
+                     .register_root(uri: "file://#{subdir2}", name: "Project 2")
+
+      expect(result).to eq(server)
+      expect(server.roots).to have_key("file://#{subdir1}")
+      expect(server.roots).to have_key("file://#{subdir2}")
+    end
+  end
+
+  describe "#register_root_from_path" do
+    let(:test_dir) { Dir.mktmpdir }
+
+    after { FileUtils.rm_rf(test_dir) }
+
+    it "registers a root from a directory path" do
+      name = "Test Project"
+
+      result = server.register_root_from_path(test_dir, name: name)
+
+      expect(result).to eq(server)
+
+      expected_uri = "file://#{test_dir}"
+      expect(server.roots).to have_key(expected_uri)
+
+      root = server.roots[expected_uri]
+      expect(root.name).to eq(name)
+    end
+
+    it "generates name from directory basename when not provided" do
+      subdir = File.join(test_dir, "my_project")
+      Dir.mkdir(subdir)
+
+      server.register_root_from_path(subdir)
+
+      expected_uri = "file://#{subdir}"
+      root = server.roots[expected_uri]
+      expect(root.name).to eq("my_project")
+    end
+
+    it "expands relative paths" do
+      original_dir = Dir.pwd
+      Dir.chdir(test_dir)
+
+      begin
+        server.register_root_from_path(".", name: "Current")
+
+        # Use realpath to handle symlinks like /var -> /private/var on macOS
+        expected_uri = "file://#{File.realpath(test_dir)}"
+        expect(server.roots).to have_key(expected_uri)
+      ensure
+        Dir.chdir(original_dir)
+      end
+    end
+  end
+
+  describe "#server_capabilities" do
+    let(:test_dir) { Dir.mktmpdir }
+
+    after { FileUtils.rm_rf(test_dir) }
+
+    it "includes roots capability when roots are registered" do
+      server.register_root(uri: "file://#{test_dir}", name: "Test")
+
+      capabilities = server.server_capabilities
+
+      expect(capabilities).to have_key(:roots)
+      expect(capabilities[:roots]).to eq({ listChanged: true })
+    end
+
+    it "does not include roots capability when no roots are registered" do
+      capabilities = server.server_capabilities
+
+      expect(capabilities).not_to have_key(:roots)
+    end
+  end
+
+  describe "#clear_roots_list_changed" do
+    it "resets the roots_list_changed flag" do
+      server.instance_variable_set(:@roots_list_changed, true)
+
+      server.clear_roots_list_changed
+
+      expect(server.instance_variable_get(:@roots_list_changed)).to be false
+    end
+  end
+
+  describe "#notify_roots_list_changed" do
+    let(:test_dir) { Dir.mktmpdir }
+    let(:mock_transport) { double("transport") }
+
+    after { FileUtils.rm_rf(test_dir) }
+
+    before do
+      server.transport = mock_transport
+      server.register_root(uri: "file://#{test_dir}", name: "Test")
+    end
+
+    it "broadcasts notification when transport supports it" do
+      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(true)
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(false)
+
+      expect(mock_transport).to receive(:broadcast_notification)
+        .with("notifications/roots/list_changed")
+
+      server.notify_roots_list_changed
+    end
+
+    it "sends notification when transport supports it (fallback)" do
+      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(false)
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(true)
+
+      expect(mock_transport).to receive(:send_notification)
+        .with("notifications/roots/list_changed")
+
+      server.notify_roots_list_changed
+    end
+
+    it "logs warning when transport doesn't support notifications" do
+      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(false)
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(false)
+
+      expect(server.logger).to receive(:warn)
+        .with(%r{Transport does not support sending notifications/roots/list_changed})
+
+      server.notify_roots_list_changed
+    end
+
+    it "does nothing when no transport is set" do
+      server.transport = nil
+
+      expect { server.notify_roots_list_changed }.not_to raise_error
+    end
+
+    it "does nothing when roots_list_changed is false" do
+      server.instance_variable_set(:@roots_list_changed, false)
+
+      expect(mock_transport).not_to receive(:broadcast_notification)
+      expect(mock_transport).not_to receive(:send_notification)
+
+      server.notify_roots_list_changed
+    end
+  end
 end

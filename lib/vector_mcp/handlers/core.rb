@@ -115,6 +115,23 @@ module VectorMCP
         result
       end
 
+      # Handles the `roots/list` request.
+      # Returns the list of available roots and clears the `listChanged` flag.
+      #
+      # @param _params [Hash] The request parameters (ignored).
+      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param server [VectorMCP::Server] The server instance.
+      # @return [Hash] A hash containing an array of root definitions.
+      #   Example: `{ roots: [ { uri: "file:///path/to/dir", name: "My Project" } ] }`
+      def self.list_roots(_params, _session, server)
+        # Once the list is supplied, clear the listChanged flag
+        result = {
+          roots: server.roots.values.map(&:as_mcp_definition)
+        }
+        server.clear_roots_list_changed if server.respond_to?(:clear_roots_list_changed)
+        result
+      end
+
       # Handles the `prompts/subscribe` request (placeholder).
       # This implementation is a simple acknowledgement.
       #

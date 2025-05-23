@@ -137,6 +137,57 @@ RSpec.describe VectorMCP::Handlers::Core do
     end
   end
 
+  describe ".list_roots" do
+    let(:roots) { {} }
+    let(:server) do
+      double("server",
+             tools: {},
+             resources: {},
+             prompts: {},
+             roots: roots,
+             logger: logger)
+    end
+
+    before do
+      allow(server).to receive(:respond_to?).with(:clear_roots_list_changed).and_return(true)
+      allow(server).to receive(:clear_roots_list_changed)
+    end
+
+    it "lists all registered root definitions" do
+      r1 = double("r1", as_mcp_definition: { "uri" => "file:///path1", "name" => "Project 1" })
+      r2 = double("r2", as_mcp_definition: { "uri" => "file:///path2", "name" => "Project 2" })
+      roots.merge!("file:///path1" => r1, "file:///path2" => r2)
+
+      result = described_class.list_roots({}, session, server)
+
+      expect(result).to eq({
+                             roots: [
+                               { "uri" => "file:///path1", "name" => "Project 1" },
+                               { "uri" => "file:///path2", "name" => "Project 2" }
+                             ]
+                           })
+    end
+
+    it "returns empty array when no roots are registered" do
+      result = described_class.list_roots({}, session, server)
+
+      expect(result).to eq({ roots: [] })
+    end
+
+    it "clears the list changed flag after listing" do
+      described_class.list_roots({}, session, server)
+
+      expect(server).to have_received(:clear_roots_list_changed)
+    end
+
+    it "handles servers that don't support clear_roots_list_changed" do
+      allow(server).to receive(:respond_to?).with(:clear_roots_list_changed).and_return(false)
+
+      expect { described_class.list_roots({}, session, server) }.not_to raise_error
+      expect(server).not_to have_received(:clear_roots_list_changed)
+    end
+  end
+
   describe ".get_prompt" do
     let(:prompt_name) { "greet" }
     let(:handler_proc) do

@@ -17,6 +17,7 @@ This library allows you to easily create MCP servers that expose your applicatio
 *   **Tools:** Define and register custom tools (functions) that the LLM can invoke.
 *   **Resources:** Expose data sources (files, database results, API outputs) for the LLM to read.
 *   **Prompts:** Provide structured prompt templates the LLM can request and use.
+*   **Roots:** Define filesystem boundaries where the server can operate, enhancing security and providing workspace context.
 *   **Sampling:** Server-initiated LLM requests with configurable capabilities (streaming, tool calls, images, token limits).
 *   **Transport:**
     *   **Stdio (stable):** Simple transport using standard input/output, ideal for process-based servers.
@@ -50,6 +51,10 @@ server = VectorMCP.new(
   }
 )
 
+# Register filesystem roots for security and context
+server.register_root_from_path('.', name: 'Current Project')
+server.register_root_from_path('./examples', name: 'Examples')
+
 # Register a tool
 server.register_tool(
   name: 'echo',
@@ -80,7 +85,9 @@ Or use a script:
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"CLI","version":"0.1"}}}';
   printf '%s\n' '{"jsonrpc":"2.0","method":"initialized"}';
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
-  printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}';
+  printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"resources/list","params":{}}';
+  printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"roots/list","params":{}}';
+  printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}';
 } | ruby my_server.rb | jq
 ```
 
@@ -194,6 +201,101 @@ end
 
 - `arguments`: Defines the parameters this prompt template expects
 - Return a Hash conforming to the MCP `GetPromptResult` schema with a `messages` array
+
+### Registering Roots
+
+Roots define filesystem boundaries where your MCP server can operate. They provide security by establishing clear boundaries and help clients understand which directories your server has access to.
+
+```ruby
+# Register a project directory as a root
+server.register_root(
+  uri: "file:///home/user/projects/myapp",
+  name: "My Application"
+)
+
+# Register from a local path (automatically creates file:// URI)
+server.register_root_from_path("/home/user/projects/frontend", name: "Frontend Code")
+
+# Register current directory
+server.register_root_from_path(".", name: "Current Project")
+
+# Chain multiple root registrations
+server.register_root_from_path("./src", name: "Source Code")
+      .register_root_from_path("./docs", name: "Documentation")
+      .register_root_from_path("./tests", name: "Test Suite")
+```
+
+**Security Features:**
+- **File URI Validation:** Only `file://` scheme URIs are supported
+- **Directory Verification:** Ensures the path exists and is a directory
+- **Readability Checks:** Verifies the server can read the directory
+- **Path Traversal Protection:** Prevents `../` attacks and unsafe path patterns
+- **Access Control:** Tools and resources can verify operations against registered roots
+
+**Usage in Tools and Resources:**
+```ruby
+# Tool that operates within registered roots
+server.register_tool(
+  name: "list_files_in_root",
+  description: "Lists files in a registered root directory",
+  input_schema: {
+    type: "object",
+    properties: {
+      root_uri: { 
+        type: "string", 
+        description: "URI of a registered root directory" 
+      }
+    },
+    required: ["root_uri"]
+  }
+) do |args, session|
+  root_uri = args["root_uri"]
+  
+  # Verify the root is registered (security check)
+  root = server.roots[root_uri]
+  raise ArgumentError, "Root '#{root_uri}' is not registered" unless root
+  
+  # Get the actual filesystem path
+  path = root.path
+  
+  # Safely list directory contents
+  entries = Dir.entries(path).reject { |entry| entry.start_with?('.') }
+  
+  {
+    root_name: root.name,
+    root_uri: root_uri,
+    files: entries.sort,
+    total_count: entries.size
+  }
+end
+
+# Resource that provides root information
+server.register_resource(
+  uri: "workspace://roots",
+  name: "Workspace Roots",
+  description: "Information about registered workspace roots",
+  mime_type: "application/json"
+) do |params|
+  {
+    total_roots: server.roots.size,
+    roots: server.roots.map do |uri, root|
+      {
+        uri: uri,
+        name: root.name,
+        path: root.path,
+        accessible: File.readable?(root.path)
+      }
+    end
+  }
+end
+```
+
+**Key Benefits:**
+- **Security:** Establishes clear filesystem boundaries for server operations
+- **Context:** Provides workspace information to LLM clients
+- **Organization:** Helps structure multi-directory projects
+- **Validation:** Automatic path validation and security checks
+- **MCP Compliance:** Full support for the MCP roots specification
 
 ## Advanced Features
 
@@ -382,6 +484,23 @@ A complete MCP server providing filesystem operations:
 - Get file metadata
 
 Works with Claude Desktop and other MCP clients.
+
+### Roots Demo (included)
+
+The `examples/roots_demo.rb` script demonstrates comprehensive roots functionality:
+- Multiple root registration with automatic validation
+- Security boundaries and workspace context
+- Tools that operate safely within registered roots
+- Resources providing workspace information
+- Integration with other MCP features
+
+Run it with: `ruby examples/roots_demo.rb`
+
+This example shows best practices for:
+- Registering multiple project directories as roots
+- Implementing security checks in tools
+- Providing workspace context to clients
+- Error handling for invalid root operations
 
 ## Development
 
