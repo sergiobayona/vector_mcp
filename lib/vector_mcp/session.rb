@@ -42,7 +42,7 @@ module VectorMCP
       raise InitializationError, "Session already initialized or initialization attempt in progress." unless @initialized_state == :pending
 
       # TODO: More robust validation of params against MCP spec for initialize request
-      protocol_version = params["protocolVersion"]
+      params["protocolVersion"]
       client_capabilities_raw = params["capabilities"]
       client_info_raw = params["clientInfo"]
 
@@ -93,7 +93,7 @@ module VectorMCP
     # @raise [VectorMCP::SamplingError] if the sampling request fails, is rejected, or times out.
     # @raise [StandardError] if the session's transport does not support `send_request`.
     def sample(request_params, timeout: nil)
-      unless @transport&.respond_to?(:send_request)
+      unless @transport.respond_to?(:send_request)
         raise StandardError, "Session's transport does not support sending requests (required for sampling)."
       end
 

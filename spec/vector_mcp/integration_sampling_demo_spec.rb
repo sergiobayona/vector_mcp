@@ -49,7 +49,7 @@ RSpec.describe "Sampling Integration Demo", type: :integration do
       expect(result.text_content).to eq("2+2 equals 4")
 
       # Verify the correct request was made
-      expect(transport).to have_received(:send_request) do |method, params, **options|
+      expect(transport).to have_received(:send_request) do |method, params, **_options|
         expect(method).to eq("sampling/createMessage")
         expect(params[:messages][0][:content][:text]).to eq("What is 2+2?")
         expect(params[:maxTokens]).to eq(10)
@@ -77,7 +77,7 @@ RSpec.describe "Sampling Integration Demo", type: :integration do
       end
 
       # Verify the correct request was attempted
-      expect(transport).to have_received(:send_request) do |method, params, **options|
+      expect(transport).to have_received(:send_request) do |method, params, **_options|
         expect(method).to eq("sampling/createMessage")
         expect(params[:messages][0][:content][:text]).to eq("Generate inappropriate content")
         expect(params[:maxTokens]).to eq(50)
@@ -105,7 +105,7 @@ RSpec.describe "Sampling Integration Demo", type: :integration do
                      })
 
       # Verify the request parameters are correctly formatted
-      expect(transport).to have_received(:send_request) do |method, params, **options|
+      expect(transport).to have_received(:send_request) do |method, params, **_options|
         expect(method).to eq("sampling/createMessage")
 
         # Verify all the MCP specification fields are properly transformed

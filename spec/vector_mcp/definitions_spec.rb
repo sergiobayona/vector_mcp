@@ -194,7 +194,7 @@ RSpec.describe VectorMCP::Definitions do
 
     describe ".from_image_file" do
       let(:temp_file) { Tempfile.new(["test_image", ".jpg"]) }
-      let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+      let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
       let(:test_uri) { "images://test.jpg" }
 
       before do
@@ -281,7 +281,7 @@ RSpec.describe VectorMCP::Definitions do
     end
 
     describe ".from_image_data" do
-      let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+      let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
       let(:test_uri) { "images://generated.jpg" }
 
       it "creates a resource from binary image data" do
@@ -545,7 +545,7 @@ RSpec.describe VectorMCP::Definitions do
   describe "integration scenarios" do
     let(:temp_dir) { Dir.mktmpdir }
     let(:image_file) { File.join(temp_dir, "test.png") }
-    let(:png_data) { [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*") + "png content" }
+    let(:png_data) { "#{[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*")}png content" }
 
     before do
       File.binwrite(image_file, png_data)

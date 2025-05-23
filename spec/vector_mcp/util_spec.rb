@@ -20,7 +20,7 @@ RSpec.describe VectorMCP::Util do
 
       context "with image file paths" do
         let(:temp_image_file) { Tempfile.new(["test", ".jpg"]) }
-        let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+        let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
 
         before do
           temp_image_file.binmode
@@ -53,7 +53,7 @@ RSpec.describe VectorMCP::Util do
       end
 
       context "with binary image data" do
-        let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+        let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
 
         it "detects and processes binary image data" do
           binary_jpeg = jpeg_data.dup.force_encoding(Encoding::ASCII_8BIT)
@@ -167,7 +167,7 @@ RSpec.describe VectorMCP::Util do
       end
 
       context "with mixed raw data" do
-        let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "content" }
+        let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}content" }
 
         it "recursively converts each item" do
           mixed_array = ["text", jpeg_data.dup.force_encoding(Encoding::ASCII_8BIT)]
@@ -273,7 +273,7 @@ RSpec.describe VectorMCP::Util do
       end
 
       it "rejects overly long strings" do
-        long_path = ("a" * 600) + ".jpg"
+        long_path = "#{"a" * 600}.jpg"
         expect(described_class.looks_like_image_file_path?(long_path)).to be false
       end
 
@@ -291,12 +291,12 @@ RSpec.describe VectorMCP::Util do
       let(:png_signature) { [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*") }
 
       it "detects JPEG binary data" do
-        jpeg_data = (jpeg_signature + "jpeg content").dup.force_encoding(Encoding::ASCII_8BIT)
+        jpeg_data = "#{jpeg_signature}jpeg content".force_encoding(Encoding::ASCII_8BIT)
         expect(described_class.binary_image_data?(jpeg_data)).to be true
       end
 
       it "detects PNG binary data" do
-        png_data = (png_signature + "png content").dup.force_encoding(Encoding::ASCII_8BIT)
+        png_data = "#{png_signature}png content".force_encoding(Encoding::ASCII_8BIT)
         expect(described_class.binary_image_data?(png_data)).to be true
       end
 
@@ -371,7 +371,7 @@ RSpec.describe VectorMCP::Util do
   describe "integration with image conversion" do
     let(:temp_dir) { Dir.mktmpdir }
     let(:image_file) { File.join(temp_dir, "test.jpg") }
-    let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+    let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
 
     before do
       File.binwrite(image_file, jpeg_data)

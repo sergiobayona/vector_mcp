@@ -197,7 +197,7 @@ module VectorMCP
       begin
         image_content = VectorMCP::ImageUtil.to_mcp_image_content(binary_data)
         [image_content]
-      rescue ArgumentError => e
+      rescue ArgumentError
         # If image processing fails, fall back to text content
         [{ type: "text", text: binary_data.to_s, mimeType: "application/octet-stream" }]
       end

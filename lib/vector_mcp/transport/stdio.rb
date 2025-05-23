@@ -213,7 +213,7 @@ module VectorMCP
       # @param session [VectorMCP::Session] The current session.
       # @param session_id [String] The identifier for this session.
       # @return [void]
-      def handle_input_line(line, session, session_id)
+      def handle_input_line(line, _session, session_id)
         message = parse_json(line)
         return if message.is_a?(Array) && message.empty? # Error handled in parse_json, indicated by empty array
 

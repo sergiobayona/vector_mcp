@@ -82,7 +82,7 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
         expect(sampling_result.text_content).to eq("Hello Server!")
 
         # Verify the transport was called with correct parameters
-        expect(stdio_transport).to have_received(:send_request) do |method, params, **options|
+        expect(stdio_transport).to have_received(:send_request) do |method, params, **_options|
           expect(method).to eq("sampling/createMessage")
           expect(params[:messages]).to eq(sample_request_params[:messages])
           expect(params[:maxTokens]).to eq(50)
@@ -323,7 +323,6 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
       }
 
       # Mock the actual response handling instead of trying to coordinate threads
-      request_id = "test_req_123"
 
       # Simulate what would happen when a response comes in
       response_data = {

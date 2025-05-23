@@ -5,7 +5,7 @@ require "spec_helper"
 RSpec.describe VectorMCP::ImageUtil do
   describe ".detect_image_format" do
     context "with JPEG data" do
-      let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "some data" }
+      let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}some data" }
 
       it "detects JPEG format" do
         expect(described_class.detect_image_format(jpeg_data)).to eq("image/jpeg")
@@ -13,7 +13,7 @@ RSpec.describe VectorMCP::ImageUtil do
     end
 
     context "with PNG data" do
-      let(:png_data) { [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*") + "PNG data" }
+      let(:png_data) { "#{[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*")}PNG data" }
 
       it "detects PNG format" do
         expect(described_class.detect_image_format(png_data)).to eq("image/png")
@@ -21,8 +21,8 @@ RSpec.describe VectorMCP::ImageUtil do
     end
 
     context "with GIF data" do
-      let(:gif87a_data) { "GIF87a" + "some gif data" }
-      let(:gif89a_data) { "GIF89a" + "some gif data" }
+      let(:gif87a_data) { "GIF87asome gif data" }
+      let(:gif89a_data) { "GIF89asome gif data" }
 
       it "detects GIF87a format" do
         expect(described_class.detect_image_format(gif87a_data)).to eq("image/gif")
@@ -34,7 +34,7 @@ RSpec.describe VectorMCP::ImageUtil do
     end
 
     context "with WebP data" do
-      let(:webp_data) { "RIFF" + [12].pack("V") + "WEBP" + "VP8 " }
+      let(:webp_data) { "RIFF#{[12].pack("V")}WEBPVP8 " }
 
       it "detects WebP format" do
         expect(described_class.detect_image_format(webp_data)).to eq("image/webp")
@@ -42,7 +42,7 @@ RSpec.describe VectorMCP::ImageUtil do
     end
 
     context "with BMP data" do
-      let(:bmp_data) { "BM" + "bitmap data" }
+      let(:bmp_data) { "BMbitmap data" }
 
       it "detects BMP format" do
         expect(described_class.detect_image_format(bmp_data)).to eq("image/bmp")
@@ -50,8 +50,8 @@ RSpec.describe VectorMCP::ImageUtil do
     end
 
     context "with TIFF data" do
-      let(:tiff_le_data) { "II*\0" + "tiff data" }
-      let(:tiff_be_data) { "MM\0*" + "tiff data" }
+      let(:tiff_le_data) { "II*\u0000tiff data" }
+      let(:tiff_be_data) { "MM\u0000*tiff data" }
 
       it "detects little-endian TIFF format" do
         expect(described_class.detect_image_format(tiff_le_data)).to eq("image/tiff")
@@ -76,8 +76,8 @@ RSpec.describe VectorMCP::ImageUtil do
   end
 
   describe ".validate_image" do
-    let(:valid_jpeg) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
-    let(:valid_png) { [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*") + "png content" }
+    let(:valid_jpeg) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
+    let(:valid_png) { "#{[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].pack("C*")}png content" }
 
     context "with valid image data" do
       it "validates JPEG data successfully" do
@@ -196,7 +196,7 @@ RSpec.describe VectorMCP::ImageUtil do
   end
 
   describe ".to_mcp_image_content" do
-    let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+    let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
     let(:encoded_jpeg) { described_class.encode_base64(jpeg_data) }
 
     context "with binary image data" do
@@ -270,7 +270,7 @@ RSpec.describe VectorMCP::ImageUtil do
 
   describe ".file_to_mcp_image_content" do
     let(:temp_file) { Tempfile.new(["test_image", ".jpg"]) }
-    let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+    let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
 
     before do
       temp_file.binmode
@@ -324,7 +324,7 @@ RSpec.describe VectorMCP::ImageUtil do
   end
 
   describe ".extract_metadata" do
-    let(:jpeg_data) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "jpeg content" }
+    let(:jpeg_data) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}jpeg content" }
 
     it "extracts basic metadata" do
       metadata = described_class.extract_metadata(jpeg_data)
@@ -397,7 +397,7 @@ RSpec.describe VectorMCP::ImageUtil do
   end
 
   describe "integration scenarios" do
-    let(:sample_jpeg) { [0xFF, 0xD8, 0xFF, 0xE0].pack("C*") + "sample jpeg data" }
+    let(:sample_jpeg) { "#{[0xFF, 0xD8, 0xFF, 0xE0].pack("C*")}sample jpeg data" }
 
     it "handles full workflow: detect -> validate -> convert" do
       # 1. Detection
