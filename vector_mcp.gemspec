@@ -30,6 +30,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-container", "~> 0.16"
   spec.add_dependency "async-http", "~> 0.61"
   spec.add_dependency "async-io", "~> 1.36"
+  spec.add_dependency "base64", "~> 0.2"
   spec.add_dependency "falcon", "~> 0.42"
 
   spec.metadata["rubygems_mfa_required"] = "true"
