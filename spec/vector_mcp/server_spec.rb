@@ -214,9 +214,19 @@ RSpec.describe VectorMCP::Server do
 
   describe "#server_capabilities" do
     context "when no tools, resources, or prompts are registered" do
-      it "returns empty capabilities" do
+      it "returns default sampling capabilities" do
         capabilities = server.server_capabilities
-        expect(capabilities).to eq({ sampling: {} })
+        expected_sampling_caps = {
+          methods: ["createMessage"],
+          features: {
+            modelPreferences: true
+          },
+          limits: {
+            defaultTimeout: 30
+          },
+          contextInclusion: %w[none thisServer]
+        }
+        expect(capabilities).to eq({ sampling: expected_sampling_caps })
       end
     end
 
@@ -233,6 +243,7 @@ RSpec.describe VectorMCP::Server do
       it "includes tools capability" do
         capabilities = server.server_capabilities
         expect(capabilities[:tools]).to eq({ listChanged: false })
+        expect(capabilities[:sampling]).to include(:methods, :features, :limits, :contextInclusion)
       end
     end
 
@@ -249,6 +260,7 @@ RSpec.describe VectorMCP::Server do
       it "includes resources capability" do
         capabilities = server.server_capabilities
         expect(capabilities[:resources]).to eq({ subscribe: false, listChanged: false })
+        expect(capabilities[:sampling]).to include(:methods, :features, :limits, :contextInclusion)
       end
     end
 
@@ -272,6 +284,138 @@ RSpec.describe VectorMCP::Server do
         VectorMCP::Handlers::Core.list_prompts({}, session, server)
         capabilities = server.server_capabilities
         expect(capabilities[:prompts]).to eq({ listChanged: false })
+      end
+    end
+  end
+
+  describe "sampling capabilities configuration" do
+    context "with default configuration" do
+      it "provides basic sampling capabilities" do
+        capabilities = server.server_capabilities[:sampling]
+
+        expect(capabilities[:methods]).to eq(["createMessage"])
+        expect(capabilities[:features][:modelPreferences]).to be true
+        expect(capabilities[:limits][:defaultTimeout]).to eq(30)
+        expect(capabilities[:contextInclusion]).to eq(%w[none thisServer])
+
+        # Features that are disabled by default should not be present
+        expect(capabilities[:features]).not_to have_key(:streaming)
+        expect(capabilities[:features]).not_to have_key(:toolCalls)
+        expect(capabilities[:features]).not_to have_key(:images)
+      end
+
+      it "returns sampling config through accessor" do
+        config = server.sampling_config
+
+        expect(config[:enabled]).to be true
+        expect(config[:methods]).to eq(["createMessage"])
+        expect(config[:supports_streaming]).to be false
+        expect(config[:supports_tool_calls]).to be false
+        expect(config[:supports_images]).to be false
+        expect(config[:max_tokens_limit]).to be_nil
+        expect(config[:timeout_seconds]).to eq(30)
+        expect(config[:context_inclusion_methods]).to eq(%w[none thisServer])
+        expect(config[:model_preferences_supported]).to be true
+      end
+    end
+
+    context "with custom configuration enabling advanced features" do
+      let(:custom_config) do
+        {
+          supports_streaming: true,
+          supports_tool_calls: true,
+          supports_images: true,
+          max_tokens_limit: 4000,
+          timeout_seconds: 60,
+          context_inclusion_methods: %w[none thisServer allServers],
+          model_preferences_supported: false
+        }
+      end
+
+      let(:enhanced_server) do
+        VectorMCP::Server.new(
+          name: "EnhancedSamplingServer",
+          version: "1.0.0",
+          sampling_config: custom_config
+        )
+      end
+
+      it "provides enhanced sampling capabilities" do
+        capabilities = enhanced_server.server_capabilities[:sampling]
+
+        expect(capabilities[:methods]).to eq(["createMessage"])
+        expect(capabilities[:features][:streaming]).to be true
+        expect(capabilities[:features][:toolCalls]).to be true
+        expect(capabilities[:features][:images]).to be true
+        expect(capabilities[:features]).not_to have_key(:modelPreferences)
+        expect(capabilities[:limits][:maxTokens]).to eq(4000)
+        expect(capabilities[:limits][:defaultTimeout]).to eq(60)
+        expect(capabilities[:contextInclusion]).to eq(%w[none thisServer allServers])
+      end
+
+      it "returns enhanced config through accessor" do
+        config = enhanced_server.sampling_config
+
+        expect(config[:supports_streaming]).to be true
+        expect(config[:supports_tool_calls]).to be true
+        expect(config[:supports_images]).to be true
+        expect(config[:max_tokens_limit]).to eq(4000)
+        expect(config[:timeout_seconds]).to eq(60)
+        expect(config[:context_inclusion_methods]).to eq(%w[none thisServer allServers])
+        expect(config[:model_preferences_supported]).to be false
+      end
+    end
+
+    context "with sampling disabled" do
+      let(:disabled_server) do
+        VectorMCP::Server.new(
+          name: "DisabledSamplingServer",
+          sampling_config: { enabled: false }
+        )
+      end
+
+      it "provides empty sampling capabilities" do
+        capabilities = disabled_server.server_capabilities[:sampling]
+        expect(capabilities).to eq({})
+      end
+
+      it "shows disabled in config" do
+        config = disabled_server.sampling_config
+        expect(config[:enabled]).to be false
+      end
+    end
+
+    context "with minimal configuration" do
+      let(:minimal_config) do
+        {
+          max_tokens_limit: 1000,
+          supports_streaming: true
+        }
+      end
+
+      let(:minimal_server) do
+        VectorMCP::Server.new(
+          name: "MinimalSamplingServer",
+          sampling_config: minimal_config
+        )
+      end
+
+      it "merges with defaults correctly" do
+        capabilities = minimal_server.server_capabilities[:sampling]
+
+        # Custom values
+        expect(capabilities[:limits][:maxTokens]).to eq(1000)
+        expect(capabilities[:features][:streaming]).to be true
+
+        # Default values preserved
+        expect(capabilities[:methods]).to eq(["createMessage"])
+        expect(capabilities[:features][:modelPreferences]).to be true
+        expect(capabilities[:limits][:defaultTimeout]).to eq(30)
+        expect(capabilities[:contextInclusion]).to eq(%w[none thisServer])
+
+        # Defaults for disabled features
+        expect(capabilities[:features]).not_to have_key(:toolCalls)
+        expect(capabilities[:features]).not_to have_key(:images)
       end
     end
   end
@@ -647,10 +791,10 @@ RSpec.describe VectorMCP::Server do
     end
 
     context "with :sse transport" do
-      it "raises NotImplementedError" do
+      it "exits when SSE dependencies are missing" do
         expect do
           server.run(transport: :sse, options: { host: "localhost" })
-        end.to raise_error(NotImplementedError, /SSE transport is not yet supported/i)
+        end.to raise_error(SystemExit)
       end
     end
   end

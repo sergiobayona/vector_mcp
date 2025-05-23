@@ -17,11 +17,6 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
   let(:mock_stdout) { StringIO.new }
 
   before do
-    # Initialize session for most tests
-    allow(server).to receive(:protocol_version).and_return("2024-11-05")
-    allow(server).to receive(:server_info).and_return({ name: server_name, version: server_version })
-    allow(server).to receive(:server_capabilities).and_return({ sampling: {} })
-
     # Set up initialized session state
     session.instance_variable_set(:@initialized_state, :succeeded)
     session.instance_variable_set(:@client_info, { name: "TestClient", version: "1.0" })
@@ -349,6 +344,72 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
       expect(result).to be_a(VectorMCP::Sampling::Result)
       expect(result.model).to eq("test-model")
       expect(result.text_content).to eq("Response text")
+    end
+  end
+
+  describe "Sampling Capabilities Configuration Validation" do
+    context "when testing server capabilities based on configuration" do
+      it "includes proper sampling capabilities in server advertisements" do
+        # Test that the server properly advertises its sampling capabilities
+        capabilities = server.server_capabilities
+
+        expect(capabilities[:sampling]).to include(:methods, :features, :limits, :contextInclusion)
+        expect(capabilities[:sampling][:methods]).to include("createMessage")
+        expect(capabilities[:sampling][:features][:modelPreferences]).to be true
+        expect(capabilities[:sampling][:limits][:defaultTimeout]).to eq(30)
+        expect(capabilities[:sampling][:contextInclusion]).to eq(%w[none thisServer])
+      end
+
+      it "respects custom timeout configuration" do
+        custom_server = VectorMCP::Server.new(
+          name: "CustomTimeoutServer",
+          sampling_config: { timeout_seconds: 60 }
+        )
+
+        capabilities = custom_server.server_capabilities
+        expect(capabilities[:sampling][:limits][:defaultTimeout]).to eq(60)
+      end
+
+      it "includes maxTokens limit when configured" do
+        limited_server = VectorMCP::Server.new(
+          name: "LimitedServer",
+          sampling_config: { max_tokens_limit: 2000 }
+        )
+
+        capabilities = limited_server.server_capabilities
+        expect(capabilities[:sampling][:limits][:maxTokens]).to eq(2000)
+      end
+
+      it "advertises advanced features when enabled" do
+        advanced_server = VectorMCP::Server.new(
+          name: "AdvancedServer",
+          sampling_config: {
+            supports_streaming: true,
+            supports_tool_calls: true,
+            supports_images: true
+          }
+        )
+
+        capabilities = advanced_server.server_capabilities
+        features = capabilities[:sampling][:features]
+
+        expect(features[:streaming]).to be true
+        expect(features[:toolCalls]).to be true
+        expect(features[:images]).to be true
+        expect(features[:modelPreferences]).to be true # Default
+      end
+
+      it "supports custom context inclusion methods" do
+        extended_server = VectorMCP::Server.new(
+          name: "ExtendedServer",
+          sampling_config: {
+            context_inclusion_methods: %w[none thisServer allServers custom]
+          }
+        )
+
+        capabilities = extended_server.server_capabilities
+        expect(capabilities[:sampling][:contextInclusion]).to eq(%w[none thisServer allServers custom])
+      end
     end
   end
 end

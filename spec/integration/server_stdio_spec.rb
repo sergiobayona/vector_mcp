@@ -146,10 +146,21 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       expect(init_response["id"]).to eq(init_request[:id])
       expect(init_response["result"]).to eq({
                                               "protocolVersion" => "2024-11-05",
-                                              "capabilities" => { "tools" => { "listChanged" => false },
-                                                                  "resources" => { "subscribe" => false, "listChanged" => false },
-                                                                  "prompts" => { "listChanged" => true },
-                                                                  "sampling" => {} },
+                                              "capabilities" => {
+                                                "tools" => { "listChanged" => false },
+                                                "resources" => { "subscribe" => false, "listChanged" => false },
+                                                "prompts" => { "listChanged" => true },
+                                                "sampling" => {
+                                                  "methods" => ["createMessage"],
+                                                  "features" => {
+                                                    "modelPreferences" => true
+                                                  },
+                                                  "limits" => {
+                                                    "defaultTimeout" => 30
+                                                  },
+                                                  "contextInclusion" => %w[none thisServer]
+                                                }
+                                              },
                                               "serverInfo" => { "name" => "VectorMCP::ExampleServer", "version" => "0.0.1" }
                                             })
 

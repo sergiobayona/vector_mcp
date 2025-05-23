@@ -6,7 +6,7 @@ require_relative "definitions"
 require_relative "session"
 require_relative "errors"
 require_relative "transport/stdio" # Default transport
-require_relative "transport/sse"
+# require_relative "transport/sse" # Load on demand to avoid async dependencies
 require_relative "handlers/core" # Default handlers
 require_relative "util" # Needed if not using Handlers::Core
 
@@ -57,45 +57,50 @@ module VectorMCP
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :in_flight_requests
     attr_accessor :transport
 
-    # Initializes a new MCP Server.
+    # Initializes a new VectorMCP server.
     #
-    # @param name_pos [String, nil] Positional argument for the server name.
-    #   Superseded by `name:` keyword if both provided and different.
-    # @param name [String] The name of the server (required).
-    # @param version [String] The version of this server application (default: "0.1.0").
-    # @param log_level [Integer] The logger level (e.g., `Logger::INFO`, `Logger::DEBUG`).
-    #   Defaults to `Logger::INFO` via the shared `VectorMCP.logger`.
-    # @param protocol_version [String] The MCP protocol version string this server uses
-    #   (default: {PROTOCOL_VERSION}).
-    # @raise [ArgumentError] if name is not provided or is empty.
-    # @raise [ArgumentError] if `name_pos` and `name:` are both provided but differ.
-    # rubocop:disable Metrics/ParameterLists
-    def initialize(name_pos = nil, *, name: nil, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION)
-      if name_pos && name && name_pos != name
-        raise ArgumentError, "Specify the server name either positionally or with the `name:` keyword (not both)."
-      end
+    # @param name_pos [String] Positional name argument (deprecated, use name: instead).
+    # @param name [String] The name of the server.
+    # @param version [String] The version of the server.
+    # @param log_level [Integer] The logging level (Logger::DEBUG, Logger::INFO, etc.).
+    # @param protocol_version [String] The MCP protocol version to use.
+    # @param sampling_config [Hash] Configuration for sampling capabilities. Available options:
+    #   - :enabled [Boolean] Whether sampling is enabled (default: true)
+    #   - :methods [Array<String>] Supported sampling methods (default: ["createMessage"])
+    #   - :supports_streaming [Boolean] Whether streaming is supported (default: false)
+    #   - :supports_tool_calls [Boolean] Whether tool calls are supported (default: false)
+    #   - :supports_images [Boolean] Whether image content is supported (default: false)
+    #   - :max_tokens_limit [Integer, nil] Maximum tokens limit (default: nil, no limit)
+    #   - :timeout_seconds [Integer] Default timeout for sampling requests (default: 30)
+    #   - :context_inclusion_methods [Array<String>] Supported context inclusion methods
+    #     (default: ["none", "thisServer"])
+    #   - :model_preferences_supported [Boolean] Whether model preferences are supported (default: true)
+    def initialize(name_pos = nil, *, name: nil, version: "0.1.0", log_level: Logger::INFO, protocol_version: PROTOCOL_VERSION, sampling_config: {})
+      raise ArgumentError, "Name provided both positionally (#{name_pos}) and as keyword argument (#{name})" if name_pos && name && name_pos != name
 
-      @name = name_pos || name
-      raise ArgumentError, "Server name is required" if @name.nil? || @name.to_s.strip.empty?
-
+      @name = name_pos || name || "UnnamedServer"
       @version = version
       @protocol_version = protocol_version
       @logger = VectorMCP.logger
-      @logger.level = log_level
+      @logger.level = log_level if log_level
 
-      @request_handlers = {}
-      @notification_handlers = {}
+      @transport = nil
       @tools = {}
       @resources = {}
       @prompts = {}
-      @in_flight_requests = {} # For $/cancelRequest
+      @request_handlers = {}
+      @notification_handlers = {}
+      @in_flight_requests = {}
       @prompts_list_changed = false
-      @prompt_subscribers = [] # For `notifications/prompts/subscribe`
+      @prompt_subscribers = []
+
+      # Configure sampling capabilities
+      @sampling_config = configure_sampling_capabilities(sampling_config)
 
       setup_default_handlers
-      logger.info("Server instance '#{@name}' v#{@version} (MCP Protocol: #{@protocol_version}, Gem: v#{VectorMCP::VERSION}) initialized.")
+
+      @logger.info("Server instance '#{@name}' v#{@version} (MCP Protocol: #{@protocol_version}, Gem: v#{VectorMCP::VERSION}) initialized.")
     end
-    # rubocop:enable Metrics/ParameterLists
 
     # --- Registration Methods ---
 
@@ -213,8 +218,13 @@ module VectorMCP
                          when :stdio
                            VectorMCP::Transport::Stdio.new(self, **options)
                          when :sse
-                           # VectorMCP::Transport::SSE.new(self, **options)
-                           raise NotImplementedError, "SSE transport is not yet supported"
+                           begin
+                             require_relative "transport/sse"
+                             VectorMCP::Transport::SSE.new(self, **options)
+                           rescue LoadError => e
+                             logger.fatal("SSE transport requires additional dependencies. Install the 'async' and 'falcon' gems.")
+                             raise NotImplementedError, "SSE transport dependencies not available: #{e.message}"
+                           end
                          when VectorMCP::Transport::Base # Allow passing an initialized transport instance
                            transport.server = self if transport.respond_to?(:server=) && transport.server.nil? # Ensure server is set
                            transport
@@ -267,6 +277,12 @@ module VectorMCP
       { name: @name, version: @version }
     end
 
+    # Returns the sampling configuration for this server.
+    # @return [Hash] The sampling configuration including capabilities and limits.
+    def sampling_config
+      @sampling_config[:config]
+    end
+
     # Describes the capabilities of this server according to MCP specifications.
     # @return [Hash] A capabilities object.
     def server_capabilities
@@ -274,7 +290,7 @@ module VectorMCP
       caps[:tools] = { listChanged: false } unless @tools.empty? # `listChanged` for tools is not standard but included for symmetry
       caps[:resources] = { subscribe: false, listChanged: false } unless @resources.empty?
       caps[:prompts] = { listChanged: @prompts_list_changed } unless @prompts.empty?
-      caps[:sampling] = {} # Advertise that the server can initiate sampling requests
+      caps[:sampling] = @sampling_config[:capabilities] # Detailed sampling capabilities
       # `experimental` is a defined field in MCP capabilities, can be used for non-standard features.
       caps
     end
@@ -312,6 +328,61 @@ module VectorMCP
     end
 
     private
+
+    # Configures sampling capabilities based on provided configuration.
+    # @api private
+    # @param config [Hash] Sampling configuration options.
+    # @return [Hash] The configured sampling capabilities.
+    def configure_sampling_capabilities(config)
+      defaults = {
+        enabled: true,
+        methods: ["createMessage"],
+        supports_streaming: false,
+        supports_tool_calls: false,
+        supports_images: false,
+        max_tokens_limit: nil,
+        timeout_seconds: 30,
+        context_inclusion_methods: %w[none thisServer],
+        model_preferences_supported: true
+      }
+
+      resolved_config = defaults.merge(config.transform_keys(&:to_sym))
+
+      # Build MCP-compliant capabilities object
+      capabilities = {}
+
+      if resolved_config[:enabled]
+        capabilities[:methods] = resolved_config[:methods]
+        capabilities[:features] = build_sampling_features(resolved_config)
+        capabilities[:limits] = build_sampling_limits(resolved_config)
+        capabilities[:contextInclusion] = resolved_config[:context_inclusion_methods]
+      end
+
+      {
+        config: resolved_config,
+        capabilities: capabilities
+      }
+    end
+
+    # Builds the features section of sampling capabilities.
+    # @api private
+    def build_sampling_features(config)
+      features = {}
+      features[:streaming] = true if config[:supports_streaming]
+      features[:toolCalls] = true if config[:supports_tool_calls]
+      features[:images] = true if config[:supports_images]
+      features[:modelPreferences] = true if config[:model_preferences_supported]
+      features
+    end
+
+    # Builds the limits section of sampling capabilities.
+    # @api private
+    def build_sampling_limits(config)
+      limits = {}
+      limits[:maxTokens] = config[:max_tokens_limit] if config[:max_tokens_limit]
+      limits[:defaultTimeout] = config[:timeout_seconds] if config[:timeout_seconds]
+      limits
+    end
 
     # Registers a session as a subscriber to prompt list changes.
     # Used by the `prompts/subscribe` handler.

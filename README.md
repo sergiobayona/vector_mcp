@@ -17,6 +17,7 @@ This library allows you to easily create MCP servers that expose your applicatio
 *   **Tools:** Define and register custom tools (functions) that the LLM can invoke.
 *   **Resources:** Expose data sources (files, database results, API outputs) for the LLM to read.
 *   **Prompts:** Provide structured prompt templates the LLM can request and use.
+*   **Sampling:** Server-initiated LLM requests with configurable capabilities (streaming, tool calls, images, token limits).
 *   **Transport:**
     *   **Stdio (stable):** Simple transport using standard input/output, ideal for process-based servers.
     *   **SSE (work-in-progress):** Server-Sent Events support is under active development and currently unavailable.
@@ -38,8 +39,16 @@ gem install vector_mcp
 ```ruby
 require 'vector_mcp'
 
-# Create a server
-server = VectorMCP.new('Echo Server')
+# Create a server with sampling capabilities
+server = VectorMCP.new(
+  name: 'Echo Server',
+  version: '1.0.0',
+  sampling_config: {
+    supports_streaming: true,
+    max_tokens_limit: 2000,
+    timeout_seconds: 45
+  }
+)
 
 # Register a tool
 server.register_tool(
@@ -80,12 +89,28 @@ Or use a script:
 ### Creating a Server
 
 ```ruby
+# Using the convenience method
 server = VectorMCP.new(
   name: "MyServer",
   version: "1.0.0",
-  log_level: Logger::INFO
+  log_level: Logger::INFO,
+  sampling_config: {
+    enabled: true,
+    supports_streaming: false,
+    max_tokens_limit: 4000,
+    timeout_seconds: 30
+  }
+)
+
+# Or using the explicit class method
+server = VectorMCP::Server.new(
+  name: "MyServer",
+  version: "1.0.0",
+  sampling_config: { enabled: false }  # Disable sampling entirely
 )
 ```
+
+The `sampling_config` parameter allows you to configure what sampling capabilities your server advertises to clients. See the [Sampling Configuration](#configuring-sampling-capabilities) section for detailed options.
 
 ### Registering Tools
 
@@ -227,7 +252,67 @@ Common error classes:
 
 VectorMCP servers can ask the connected client to run an LLM completion and return the result. This allows servers to leverage LLMs for tasks like content generation, analysis, or decision-making, while keeping the user in control of the final interaction with the LLM (as mediated by the client).
 
-The `session.sample` method sends a `sampling/createMessage` request to the client and waits for the response.
+#### Configuring Sampling Capabilities
+
+You can configure your server's sampling capabilities during initialization to advertise what features your server supports:
+
+```ruby
+server = VectorMCP::Server.new(
+  name: "MyServer",
+  version: "1.0.0",
+  sampling_config: {
+    enabled: true,                                    # Enable/disable sampling (default: true)
+    supports_streaming: true,                         # Support streaming responses (default: false)
+    supports_tool_calls: true,                        # Support tool calls in sampling (default: false)
+    supports_images: true,                            # Support image content (default: false)
+    max_tokens_limit: 4000,                          # Maximum tokens limit (default: nil, no limit)
+    timeout_seconds: 60,                             # Default timeout in seconds (default: 30)
+    context_inclusion_methods: ["none", "thisServer", "allServers"], # Supported context methods
+    model_preferences_supported: true                 # Support model preferences (default: true)
+  }
+)
+```
+
+**Configuration Options:**
+- `enabled`: Whether sampling is available at all
+- `supports_streaming`: Advertise support for streaming responses
+- `supports_tool_calls`: Advertise support for tool calls within sampling
+- `supports_images`: Advertise support for image content in messages
+- `max_tokens_limit`: Maximum tokens your server can handle (helps clients choose appropriate limits)
+- `timeout_seconds`: Default timeout for sampling requests
+- `context_inclusion_methods`: Supported context inclusion modes (`"none"`, `"thisServer"`, `"allServers"`)
+- `model_preferences_supported`: Whether your server supports model selection hints
+
+These capabilities are advertised to clients during the MCP handshake, helping them understand what your server supports and make appropriate sampling requests.
+
+#### Minimal Configuration Examples
+
+```ruby
+# Basic sampling (default configuration)
+server = VectorMCP::Server.new(name: "BasicServer")
+# Advertises: createMessage support, model preferences, 30s timeout, basic context inclusion
+
+# Advanced streaming server
+server = VectorMCP::Server.new(
+  name: "StreamingServer",
+  sampling_config: {
+    supports_streaming: true,
+    supports_tool_calls: true,
+    max_tokens_limit: 8000,
+    timeout_seconds: 120
+  }
+)
+
+# Disable sampling entirely
+server = VectorMCP::Server.new(
+  name: "NoSamplingServer",
+  sampling_config: { enabled: false }
+)
+```
+
+#### Using Sampling in Your Handlers
+
+The `session.sample` method sends a `sampling/createMessage` request to the client and waits for the response:
 
 ```ruby
 # Inside a tool, resource, or prompt handler block:
@@ -244,13 +329,12 @@ begin
       hints: [{ name: "claude-3-haiku" }, { name: "gpt-3.5-turbo" }], # Preferred models
       intelligence_priority: 0.5, # Balance between capability, speed, and cost
       speed_priority: 0.8
-    }
-    # timeout: 15 # Optional: per-request timeout in seconds
+    },
+    timeout: 15 # Optional: per-request timeout in seconds
   )
 
   if sampling_result.text?
     tagline = sampling_result.text_content
-    # Use the tagline...
     "Generated tagline: #{tagline}"
   else
     "LLM did not return text content."
@@ -259,18 +343,30 @@ rescue VectorMCP::SamplingTimeoutError => e
   server.logger.warn("Sampling request timed out: #{e.message}")
   "Sorry, the request for a tagline timed out."
 rescue VectorMCP::SamplingError => e
-  server.logger.error("Sampling request failed: #{e.message} Details: #{e.details.inspect}")
+  server.logger.error("Sampling request failed: #{e.message}")
   "Sorry, couldn't generate a tagline due to an error."
-rescue ArgumentError => e # e.g. invalid params for session.sample itself
+rescue ArgumentError => e
   server.logger.error("Invalid arguments for sampling: #{e.message}")
   "Internal error: Invalid arguments for tagline generation."
 end
 ```
 
-- The `session.sample` method takes a hash conforming to the `VectorMCP::Sampling::Request` structure.
-- It returns a `VectorMCP::Sampling::Result` object.
-- It can raise `VectorMCP::SamplingTimeoutError` if the client doesn't respond in time, or other `VectorMCP::SamplingError` subclasses if the client returns an error or other issues occur (e.g., `SamplingRejectedError` if the user/client denies the request).
-- Refer to `lib/vector_mcp/sampling/request.rb` and `lib/vector_mcp/sampling/result.rb` for detailed parameter and result structures, and `lib/vector_mcp/errors.rb` for specific error types.
+**Key Points:**
+- The `session.sample` method takes a hash conforming to the `VectorMCP::Sampling::Request` structure
+- It returns a `VectorMCP::Sampling::Result` object with methods like `text?`, `text_content`, `image?`, etc.
+- Raises `VectorMCP::SamplingTimeoutError`, `VectorMCP::SamplingError`, or `VectorMCP::SamplingRejectedError` on failures
+- Your server's advertised capabilities help clients understand what parameters are supported
+
+#### Accessing Sampling Configuration
+
+You can access your server's sampling configuration at runtime:
+
+```ruby
+config = server.sampling_config
+puts "Streaming supported: #{config[:supports_streaming]}"
+puts "Max tokens: #{config[:max_tokens_limit] || 'unlimited'}"
+puts "Timeout: #{config[:timeout_seconds]}s"
+```
 
 ## Example Implementations
 
