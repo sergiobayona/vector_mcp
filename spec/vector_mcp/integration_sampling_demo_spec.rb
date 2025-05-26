@@ -60,7 +60,9 @@ RSpec.describe "Sampling Integration Demo", type: :integration do
       # Mock the transport to raise a sampling error
       allow(transport).to receive(:send_request)
         .with("sampling/createMessage", anything, any_args)
-        .and_raise(VectorMCP::SamplingError, "Client returned an error for 'sampling/createMessage' request (ID: test_123): [-32001] Content policy violation")
+        .and_raise(VectorMCP::SamplingError,
+                   "Client returned an error for 'sampling/createMessage' request (ID: test_123): " \
+                   "[-32001] Content policy violation")
 
       # Execute sampling and expect error
       expect do

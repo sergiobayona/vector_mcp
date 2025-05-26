@@ -35,9 +35,6 @@ module VectorMCP
       @request_id = request_id
       super(message)
     end
-
-    # Allows setting the request_id after initialization if it wasn't known at first.
-    attr_writer :request_id
   end
 
   # Standard JSON-RPC error classes

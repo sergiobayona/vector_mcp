@@ -93,38 +93,52 @@ module VectorMCP
     # @raise [VectorMCP::SamplingError] if the sampling request fails, is rejected, or times out.
     # @raise [StandardError] if the session's transport does not support `send_request`.
     def sample(request_params, timeout: nil)
-      unless @transport.respond_to?(:send_request)
-        raise StandardError, "Session's transport does not support sending requests (required for sampling)."
-      end
-
-      unless initialized?
-        # Or raise an error, depending on desired strictness. Client shouldn't allow sampling before init.
-        @logger.warn("[Session #{@id}] Attempted to send sampling request on a non-initialized session.")
-        raise InitializationError, "Cannot send sampling request: session not initialized."
-      end
+      validate_sampling_preconditions
 
       sampling_req_obj = VectorMCP::Sampling::Request.new(request_params)
       @logger.info("[Session #{@id}] Sending sampling/createMessage request to client.")
 
-      begin
-        # Construct arguments for transport.send_request, including timeout if provided
-        send_request_args = ["sampling/createMessage", sampling_req_obj.to_h]
-        send_request_kwargs = {}
-        send_request_kwargs[:timeout] = timeout if timeout
+      send_sampling_request(sampling_req_obj, timeout)
+    end
 
-        raw_result = @transport.send_request(*send_request_args, **send_request_kwargs)
+    private
 
-        VectorMCP::Sampling::Result.new(raw_result)
-      rescue ArgumentError => e # From Sampling::Request.new or if raw_result is bad for Sampling::Result
-        @logger.error("[Session #{@id}] Invalid parameters for sampling request or result: #{e.message}")
-        raise VectorMCP::SamplingError, "Invalid sampling parameters or malformed client response: #{e.message}", details: { original_error: e.to_s }
-      rescue VectorMCP::SamplingError => e # Timeout or client error already wrapped by transport
-        @logger.warn("[Session #{@id}] Sampling request failed: #{e.message}")
-        raise e # Re-raise to propagate
-      rescue StandardError => e # Other unexpected errors from transport or result processing
-        @logger.error("[Session #{@id}] Unexpected error during sampling: #{e.class.name}: #{e.message}")
-        raise VectorMCP::SamplingError, "An unexpected error occurred during sampling: #{e.message}", details: { original_error: e.to_s }
+    # Validates that sampling can be performed on this session.
+    # @api private
+    # @raise [StandardError, InitializationError] if preconditions are not met.
+    def validate_sampling_preconditions
+      unless @transport.respond_to?(:send_request)
+        raise StandardError, "Session's transport does not support sending requests (required for sampling)."
       end
+
+      return if initialized?
+
+      @logger.warn("[Session #{@id}] Attempted to send sampling request on a non-initialized session.")
+      raise InitializationError, "Cannot send sampling request: session not initialized."
+    end
+
+    # Sends the sampling request and handles the response.
+    # @api private
+    # @param sampling_req_obj [VectorMCP::Sampling::Request] The sampling request object.
+    # @param timeout [Numeric, nil] Optional timeout for the request.
+    # @return [VectorMCP::Sampling::Result] The sampling result.
+    # @raise [VectorMCP::SamplingError] if the request fails.
+    def send_sampling_request(sampling_req_obj, timeout)
+      send_request_args = ["sampling/createMessage", sampling_req_obj.to_h]
+      send_request_kwargs = {}
+      send_request_kwargs[:timeout] = timeout if timeout
+
+      raw_result = @transport.send_request(*send_request_args, **send_request_kwargs)
+      VectorMCP::Sampling::Result.new(raw_result)
+    rescue ArgumentError => e
+      @logger.error("[Session #{@id}] Invalid parameters for sampling request or result: #{e.message}")
+      raise VectorMCP::SamplingError, "Invalid sampling parameters or malformed client response: #{e.message}", details: { original_error: e.to_s }
+    rescue VectorMCP::SamplingError => e
+      @logger.warn("[Session #{@id}] Sampling request failed: #{e.message}")
+      raise e
+    rescue StandardError => e
+      @logger.error("[Session #{@id}] Unexpected error during sampling: #{e.class.name}: #{e.message}")
+      raise VectorMCP::SamplingError, "An unexpected error occurred during sampling: #{e.message}", details: { original_error: e.to_s }
     end
   end
 end

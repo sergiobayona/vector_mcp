@@ -157,7 +157,20 @@ module VectorMCP
     #     validate: false
     #   )
     def to_mcp_image_content(data, mime_type: nil, validate: true, max_size: DEFAULT_MAX_SIZE)
-      # Determine if input is base64 or binary
+      binary_data, base64_data = process_image_data(data)
+      detected_mime_type = validate_and_detect_format(binary_data, validate, max_size)
+      final_mime_type = determine_final_mime_type(mime_type, detected_mime_type)
+
+      {
+        type: "image",
+        data: base64_data,
+        mimeType: final_mime_type
+      }
+    end
+
+    # Processes input data to extract both binary and base64 representations.
+    # @api private
+    def process_image_data(data)
       is_base64 = base64_string?(data)
 
       if is_base64
@@ -174,23 +187,29 @@ module VectorMCP
         base64_data = encode_base64(binary_data)
       end
 
+      [binary_data, base64_data]
+    end
+
+    # Validates image data and detects MIME type if validation is enabled.
+    # @api private
+    def validate_and_detect_format(binary_data, validate, max_size)
       if validate
         validation = validate_image(binary_data, max_size: max_size)
         raise ArgumentError, "Image validation failed: #{validation[:errors].join(", ")}" unless validation[:valid]
 
-        detected_mime_type = validation[:mime_type]
+        validation[:mime_type]
       else
-        detected_mime_type = detect_image_format(binary_data)
+        detect_image_format(binary_data)
       end
+    end
 
-      final_mime_type = mime_type || detected_mime_type
+    # Determines the final MIME type to use, preferring explicit over detected.
+    # @api private
+    def determine_final_mime_type(explicit_mime_type, detected_mime_type)
+      final_mime_type = explicit_mime_type || detected_mime_type
       raise ArgumentError, "Could not determine image MIME type" if final_mime_type.nil?
 
-      {
-        type: "image",
-        data: base64_data,
-        mimeType: final_mime_type
-      }
+      final_mime_type
     end
 
     # Converts file path to MCP-compliant image content.

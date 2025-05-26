@@ -92,19 +92,28 @@ module VectorMCP
     # @param mime_type [String] The default MIME type for child items if they need conversion.
     # @return [Array<Hash>] MCP content array.
     def array_content(arr, mime_type)
-      if arr.all? { |item| item.is_a?(Hash) && (item[:type] || item["type"]) }
-        arr.map do |item|
-          normalized = item.transform_keys(&:to_sym)
-          if normalized[:type] == "image"
-            validate_and_enhance_image_content(normalized)
-          else
-            normalized
-          end
-        end
+      if all_content_items?(arr)
+        arr.map { |item| process_content_item(item) }
       else
-        # Recursively convert each item, preserving the original mime_type intent for non-structured children.
         arr.flat_map { |item| convert_to_mcp_content(item, mime_type: mime_type) }
       end
+    end
+
+    # Checks if all array items are pre-formatted MCP content items.
+    # @param arr [Array] The array to check.
+    # @return [Boolean] True if all items have type fields.
+    def all_content_items?(arr)
+      arr.all? { |item| item.is_a?(Hash) && (item[:type] || item["type"]) }
+    end
+
+    # Processes a single content item, normalizing and validating as needed.
+    # @param item [Hash] The content item to process.
+    # @return [Hash] The processed content item.
+    def process_content_item(item)
+      normalized = item.transform_keys(&:to_sym)
+      return validate_and_enhance_image_content(normalized) if normalized[:type] == "image"
+
+      normalized
     end
 
     # Fallback conversion for any other object type to an MCP text content item.
@@ -116,7 +125,8 @@ module VectorMCP
       [{ type: "text", text: obj.to_s, mimeType: mime_type }]
     end
 
-    module_function :string_content, :hash_content, :array_content, :fallback_content
+    module_function :string_content, :hash_content, :array_content, :fallback_content,
+                    :all_content_items?, :process_content_item
 
     # Extracts an ID from a potentially malformed JSON string using regex.
     # This is a best-effort attempt, primarily for error reporting when full JSON parsing fails.

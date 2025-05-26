@@ -34,15 +34,44 @@ module VectorMCP
       def supports_image_input?
         return false unless input_schema.is_a?(Hash)
 
-        properties = input_schema["properties"] || input_schema[:properties] || {}
-        properties.any? do |_prop, schema|
-          schema.is_a?(Hash) && (
-            schema["format"] == "image" ||
-            schema[:format] == "image" ||
-            (schema["type"] == "string" && schema["contentEncoding"] == "base64" && schema["contentMediaType"]&.start_with?("image/")) ||
-            (schema[:type] == "string" && schema[:contentEncoding] == "base64" && schema[:contentMediaType]&.start_with?("image/"))
-          )
-        end
+        properties = extract_schema_properties
+        properties.any? { |_prop, schema| image_property?(schema) }
+      end
+
+      private
+
+      # Extracts properties from the input schema, handling both string and symbol keys.
+      def extract_schema_properties
+        input_schema["properties"] || input_schema[:properties] || {}
+      end
+
+      # Checks if a property schema represents an image input.
+      def image_property?(schema)
+        return false unless schema.is_a?(Hash)
+
+        explicit_image_format?(schema) || base64_image_content?(schema)
+      end
+
+      # Checks if the schema explicitly declares image format.
+      def explicit_image_format?(schema)
+        schema["format"] == "image" || schema[:format] == "image"
+      end
+
+      # Checks if the schema represents base64-encoded image content.
+      def base64_image_content?(schema)
+        string_type_with_base64_encoding?(schema) && image_media_type?(schema)
+      end
+
+      # Checks if the schema is a string type with base64 encoding.
+      def string_type_with_base64_encoding?(schema)
+        (schema["type"] == "string" && schema["contentEncoding"] == "base64") ||
+          (schema[:type] == "string" && schema[:contentEncoding] == "base64")
+      end
+
+      # Checks if the schema has an image media type.
+      def image_media_type?(schema)
+        schema["contentMediaType"]&.start_with?("image/") ||
+          schema[:contentMediaType]&.start_with?("image/")
       end
     end
 

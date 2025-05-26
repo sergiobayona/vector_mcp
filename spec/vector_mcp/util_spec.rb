@@ -418,7 +418,7 @@ RSpec.describe VectorMCP::Util do
         "Hello, World!",
         image_file,
         { type: "text", text: "More text" },
-        binary_jpeg = jpeg_data.dup.force_encoding(Encoding::ASCII_8BIT)
+        jpeg_data.dup.force_encoding(Encoding::ASCII_8BIT)
       ]
 
       result = described_class.convert_to_mcp_content(mixed_content)

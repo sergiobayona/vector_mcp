@@ -245,7 +245,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
       allow(VectorMCP::Util).to receive(:extract_id_from_invalid_json).and_raise(StandardError)
       allow(transport).to receive(:send_error)
 
-      transport.send(:handle_input_line, "{ invalid json", session, session_id)
+      transport.send(:handle_input_line, "{ invalid json", session)
 
       expect(transport).to have_received(:send_error).with(nil, -32_700, "Parse error")
     end
@@ -255,7 +255,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
       allow(transport).to receive(:send_error)
 
       msg = { jsonrpc: "2.0", method: "foo" }.to_json
-      transport.send(:handle_input_line, msg, session, session_id)
+      transport.send(:handle_input_line, msg, session)
 
       expect(transport).to have_received(:send_error).with(nil, -32_603, "Internal error", anything)
     end
@@ -265,7 +265,7 @@ RSpec.describe VectorMCP::Transport::Stdio do
       allow(transport).to receive(:send_response)
 
       msg = { jsonrpc: "2.0", method: "foo" }.to_json
-      transport.send(:handle_input_line, msg, session, session_id)
+      transport.send(:handle_input_line, msg, session)
 
       expect(transport).not_to have_received(:send_response)
     end

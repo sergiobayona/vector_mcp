@@ -247,7 +247,7 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
         # Mock handle_outgoing_response to verify it gets called
         allow(transport).to receive(:handle_outgoing_response)
 
-        transport.send(:handle_input_line, response_message.to_json, session, "test_session")
+        transport.send(:handle_input_line, response_message.to_json, session)
 
         expect(transport).to have_received(:handle_outgoing_response).with(response_message)
       end
@@ -261,7 +261,7 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
 
         allow(transport).to receive(:handle_outgoing_response)
 
-        transport.send(:handle_input_line, error_message.to_json, session, "test_session")
+        transport.send(:handle_input_line, error_message.to_json, session)
 
         expect(transport).to have_received(:handle_outgoing_response).with(error_message)
       end
@@ -277,7 +277,7 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
         allow(transport).to receive(:handle_outgoing_response)
         allow(server).to receive(:handle_message).and_return(nil)
 
-        transport.send(:handle_input_line, request_message.to_json, session, "test_session")
+        transport.send(:handle_input_line, request_message.to_json, session)
 
         expect(transport).not_to have_received(:handle_outgoing_response)
         expect(server).to have_received(:handle_message)
@@ -293,7 +293,7 @@ RSpec.describe "VectorMCP Sampling Feature", type: :integration do
         allow(transport).to receive(:handle_outgoing_response)
         allow(server).to receive(:handle_message).and_return(nil)
 
-        transport.send(:handle_input_line, notification_message.to_json, session, "test_session")
+        transport.send(:handle_input_line, notification_message.to_json, session)
 
         expect(transport).not_to have_received(:handle_outgoing_response)
         expect(server).to have_received(:handle_message)

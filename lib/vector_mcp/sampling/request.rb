@@ -75,37 +75,115 @@ module VectorMCP
       def validate_message(msg, idx)
         raise ArgumentError, "Each message in 'messages' must be a Hash (at index #{idx})" unless msg.is_a?(Hash)
 
-        msg_role = msg[:role] || msg["role"]
-        msg_content = msg[:content] || msg["content"]
+        msg_role = extract_message_role(msg)
+        msg_content = extract_message_content(msg)
 
-        raise ArgumentError, "Message role must be 'user' or 'assistant' (at index #{idx})" unless %w[user assistant].include?(msg_role)
-        raise ArgumentError, "Message content must be a Hash (at index #{idx})" unless msg_content.is_a?(Hash)
+        validate_message_role(msg_role, idx)
+        validate_message_content_structure(msg_content, idx)
+        validate_content_by_type(msg_content, idx)
+      end
 
-        content_type = msg_content[:type] || msg_content["type"]
+      def extract_message_role(msg)
+        msg[:role] || msg["role"]
+      end
+
+      def extract_message_content(msg)
+        msg[:content] || msg["content"]
+      end
+
+      def validate_message_role(role, idx)
+        raise ArgumentError, "Message role must be 'user' or 'assistant' (at index #{idx})" unless %w[user assistant].include?(role)
+      end
+
+      def validate_message_content_structure(content, idx)
+        raise ArgumentError, "Message content must be a Hash (at index #{idx})" unless content.is_a?(Hash)
+      end
+
+      def validate_content_by_type(content, idx)
+        content_type = content[:type] || content["type"]
         raise ArgumentError, "Message content type must be 'text' or 'image' (at index #{idx})" unless %w[text image].include?(content_type)
 
-        if content_type == "text" && (msg_content[:text] || msg_content["text"]).to_s.empty?
-          raise ArgumentError, "Text content must not be empty if type is 'text' (at index #{idx})"
+        case content_type
+        when "text"
+          validate_text_content(content, idx)
+        when "image"
+          validate_image_content(content, idx)
         end
+      end
 
-        return unless content_type == "image"
-        unless (msg_content[:data] || msg_content["data"]).is_a?(String) && !msg_content[:data].to_s.empty?
-          raise ArgumentError, "Image content 'data' (base64 string) is required if type is 'image' (at index #{idx})"
-        end
-        return if (msg_content[:mime_type] || msg_content["mime_type"]).is_a?(String) && !msg_content[:mime_type].to_s.empty?
+      def validate_text_content(content, idx)
+        text_value = content[:text] || content["text"]
+        return unless text_value.to_s.empty?
+
+        raise ArgumentError, "Text content must not be empty if type is 'text' (at index #{idx})"
+      end
+
+      def validate_image_content(content, idx)
+        validate_image_data(content, idx)
+        validate_image_mime_type(content, idx)
+      end
+
+      def validate_image_data(content, idx)
+        data_value = content[:data] || content["data"]
+        return if data_value.is_a?(String) && !data_value.empty?
+
+        raise ArgumentError, "Image content 'data' (base64 string) is required if type is 'image' (at index #{idx})"
+      end
+
+      def validate_image_mime_type(content, idx)
+        mime_type_value = content[:mime_type] || content["mime_type"]
+        return if mime_type_value.is_a?(String) && !mime_type_value.empty?
 
         raise ArgumentError, "Image content 'mime_type' is required if type is 'image' (at index #{idx})"
       end
 
       def validate_optional_params
-        raise ArgumentError, "'model_preferences' must be a Hash if provided" if @model_preferences && !@model_preferences.is_a?(Hash)
-        raise ArgumentError, "'system_prompt' must be a String if provided" if @system_prompt && !@system_prompt.is_a?(String)
-        if @include_context && !%w[none thisServer allServers].include?(@include_context)
-          raise ArgumentError, "'include_context' must be 'none', 'thisServer', or 'allServers' if provided"
-        end
-        raise ArgumentError, "'temperature' must be a Numeric if provided" if @temperature && !@temperature.is_a?(Numeric)
-        raise ArgumentError, "'max_tokens' must be an Integer if provided" if @max_tokens && !@max_tokens.is_a?(Integer)
-        raise ArgumentError, "'stop_sequences' must be an Array if provided" if @stop_sequences && !@stop_sequences.is_a?(Array)
+        validate_model_preferences
+        validate_system_prompt
+        validate_include_context
+        validate_temperature
+        validate_max_tokens
+        validate_stop_sequences
+        validate_metadata
+      end
+
+      def validate_model_preferences
+        return unless @model_preferences && !@model_preferences.is_a?(Hash)
+
+        raise ArgumentError, "'model_preferences' must be a Hash if provided"
+      end
+
+      def validate_system_prompt
+        return unless @system_prompt && !@system_prompt.is_a?(String)
+
+        raise ArgumentError, "'system_prompt' must be a String if provided"
+      end
+
+      def validate_include_context
+        return unless @include_context && !%w[none thisServer allServers].include?(@include_context)
+
+        raise ArgumentError, "'include_context' must be 'none', 'thisServer', or 'allServers' if provided"
+      end
+
+      def validate_temperature
+        return unless @temperature && !@temperature.is_a?(Numeric)
+
+        raise ArgumentError, "'temperature' must be a Numeric if provided"
+      end
+
+      def validate_max_tokens
+        return unless @max_tokens && !@max_tokens.is_a?(Integer)
+
+        raise ArgumentError, "'max_tokens' must be an Integer if provided"
+      end
+
+      def validate_stop_sequences
+        return unless @stop_sequences && !@stop_sequences.is_a?(Array)
+
+        raise ArgumentError, "'stop_sequences' must be an Array if provided"
+      end
+
+      def validate_metadata
         return unless @metadata && !@metadata.is_a?(Hash)
 
         raise ArgumentError, "'metadata' must be a Hash if provided"

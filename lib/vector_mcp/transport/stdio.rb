@@ -125,45 +125,12 @@ module VectorMCP
         request_payload = { jsonrpc: "2.0", id: request_id, method: method }
         request_payload[:params] = params if params
 
-        response = nil
-        condition = ConditionVariable.new
-
-        @mutex.synchronize do
-          @outgoing_request_conditions[request_id] = condition
-        end
-
+        setup_request_tracking(request_id)
         logger.debug "[Stdio Transport] Sending request ID #{request_id}: #{method}"
         write_message(request_payload)
 
-        @mutex.synchronize do
-          Timeout.timeout(timeout) do
-            until @outgoing_request_responses.key?(request_id) # Guard against spurious wake-ups
-              condition.wait(@mutex) # Releases mutex and waits, reacquires on signal or timeout
-            end
-            response = @outgoing_request_responses.delete(request_id)
-          end
-        rescue Timeout::Error
-          logger.warn "[Stdio Transport] Timeout waiting for response to request ID #{request_id} (#{method}) after #{timeout}s"
-          @outgoing_request_responses.delete(request_id) # Clean up if it arrives late
-          @outgoing_request_conditions.delete(request_id)
-          # TODO: Differentiate error type based on MCP spec for sampling timeouts
-          raise VectorMCP::SamplingTimeoutError, "Timeout waiting for client response to '#{method}' request (ID: #{request_id})"
-        ensure
-          @outgoing_request_conditions.delete(request_id) # Ensure condition is removed
-        end
-
-        if response.nil? # Should not happen if timeout is caught correctly
-          raise VectorMCP::SamplingError, "No response received for '#{method}' request (ID: #{request_id}) - this indicates a logic error."
-        end
-
-        if response.key?(:error)
-          err = response[:error]
-          logger.warn "[Stdio Transport] Client returned error for request ID #{request_id} (#{method}): #{err.inspect}"
-          # TODO: Map client error codes/messages to specific VectorMCP::SamplingError subclasses
-          raise VectorMCP::SamplingError, "Client returned an error for '#{method}' request (ID: #{request_id}): [#{err[:code]}] #{err[:message]}"
-        end
-
-        response[:result]
+        response = wait_for_response(request_id, method, timeout)
+        process_response(response, request_id, method)
       end
 
       # Initiates an immediate shutdown of the transport.
@@ -182,9 +149,8 @@ module VectorMCP
       # @api private
       # @param session [VectorMCP::Session] The session object for this connection.
       # @return [void]
+      # Constant identifier for stdio sessions
       def read_input_loop(session)
-        session_id = "stdio-session" # Constant identifier for stdio sessions
-
         while @running
           line = read_input_line
           if line.nil?
@@ -193,7 +159,7 @@ module VectorMCP
           end
           next if line.strip.empty?
 
-          handle_input_line(line, session, session_id)
+          handle_input_line(line, session)
         end
       end
 
@@ -211,25 +177,42 @@ module VectorMCP
       # @api private
       # @param line [String] The line of text read from stdin.
       # @param session [VectorMCP::Session] The current session.
-      # @param session_id [String] The identifier for this session.
       # @return [void]
-      def handle_input_line(line, _session, session_id)
+      def handle_input_line(line, _session)
         message = parse_json(line)
         return if message.is_a?(Array) && message.empty? # Error handled in parse_json, indicated by empty array
 
-        # Check if this is a response to an outgoing request (has id but no method)
-        if message["id"] && !message["method"] && (message.key?("result") || message.key?("error"))
-          handle_outgoing_response(message)
-          return
-        end
+        return handle_outgoing_response(message) if outgoing_response?(message)
 
-        # Ensure a session object exists for this stdio transport if it's a single, persistent connection.
-        # For stdio, we can treat the entire duration of the transport as a single session.
-        @current_session ||= VectorMCP::Session.new(@server, self, id: "stdio_global_session")
-        session_id = @current_session.id # Use the persistent session ID
+        ensure_session_exists
+        handle_server_message(message)
+      end
+
+      # Checks if a message is a response to an outgoing request.
+      # @api private
+      # @param message [Hash] The parsed message.
+      # @return [Boolean] True if this is an outgoing response.
+      def outgoing_response?(message)
+        message["id"] && !message["method"] && (message.key?("result") || message.key?("error"))
+      end
+
+      # Ensures a global session exists for this stdio transport.
+      # @api private
+      # @return [VectorMCP::Session] The current session.
+      def ensure_session_exists
+        @ensure_session_exists ||= VectorMCP::Session.new(@server, self, id: "stdio_global_session")
+      end
+
+      # Handles a server message with proper error handling.
+      # @api private
+      # @param message [Hash] The parsed message.
+      # @return [void]
+      def handle_server_message(message)
+        session = ensure_session_exists
+        session_id = session.id
 
         begin
-          result = @server.handle_message(message, @current_session, session_id)
+          result = @server.handle_message(message, session, session_id)
           send_response(message["id"], result) if message["id"] && result
         rescue VectorMCP::ProtocolError => e
           handle_protocol_error(e, message)
@@ -370,6 +353,63 @@ module VectorMCP
           logger.error("Output pipe closed. Cannot send message. Shutting down stdio transport.")
           shutdown # Initiate shutdown as we can no longer communicate
         end
+      end
+
+      # Sets up tracking for an outgoing request.
+      # @api private
+      # @param request_id [String] The request ID to track.
+      # @return [void]
+      def setup_request_tracking(request_id)
+        condition = ConditionVariable.new
+        @mutex.synchronize do
+          @outgoing_request_conditions[request_id] = condition
+        end
+      end
+
+      # Waits for a response to an outgoing request.
+      # @api private
+      # @param request_id [String] The request ID to wait for.
+      # @param method [String] The request method name.
+      # @param timeout [Numeric] How long to wait.
+      # @return [Hash] The response data.
+      # @raise [VectorMCP::SamplingTimeoutError] if timeout occurs.
+      def wait_for_response(request_id, method, timeout)
+        condition = @outgoing_request_conditions[request_id]
+
+        @mutex.synchronize do
+          Timeout.timeout(timeout) do
+            condition.wait(@mutex) until @outgoing_request_responses.key?(request_id)
+            @outgoing_request_responses.delete(request_id)
+          end
+        rescue Timeout::Error
+          logger.warn "[Stdio Transport] Timeout waiting for response to request ID #{request_id} (#{method}) after #{timeout}s"
+          @outgoing_request_responses.delete(request_id)
+          @outgoing_request_conditions.delete(request_id)
+          raise VectorMCP::SamplingTimeoutError, "Timeout waiting for client response to '#{method}' request (ID: #{request_id})"
+        ensure
+          @outgoing_request_conditions.delete(request_id)
+        end
+      end
+
+      # Processes the response from an outgoing request.
+      # @api private
+      # @param response [Hash, nil] The response data.
+      # @param request_id [String] The request ID.
+      # @param method [String] The request method name.
+      # @return [Object] The result data.
+      # @raise [VectorMCP::SamplingError] if response contains an error or is nil.
+      def process_response(response, request_id, method)
+        if response.nil?
+          raise VectorMCP::SamplingError, "No response received for '#{method}' request (ID: #{request_id}) - this indicates a logic error."
+        end
+
+        if response.key?(:error)
+          err = response[:error]
+          logger.warn "[Stdio Transport] Client returned error for request ID #{request_id} (#{method}): #{err.inspect}"
+          raise VectorMCP::SamplingError, "Client returned an error for '#{method}' request (ID: #{request_id}): [#{err[:code]}] #{err[:message]}"
+        end
+
+        response[:result]
       end
     end
   end
