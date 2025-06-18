@@ -28,6 +28,14 @@
   - Automatic path validation and security checks
   - List change notifications for roots
 
+* **SSE Transport Implementation**: Complete HTTP/Server-Sent Events transport
+  - New `VectorMCP::Transport::SSE` class with HTTP server capabilities
+  - Puma-based HTTP server with concurrent request handling
+  - Bi-directional communication: SSE for server-to-client, HTTP POST for client-to-server
+  - Session management with unique session IDs and connection tracking
+  - Support for web browsers and HTTP-based MCP clients
+  - Configurable host, port, and path prefix options
+
 * **Enhanced Content Utilities**: Improved content processing in `VectorMCP::Util`
   - Automatic image file path detection and processing
   - Binary image data detection and conversion

@@ -37,7 +37,7 @@ rake doc           # Alias for yard (outputs to doc/ directory)
 ruby examples/simple_server.rb      # Basic MCP server demo
 ruby examples/stdio_server.rb       # Stdio transport example
 ruby examples/roots_demo.rb         # Filesystem roots demonstration
-ruby examples/http_server.rb        # HTTP server example
+ruby examples/http_server.rb        # HTTP server with SSE transport example
 ```
 
 ## Architecture
@@ -47,7 +47,7 @@ ruby examples/http_server.rb        # HTTP server example
 - **VectorMCP::Server** (`lib/vector_mcp/server.rb`): Main server class handling MCP protocol
 - **Transport Layer** (`lib/vector_mcp/transport/`): Communication protocols
   - `Stdio`: Standard input/output (stable)
-  - `Sse`: Server-Sent Events (work in progress)
+  - `Sse`: Server-Sent Events over HTTP (stable)
 - **Handlers** (`lib/vector_mcp/handlers/`): Request processing logic
 - **Sampling** (`lib/vector_mcp/sampling/`): Server-initiated LLM requests with streaming support
 - **Definitions** (`lib/vector_mcp/definitions.rb`): Tool, Resource, and Prompt definitions
@@ -62,10 +62,19 @@ ruby examples/http_server.rb        # HTTP server example
 
 ### Request Flow
 
-1. Client connects via transport layer (stdio/SSE)
-2. JSON-RPC messages processed by server registry
+**Stdio Transport:**
+1. Client connects via stdin/stdout
+2. JSON-RPC messages processed line-by-line
 3. Handlers dispatch to registered tools/resources/prompts
-4. Responses formatted according to MCP specification
+4. Responses sent back via stdout
+
+**SSE Transport:**
+1. Client establishes SSE connection (`GET /sse`)
+2. Server sends session info and message endpoint URL
+3. Client sends JSON-RPC requests (`POST /message?session_id=<id>`)
+4. Server processes requests and sends responses via SSE stream
+5. Handlers dispatch to registered tools/resources/prompts
+6. All responses formatted according to MCP specification
 
 ## Development Guidelines
 

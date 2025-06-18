@@ -57,7 +57,7 @@ end
 port = ENV["PORT"]&.to_i || 7464
 begin
   puts "Starting VectorMCP HTTP server on port #{port}..."
-  server.run(transport: :sse, options: { port: port, host: "localhost", path_prefix: "/invoke" })
+  server.run(transport: :sse, options: { port: port, host: "localhost" })
 rescue Interrupt
   puts "Server interrupted"
   exit 0

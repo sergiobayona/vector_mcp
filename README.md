@@ -21,7 +21,7 @@ This library allows you to easily create MCP servers that expose your applicatio
 *   **Sampling:** Server-initiated LLM requests with configurable capabilities (streaming, tool calls, images, token limits).
 *   **Transport:**
     *   **Stdio (stable):** Simple transport using standard input/output, ideal for process-based servers.
-    *   **SSE (work-in-progress):** Server-Sent Events support is under active development and currently unavailable.
+    *   **SSE (stable):** Server-Sent Events over HTTP, enabling web-based MCP clients and browser integration.
 
 ## Installation
 
@@ -33,7 +33,6 @@ gem 'vector_mcp'
 gem install vector_mcp
 ```
 
-> ⚠️  **Note:** SSE transport is not yet supported in the released gem.
 
 ## Quick Start
 
@@ -89,6 +88,71 @@ Or use a script:
   printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"roots/list","params":{}}';
   printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello VectorMCP!"}}}';
 } | ruby my_server.rb | jq
+```
+
+### HTTP/SSE Transport
+
+For web-based clients and browser integration, use the SSE transport:
+
+```ruby
+require 'vector_mcp'
+
+server = VectorMCP.new(
+  name: 'My HTTP Server',
+  version: '1.0.0'
+)
+
+# Register tools, resources, prompts...
+server.register_tool(
+  name: 'echo',
+  description: 'Returns the input message',
+  input_schema: {
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message']
+  }
+) { |args| args['message'] }
+
+# Start HTTP server with SSE transport
+server.run(transport: :sse, options: { port: 8080, host: 'localhost' })
+```
+
+The server provides two HTTP endpoints:
+
+*   **SSE Stream:** `GET /sse` - Establishes server-sent events connection
+*   **Messages:** `POST /message?session_id=<id>` - Sends JSON-RPC requests
+
+**Client Integration:**
+
+```javascript
+// Connect to SSE stream
+const eventSource = new EventSource('http://localhost:8080/sse');
+
+eventSource.addEventListener('endpoint', (event) => {
+  const data = JSON.parse(event.data);
+  const messageUrl = data.uri; // POST endpoint for this session
+  
+  // Send MCP initialization
+  fetch(messageUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { 
+        protocolVersion: '2024-11-05', 
+        capabilities: {},
+        clientInfo: { name: 'WebClient', version: '1.0' }
+      }
+    })
+  });
+});
+
+eventSource.addEventListener('message', (event) => {
+  const response = JSON.parse(event.data);
+  console.log('MCP Response:', response);
+});
 ```
 
 ## Core Usage
