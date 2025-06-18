@@ -15,25 +15,22 @@ module VectorMCP
           # @return [Enumerator] Rack-compatible streaming response body
           def create_sse_stream(client_conn, endpoint_url, logger)
             Enumerator.new do |yielder|
-              begin
-                # Send initial endpoint event
-                yielder << format_sse_event("endpoint", endpoint_url)
-                logger.debug { "Sent endpoint event to client #{client_conn.session_id}: #{endpoint_url}" }
+              # Send initial endpoint event
+              yielder << format_sse_event("endpoint", endpoint_url)
+              logger.debug { "Sent endpoint event to client #{client_conn.session_id}: #{endpoint_url}" }
 
-                # Start streaming thread for this client
-                client_conn.stream_thread = Thread.new do
-                  stream_messages_to_client(client_conn, yielder, logger)
-                end
-
-                # Keep the connection alive by yielding from the streaming thread
-                client_conn.stream_thread.join
-
-              rescue StandardError => e
-                logger.error { "Error in SSE stream for client #{client_conn.session_id}: #{e.message}\n#{e.backtrace.join("\n")}" }
-              ensure
-                logger.debug { "SSE stream ended for client #{client_conn.session_id}" }
-                client_conn.close
+              # Start streaming thread for this client
+              client_conn.stream_thread = Thread.new do
+                stream_messages_to_client(client_conn, yielder, logger)
               end
+
+              # Keep the connection alive by yielding from the streaming thread
+              client_conn.stream_thread.join
+            rescue StandardError => e
+              logger.error { "Error in SSE stream for client #{client_conn.session_id}: #{e.message}\n#{e.backtrace.join("\n")}" }
+            ensure
+              logger.debug { "SSE stream ended for client #{client_conn.session_id}" }
+              client_conn.close
             end
           end
 

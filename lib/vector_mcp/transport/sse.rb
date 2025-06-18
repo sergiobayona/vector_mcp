@@ -115,7 +115,7 @@ module VectorMCP
       def send_notification(session_id, method, params = nil)
         message = { jsonrpc: "2.0", method: method }
         message[:params] = params if params
-        
+
         client_conn = @clients[session_id]
         return false unless client_conn
 
@@ -161,11 +161,7 @@ module VectorMCP
       # Creates a single, shared {VectorMCP::Session} instance for this transport run.
       # All client interactions will use this session context.
       def create_session
-        @session = VectorMCP::Session.new(
-          server_info: server.server_info,
-          server_capabilities: server.server_capabilities,
-          protocol_version: server.protocol_version
-        )
+        @session = VectorMCP::Session.new(server, self, id: SecureRandom.uuid)
       end
 
       # Starts the Puma HTTP server.
@@ -173,10 +169,10 @@ module VectorMCP
         @puma_server = Puma::Server.new(build_rack_app)
         puma_config = PumaConfig.new(@host, @port, logger)
         puma_config.configure(@puma_server)
-        
+
         @running = true
         setup_signal_traps
-        
+
         logger.info("Puma server starting on #{@host}:#{@port}")
         @puma_server.run.join # This blocks until server stops
         logger.info("Puma server stopped.")
@@ -201,9 +197,7 @@ module VectorMCP
       # Cleans up resources for all connected clients on server shutdown.
       def cleanup_clients
         logger.info("Cleaning up #{@clients.size} client connection(s)...")
-        @clients.each_value do |conn|
-          conn.close
-        end
+        @clients.each_value(&:close)
         @clients.clear
       end
 

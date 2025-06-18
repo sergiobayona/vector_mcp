@@ -1,39 +1,38 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require "rack/test" # For simulating requests
-require "async/queue" # For mocking client queue
+require "rack/test"
 require "vector_mcp/transport/sse"
-require "vector_mcp/server" # Needed for the mock server
-require "vector_mcp/definitions" # Corrected require path
-require "vector_mcp/session" # Needed for mock session
+require "vector_mcp/server"
+require "vector_mcp/definitions"
+require "vector_mcp/session"
 
 RSpec.describe VectorMCP::Transport::SSE do
-  include Rack::Test::Methods # Include Rack::Test helpers
+  include Rack::Test::Methods
 
-  let(:mock_logger) { instance_double(Logger, info: nil, debug: nil, warn: nil, error: nil, fatal: nil, :<< => nil) }
+  let(:mock_logger) { instance_double(Logger, info: nil, debug: nil, warn: nil, error: nil, fatal: nil) }
   let(:mock_server_info) { instance_double("VectorMCP::ServerInfo", name: "TestServer", version: "0.1") }
   let(:mock_resource_provider_options) { instance_double("VectorMCP::ResourceProviderOptions") }
   let(:mock_server_capabilities) { instance_double("VectorMCP::ServerCapabilities", resources: mock_resource_provider_options) }
-  let(:mock_session) { instance_double(VectorMCP::Session) } # Mock session object
+  let(:mock_session) { instance_double(VectorMCP::Session) }
   let(:mock_mcp_server) do
     instance_double(
       VectorMCP::Server,
       logger: mock_logger,
       server_info: mock_server_info,
       server_capabilities: mock_server_capabilities,
-      protocol_version: "2025-03-26",
-      handle_message: nil # Default mock
+      protocol_version: "2024-11-05",
+      handle_message: nil
     )
   end
 
   subject(:transport) { described_class.new(mock_mcp_server, options) }
-  let(:options) { { path_prefix: "/test_mcp" } } # Use a specific prefix for testing
+  let(:options) { { path_prefix: "/test_mcp" } }
 
   # Helper to access the Rack app built by the transport
-  let(:app) { transport.send(:build_rack_app, mock_session) }
+  let(:app) { transport.build_rack_app(mock_session) }
 
-  # Helper to access internal clients hash (use sparingly)
+  # Helper to access internal clients hash
   let(:clients) { transport.instance_variable_get(:@clients) }
 
   describe "#initialize" do
@@ -55,7 +54,7 @@ RSpec.describe VectorMCP::Transport::SSE do
       end
 
       it "correctly formats the path_prefix" do
-        expect(transport.path_prefix).to eq("/custom/api") # Ensures trailing slash is removed
+        expect(transport.path_prefix).to eq("/custom/api")
       end
     end
 
@@ -66,6 +65,16 @@ RSpec.describe VectorMCP::Transport::SSE do
         expect(transport.path_prefix).to eq("/no-slash")
       end
     end
+
+    it "initializes with thread-safe client storage" do
+      expect(clients).to be_a(Concurrent::Hash)
+      expect(clients).to be_empty
+    end
+
+    it "logs the initialization" do
+      expect(mock_logger).to receive(:debug).with(no_args)
+      described_class.new(mock_mcp_server, options)
+    end
   end
 
   describe "Rack Application Routing" do
@@ -75,11 +84,8 @@ RSpec.describe VectorMCP::Transport::SSE do
       expect(last_response.body).to eq("VectorMCP Server OK")
     end
 
-    # We won't test the full SSE connection via Rack::Test easily
-    # Instead, we'll test the handle_sse_connection method directly if needed.
-    # For now, just check the route exists.
     it "routes GET requests to the SSE path" do
-      # Mock the handler to avoid full SSE logic in routing test
+      # Mock the SSE connection handler to avoid full SSE logic
       allow(transport).to receive(:handle_sse_connection).and_return([200, {}, ["SSE OK"]])
       get "/test_mcp/sse"
       expect(last_response).to be_ok
@@ -87,255 +93,348 @@ RSpec.describe VectorMCP::Transport::SSE do
     end
 
     it "routes POST requests to the message path" do
-      # Mock the handler to avoid full message logic in routing test
+      # Mock the message handler to avoid full message logic
       allow(transport).to receive(:handle_message_post).and_return([202, {}, ["Accepted"]])
       post "/test_mcp/message"
       expect(last_response.status).to eq(202)
       expect(last_response.body).to eq("Accepted")
     end
-  end
 
-  describe "#handle_message_post" do
-    let(:session_id) { "test-session-123" }
-    let(:mock_client_queue) { instance_double(Async::Queue) }
-    let(:mock_client_conn) { described_class::ClientConnection.new(session_id, mock_client_queue, nil) }
-    let(:request_id) { 1 }
-    let(:request_body) { { jsonrpc: "2.0", id: request_id, method: "test/method", params: { key: "value" } }.to_json }
-    let(:headers) { { "CONTENT_TYPE" => "application/json" } }
-
-    before do
-      # Register a mock client connection before the request
-      clients[session_id] = mock_client_conn
-      # Prevent actual enqueuing in these tests, just verify calls
-      allow(transport).to receive(:enqueue_formatted_response)
-      allow(transport).to receive(:enqueue_error)
-    end
-
-    context "when receiving a valid request" do
-      let(:success_result) { { result: "success data" } }
-
-      before do
-        # Stub the server's message handler to return success
-        allow(mock_mcp_server).to receive(:handle_message)
-          .with(JSON.parse(request_body), mock_session, session_id)
-          .and_return(success_result[:result]) # Server returns just the result part
-      end
-
-      it "calls the server's handle_message" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(mock_mcp_server).to have_received(:handle_message)
-          .with(JSON.parse(request_body), mock_session, session_id)
-      end
-
-      it "enqueues a formatted response" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(transport).to have_received(:enqueue_formatted_response)
-          .with(mock_client_conn, request_id, success_result[:result])
-      end
-
-      it "returns a 202 Accepted response" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(last_response.status).to eq(202)
-        expect(JSON.parse(last_response.body)).to eq({ "status" => "accepted", "id" => request_id })
-      end
-    end
-
-    context "when session_id query parameter is missing" do
-      it "returns a 400 Bad Request response" do
-        post "/test_mcp/message", request_body, headers # No session_id in query
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["code"]).to eq(-32_600) # Invalid Request
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Missing session_id parameter")
-      end
-
-      it "does not call server handle_message" do
-        expect(mock_mcp_server).not_to receive(:handle_message)
-        post "/test_mcp/message", request_body, headers
-      end
-
-      it "does not enqueue any response or error" do
-        expect(transport).not_to receive(:enqueue_formatted_response)
-        expect(transport).not_to receive(:enqueue_error)
-        post "/test_mcp/message", request_body, headers
-      end
-    end
-
-    context "when session_id is invalid or expired" do
-      before do
-        # Ensure the session_id we use is not in the clients hash
-        clients.delete("invalid-session-id")
-      end
-
-      it "returns a 404 Not Found response" do
-        post "/test_mcp/message?session_id=invalid-session-id", request_body, headers
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["code"]).to eq(-32_001) # Custom server error
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Invalid session_id")
-      end
-
-      it "does not call server handle_message" do
-        expect(mock_mcp_server).not_to receive(:handle_message)
-        post "/test_mcp/message?session_id=invalid-session-id", request_body, headers
-      end
-
-      it "does not enqueue any response or error" do
-        expect(transport).not_to receive(:enqueue_formatted_response)
-        expect(transport).not_to receive(:enqueue_error)
-        post "/test_mcp/message?session_id=invalid-session-id", request_body, headers
-      end
-    end
-
-    context "when request body contains invalid JSON" do
-      let(:invalid_request_body) { "{\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"bad/json" }
-      # Missing closing quote and brace
-
-      it "returns a 400 Bad Request response" do
-        post "/test_mcp/message?session_id=#{session_id}", invalid_request_body, headers
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["code"]).to eq(-32_700) # Parse Error
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Parse error")
-        # ID extracted from invalid JSON should be a string
-        expect(JSON.parse(last_response.body)["id"]).to eq("2") # Expect string "2"
-      end
-
-      it "does not call server handle_message" do
-        expect(mock_mcp_server).not_to receive(:handle_message)
-        post "/test_mcp/message?session_id=#{session_id}", invalid_request_body, headers
-      end
-
-      it "enqueues a Parse Error (-32700) message" do
-        # Allow the util to be called
-        allow(VectorMCP::Util).to receive(:extract_id_from_invalid_json).and_return(2)
-        post "/test_mcp/message?session_id=#{session_id}", invalid_request_body, headers
-        expect(transport).to have_received(:enqueue_error).with(mock_client_conn, 2, -32_700, "Parse error")
-      end
-    end
-
-    context "when server.handle_message raises a ProtocolError" do
-      let(:protocol_error) { VectorMCP::MethodNotFoundError.new("test/method", request_id: request_id) }
-
-      before do
-        allow(mock_mcp_server).to receive(:handle_message)
-          .with(JSON.parse(request_body), mock_session, session_id)
-          .and_raise(protocol_error)
-      end
-
-      it "returns the corresponding HTTP status code (404 for MethodNotFound)" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(last_response.status).to eq(404)
-      end
-
-      it "returns the formatted JSON-RPC error in the body" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        error_response = JSON.parse(last_response.body)["error"]
-        expect(error_response["code"]).to eq(protocol_error.code)
-        expect(error_response["message"]).to eq(protocol_error.message)
-        expect(JSON.parse(last_response.body)["id"]).to eq(request_id)
-      end
-
-      it "enqueues the same error message via SSE" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(transport).to have_received(:enqueue_error)
-          .with(mock_client_conn, request_id, protocol_error.code, protocol_error.message, protocol_error.details)
-      end
-    end
-
-    context "when server.handle_message raises a StandardError" do
-      let(:standard_error) { StandardError.new("Something unexpected broke") }
-
-      before do
-        allow(mock_mcp_server).to receive(:handle_message)
-          .with(JSON.parse(request_body), mock_session, session_id)
-          .and_raise(standard_error)
-      end
-
-      it "returns a 500 Internal Server Error response" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(last_response.status).to eq(500)
-      end
-
-      it "returns a generic JSON-RPC Internal Error in the body" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        error_response = JSON.parse(last_response.body)["error"]
-        expect(error_response["code"]).to eq(-32_603)
-        expect(error_response["message"]).to eq("Internal server error")
-        # We also check that the original error message is included in the 'data' field
-        expect(error_response["data"]["details"]).to eq(standard_error.message)
-        expect(JSON.parse(last_response.body)["id"]).to eq(request_id)
-      end
-
-      it "enqueues the Internal Error message via SSE" do
-        post "/test_mcp/message?session_id=#{session_id}", request_body, headers
-        expect(transport).to have_received(:enqueue_error)
-          .with(mock_client_conn, request_id, -32_603, "Internal server error", { details: standard_error.message })
-      end
-    end
-
-    context "when receiving a non-POST request" do
-      it "returns a 405 Method Not Allowed response" do
-        get "/test_mcp/message?session_id=#{session_id}" # Use GET instead of POST
-        expect(last_response.status).to eq(405)
-        expect(last_response.body).to eq("Method Not Allowed")
-      end
-
-      it "does not call server handle_message" do
-        expect(mock_mcp_server).not_to receive(:handle_message)
-        get "/test_mcp/message?session_id=#{session_id}"
-      end
-
-      it "does not enqueue any response or error" do
-        expect(transport).not_to receive(:enqueue_formatted_response)
-        expect(transport).not_to receive(:enqueue_error)
-        get "/test_mcp/message?session_id=#{session_id}"
-      end
+    it "returns 404 for unknown paths" do
+      get "/unknown/path"
+      expect(last_response.status).to eq(404)
+      expect(last_response.body).to eq("Not Found")
     end
   end
 
   describe "#send_notification" do
-    let(:session_id) { "notify-session-456" }
-    let(:method) { "test/notification" }
-    let(:params) { { data: "info" } }
-    let(:expected_message) { { jsonrpc: "2.0", method: method, params: params } }
-    let(:mock_client_queue) { instance_double(Async::Queue) }
-    let(:mock_client_conn) { described_class::ClientConnection.new(session_id, mock_client_queue, nil) }
+    let(:session_id) { "test-session-123" }
+    let(:method_name) { "test/notification" }
+    let(:params) { { key: "value" } }
+    let(:mock_client_conn) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: session_id) }
 
-    before do
-      allow(mock_client_queue).to receive(:enqueue) # Stub the actual enqueue
-    end
-
-    context "when client connection exists" do
+    context "when client exists" do
       before do
         clients[session_id] = mock_client_conn
+        allow(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).and_return(true)
       end
 
-      it "enqueues the formatted notification message to the client queue" do
-        transport.send_notification(session_id, method, params)
-        expect(mock_client_queue).to have_received(:enqueue).with(expected_message)
+      it "enqueues the notification via StreamManager" do
+        expected_message = { jsonrpc: "2.0", method: method_name, params: params }
+        expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
+
+        result = transport.send_notification(session_id, method_name, params)
+        expect(result).to be true
       end
 
-      it "returns true" do
-        expect(transport.send_notification(session_id, method, params)).to be true
+      it "works without params" do
+        expected_message = { jsonrpc: "2.0", method: method_name }
+        expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
+
+        result = transport.send_notification(session_id, method_name)
+        expect(result).to be true
       end
     end
 
-    context "when client connection does not exist" do
-      before do
-        clients.delete(session_id)
-      end
-
-      it "does not enqueue any message" do
-        expect(mock_client_queue).not_to receive(:enqueue)
-        transport.send_notification(session_id, method, params)
-      end
-
+    context "when client does not exist" do
       it "returns false" do
-        expect(transport.send_notification(session_id, method, params)).to be false
+        result = transport.send_notification("nonexistent", method_name, params)
+        expect(result).to be false
+      end
+    end
+  end
+
+  describe "#broadcast_notification" do
+    let(:method_name) { "broadcast/notification" }
+    let(:params) { { broadcast: true } }
+    let(:client1) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: "client1") }
+    let(:client2) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: "client2") }
+
+    before do
+      clients["client1"] = client1
+      clients["client2"] = client2
+      allow(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).and_return(true)
+    end
+
+    it "sends notification to all connected clients" do
+      expected_message = { jsonrpc: "2.0", method: method_name, params: params }
+
+      expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(client1, expected_message)
+      expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(client2, expected_message)
+
+      transport.broadcast_notification(method_name, params)
+    end
+
+    it "logs the broadcast" do
+      expect(mock_logger).to receive(:debug).with(no_args)
+      transport.broadcast_notification(method_name, params)
+    end
+
+    it "works with no clients" do
+      clients.clear
+      expect { transport.broadcast_notification(method_name, params) }.not_to raise_error
+    end
+  end
+
+  describe "#handle_sse_connection" do
+    let(:env) { { "REQUEST_METHOD" => "GET" } }
+
+    before do
+      allow(SecureRandom).to receive(:uuid).and_return("mock-session-id")
+      allow(VectorMCP::Transport::SSE::ClientConnection).to receive(:new).and_return(mock_client_connection)
+      allow(VectorMCP::Transport::SSE::StreamManager).to receive(:create_sse_stream).and_return(["SSE Stream"])
+    end
+
+    let(:mock_client_connection) do
+      instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: "mock-session-id")
+    end
+
+    it "accepts GET requests" do
+      status, headers, body = transport.send(:handle_sse_connection, env)
+      expect(status).to eq(200)
+      expect(headers["Content-Type"]).to eq("text/event-stream")
+      expect(headers["Cache-Control"]).to eq("no-cache")
+      expect(headers["Connection"]).to eq("keep-alive")
+      expect(body).to eq(["SSE Stream"])
+    end
+
+    it "creates a new client connection" do
+      expect(VectorMCP::Transport::SSE::ClientConnection).to receive(:new).with("mock-session-id", mock_logger)
+      transport.send(:handle_sse_connection, env)
+    end
+
+    it "stores the client connection" do
+      transport.send(:handle_sse_connection, env)
+      expect(clients["mock-session-id"]).to eq(mock_client_connection)
+    end
+
+    it "creates SSE stream via StreamManager" do
+      expect(VectorMCP::Transport::SSE::StreamManager).to receive(:create_sse_stream).with(
+        mock_client_connection,
+        "/test_mcp/message?session_id=mock-session-id",
+        mock_logger
+      )
+      transport.send(:handle_sse_connection, env)
+    end
+
+    it "logs the new connection" do
+      expect(mock_logger).to receive(:info).with("New SSE client connected: mock-session-id")
+      expect(mock_logger).to receive(:debug).with("Client mock-session-id should POST messages to: /test_mcp/message?session_id=mock-session-id")
+      transport.send(:handle_sse_connection, env)
+    end
+
+    context "with non-GET request" do
+      let(:env) { { "REQUEST_METHOD" => "POST" } }
+
+      it "returns 405 Method Not Allowed" do
+        status, headers, body = transport.send(:handle_sse_connection, env)
+        expect(status).to eq(405)
+        expect(headers["Allow"]).to eq("GET")
+        expect(body).to eq(["Method Not Allowed. Only GET is supported for SSE endpoint."])
       end
 
-      it "logs a warning" do
-        # Expect the logger (which is mocked) to receive a warn call
-        expect(mock_logger).to receive(:warn).with(/Cannot enqueue message.*#{session_id}/)
-        transport.send_notification(session_id, method, params)
+      it "logs the invalid method" do
+        expect(mock_logger).to receive(:warn).with("Received non-GET request on SSE endpoint: POST")
+        transport.send(:handle_sse_connection, env)
+      end
+    end
+  end
+
+  describe "#handle_message_post" do
+    let(:session_id) { "test-session-456" }
+    let(:client_conn) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: session_id) }
+    let(:env) { { "REQUEST_METHOD" => "POST", "QUERY_STRING" => "session_id=#{session_id}" } }
+    let(:mock_message_handler) { instance_double(VectorMCP::Transport::SSE::MessageHandler) }
+
+    before do
+      clients[session_id] = client_conn
+      allow(VectorMCP::Transport::SSE::MessageHandler).to receive(:new).and_return(mock_message_handler)
+      allow(mock_message_handler).to receive(:handle_post_message).and_return([202, {}, ["Accepted"]])
+    end
+
+    it "accepts POST requests with valid session_id" do
+      status, = transport.send(:handle_message_post, env)
+      expect(status).to eq(202)
+    end
+
+    it "creates MessageHandler with correct parameters" do
+      # Ensure @session is set so the expectation matches the actual call
+      transport.build_rack_app(mock_session)
+      expect(VectorMCP::Transport::SSE::MessageHandler).to receive(:new).with(mock_mcp_server, mock_session, mock_logger)
+      transport.send(:handle_message_post, env)
+    end
+
+    it "delegates to MessageHandler" do
+      expect(mock_message_handler).to receive(:handle_post_message).with(env, client_conn)
+      transport.send(:handle_message_post, env)
+    end
+
+    context "with non-POST request" do
+      let(:env) { { "REQUEST_METHOD" => "GET", "QUERY_STRING" => "session_id=#{session_id}" } }
+
+      it "returns 405 Method Not Allowed" do
+        status, headers, body = transport.send(:handle_message_post, env)
+        expect(status).to eq(405)
+        expect(headers["Allow"]).to eq("POST")
+        expect(body).to eq(["Method Not Allowed"])
+      end
+
+      it "logs the invalid method" do
+        expect(mock_logger).to receive(:warn).with("Received non-POST request on message endpoint: GET")
+        transport.send(:handle_message_post, env)
+      end
+    end
+
+    context "without session_id parameter" do
+      let(:env) { { "REQUEST_METHOD" => "POST", "QUERY_STRING" => "" } }
+
+      it "returns 400 Bad Request" do
+        status, = transport.send(:handle_message_post, env)
+        expect(status).to eq(400)
+      end
+
+      it "returns JSON-RPC error" do
+        _, _, body = transport.send(:handle_message_post, env)
+        response = JSON.parse(body.first)
+        expect(response["error"]["code"]).to eq(VectorMCP::InvalidRequestError.new("Missing session_id parameter").code)
+        expect(response["error"]["message"]).to eq("Missing session_id parameter")
+      end
+    end
+
+    context "with invalid session_id" do
+      let(:env) { { "REQUEST_METHOD" => "POST", "QUERY_STRING" => "session_id=invalid" } }
+
+      it "returns 404 Not Found" do
+        status, = transport.send(:handle_message_post, env)
+        expect(status).to eq(404)
+      end
+
+      it "returns JSON-RPC error" do
+        _, _, body = transport.send(:handle_message_post, env)
+        response = JSON.parse(body.first)
+        expect(response["error"]["code"]).to eq(VectorMCP::NotFoundError.new("Invalid session_id").code)
+        expect(response["error"]["message"]).to eq("Invalid session_id")
+      end
+    end
+  end
+
+  describe "#stop" do
+    let(:client1) { instance_double(VectorMCP::Transport::SSE::ClientConnection, close: nil) }
+    let(:client2) { instance_double(VectorMCP::Transport::SSE::ClientConnection, close: nil) }
+    let(:mock_puma_server) { instance_double(Puma::Server, stop: nil) }
+
+    before do
+      clients["client1"] = client1
+      clients["client2"] = client2
+      transport.instance_variable_set(:@puma_server, mock_puma_server)
+    end
+
+    it "stops the running flag" do
+      transport.stop
+      expect(transport.instance_variable_get(:@running)).to be false
+    end
+
+    it "closes all client connections" do
+      expect(client1).to receive(:close)
+      expect(client2).to receive(:close)
+      transport.stop
+    end
+
+    it "clears the clients hash" do
+      transport.stop
+      expect(clients).to be_empty
+    end
+
+    it "stops the Puma server" do
+      expect(mock_puma_server).to receive(:stop)
+      transport.stop
+    end
+
+    it "logs the shutdown" do
+      expect(mock_logger).to receive(:info).with("Cleaning up 2 client connection(s)...")
+      expect(mock_logger).to receive(:info).with("SSE transport stopped")
+      transport.stop
+    end
+
+    it "handles nil Puma server gracefully" do
+      transport.instance_variable_set(:@puma_server, nil)
+      expect { transport.stop }.not_to raise_error
+    end
+  end
+
+  describe "#build_rack_app" do
+    it "returns self as Rack app" do
+      result = transport.build_rack_app
+      expect(result).to eq(transport)
+    end
+
+    it "sets session when provided" do
+      custom_session = instance_double(VectorMCP::Session)
+      transport.build_rack_app(custom_session)
+      expect(transport.instance_variable_get(:@session)).to eq(custom_session)
+    end
+  end
+
+  describe "error handling in #call" do
+    let(:env) { { "PATH_INFO" => "/test", "REQUEST_METHOD" => "GET" } }
+
+    before do
+      allow(transport).to receive(:route_request).and_raise(StandardError, "Test error")
+    end
+
+    it "catches errors and returns 500" do
+      status, headers, body = transport.call(env)
+      expect(status).to eq(500)
+      expect(headers["Content-Type"]).to eq("text/plain")
+      expect(body).to eq(["Internal Server Error"])
+    end
+
+    it "logs the error" do
+      expect(mock_logger).to receive(:error).with(a_string_matching(/Test error/))
+      transport.call(env)
+    end
+  end
+
+  describe "session creation" do
+    it "creates session with server and transport" do
+      expect(VectorMCP::Session).to receive(:new).with(
+        mock_mcp_server,
+        transport,
+        hash_including(id: a_string_matching(/\A[0-9a-f-]{36}\z/))
+      ).and_return(mock_session)
+
+      transport.send(:create_session)
+      expect(transport.instance_variable_get(:@session)).to eq(mock_session)
+    end
+  end
+
+  describe "helper methods" do
+    describe "#extract_session_id" do
+      it "extracts session_id from query string" do
+        result = transport.send(:extract_session_id, "session_id=abc123&other=param")
+        expect(result).to eq("abc123")
+      end
+
+      it "returns nil for empty query string" do
+        result = transport.send(:extract_session_id, "")
+        expect(result).to be_nil
+      end
+
+      it "returns nil for nil query string" do
+        result = transport.send(:extract_session_id, nil)
+        expect(result).to be_nil
+      end
+
+      it "handles URL-encoded session IDs" do
+        result = transport.send(:extract_session_id, "session_id=abc%2D123")
+        expect(result).to eq("abc-123")
+      end
+    end
+
+    describe "#build_post_url" do
+      it "builds correct POST URL with session_id" do
+        result = transport.send(:build_post_url, "test-session")
+        expect(result).to eq("/test_mcp/message?session_id=test-session")
       end
     end
   end
