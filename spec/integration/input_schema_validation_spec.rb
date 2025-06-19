@@ -9,10 +9,10 @@ RSpec.describe "Input Schema Validation Integration" do
 
     before do
       session.initialize!({
-        "protocolVersion" => "2024-11-05",
-        "clientInfo" => { "name" => "test-client", "version" => "1.0.0" },
-        "capabilities" => {}
-      })
+                            "protocolVersion" => "2024-11-05",
+                            "clientInfo" => { "name" => "test-client", "version" => "1.0.0" },
+                            "capabilities" => {}
+                          })
     end
 
     context "String validation" do
@@ -28,19 +28,19 @@ RSpec.describe "Input Schema Validation Integration" do
             "required" => ["message"],
             "additionalProperties" => false
           }
-        ) { |args| "Received: #{args['message']}" }
+        ) { |args| "Received: #{args["message"]}" }
       end
 
       it "accepts valid string parameter" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 1,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "string_tool",
-            "arguments" => { "message" => "Hello World" }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 1,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "string_tool",
+                                           "arguments" => { "message" => "Hello World" }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to eq("Received: Hello World")
@@ -49,14 +49,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects missing required parameter" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 2,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "string_tool",
-              "arguments" => {}
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 2,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "string_tool",
+                                    "arguments" => {}
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.message).to include("Invalid arguments for tool 'string_tool'")
           expect(error.details[:tool]).to eq("string_tool")
@@ -68,14 +68,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects empty string (violates minLength)" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 3,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "string_tool",
-              "arguments" => { "message" => "" }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 3,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "string_tool",
+                                    "arguments" => { "message" => "" }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("min")
         end
@@ -84,14 +84,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects non-string type" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 4,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "string_tool",
-              "arguments" => { "message" => 123 }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 4,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "string_tool",
+                                    "arguments" => { "message" => 123 }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("type")
         end
@@ -100,17 +100,17 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects additional properties" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 5,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "string_tool",
-              "arguments" => {
-                "message" => "valid",
-                "extra" => "not allowed"
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 5,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "string_tool",
+                                    "arguments" => {
+                                      "message" => "valid",
+                                      "extra" => "not allowed"
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("additional properties")
         end
@@ -131,19 +131,19 @@ RSpec.describe "Input Schema Validation Integration" do
             "required" => ["age"],
             "additionalProperties" => false
           }
-        ) { |args| "Age: #{args['age']}, Score: #{args['score']}" }
+        ) { |args| "Age: #{args["age"]}, Score: #{args["score"]}" }
       end
 
       it "accepts valid integer within range" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 6,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "number_tool",
-            "arguments" => { "age" => 25 }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 6,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "number_tool",
+                                           "arguments" => { "age" => 25 }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Age: 25")
@@ -151,17 +151,17 @@ RSpec.describe "Input Schema Validation Integration" do
 
       it "accepts optional number parameters" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 7,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "number_tool",
-            "arguments" => {
-              "age" => 30,
-              "score" => 85.5
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 7,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "number_tool",
+                                           "arguments" => {
+                                             "age" => 30,
+                                             "score" => 85.5
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Score: 85.5")
@@ -170,14 +170,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects age below minimum" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 8,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "number_tool",
-              "arguments" => { "age" => -1 }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 8,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "number_tool",
+                                    "arguments" => { "age" => -1 }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("minimum")
         end
@@ -186,14 +186,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects age above maximum" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 9,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "number_tool",
-              "arguments" => { "age" => 200 }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 9,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "number_tool",
+                                    "arguments" => { "age" => 200 }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("maximum")
         end
@@ -202,14 +202,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects string when number expected" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 10,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "number_tool",
-              "arguments" => { "age" => "twenty-five" }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 10,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "number_tool",
+                                    "arguments" => { "age" => "twenty-five" }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("type")
         end
@@ -233,28 +233,28 @@ RSpec.describe "Input Schema Validation Integration" do
               },
               "priority" => {
                 "type" => "string",
-                "enum" => ["low", "medium", "high", "critical"]
+                "enum" => %w[low medium high critical]
               }
             },
-            "required" => ["tags", "priority"],
+            "required" => %w[tags priority],
             "additionalProperties" => false
           }
-        ) { |args| "Tags: #{args['tags'].join(', ')}, Priority: #{args['priority']}" }
+        ) { |args| "Tags: #{args["tags"].join(", ")}, Priority: #{args["priority"]}" }
       end
 
       it "accepts valid array and enum" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 11,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "array_tool",
-            "arguments" => {
-              "tags" => ["urgent", "bug", "frontend"],
-              "priority" => "high"
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 11,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "array_tool",
+                                           "arguments" => {
+                                             "tags" => %w[urgent bug frontend],
+                                             "priority" => "high"
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Tags: urgent, bug, frontend")
@@ -264,17 +264,17 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects empty array (violates minItems)" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 12,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "array_tool",
-              "arguments" => {
-                "tags" => [],
-                "priority" => "medium"
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 12,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "array_tool",
+                                    "arguments" => {
+                                      "tags" => [],
+                                      "priority" => "medium"
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("min")
         end
@@ -283,17 +283,17 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects array with too many items" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 13,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "array_tool",
-              "arguments" => {
-                "tags" => ["one", "two", "three", "four", "five", "six"],
-                "priority" => "medium"
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 13,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "array_tool",
+                                    "arguments" => {
+                                      "tags" => %w[one two three four five six],
+                                      "priority" => "medium"
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("more items than")
         end
@@ -302,17 +302,17 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects invalid enum value" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 14,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "array_tool",
-              "arguments" => {
-                "tags" => ["valid"],
-                "priority" => "super-urgent"
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 14,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "array_tool",
+                                    "arguments" => {
+                                      "tags" => ["valid"],
+                                      "priority" => "super-urgent"
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("did not match one of")
         end
@@ -335,42 +335,42 @@ RSpec.describe "Input Schema Validation Integration" do
                   "settings" => {
                     "type" => "object",
                     "properties" => {
-                      "theme" => { "type" => "string", "enum" => ["light", "dark"] },
+                      "theme" => { "type" => "string", "enum" => %w[light dark] },
                       "notifications" => { "type" => "boolean" }
                     },
                     "required" => ["theme"],
                     "additionalProperties" => false
                   }
                 },
-                "required" => ["name", "email"],
+                "required" => %w[name email],
                 "additionalProperties" => false
               }
             },
             "required" => ["user"],
             "additionalProperties" => false
           }
-        ) { |args| "User: #{args['user']['name']} (#{args['user']['email']})" }
+        ) { |args| "User: #{args["user"]["name"]} (#{args["user"]["email"]})" }
       end
 
       it "accepts complete valid nested object" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 15,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "nested_tool",
-            "arguments" => {
-              "user" => {
-                "name" => "Alice Smith",
-                "email" => "alice@example.com",
-                "settings" => {
-                  "theme" => "dark",
-                  "notifications" => true
-                }
-              }
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 15,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "nested_tool",
+                                           "arguments" => {
+                                             "user" => {
+                                               "name" => "Alice Smith",
+                                               "email" => "alice@example.com",
+                                               "settings" => {
+                                                 "theme" => "dark",
+                                                 "notifications" => true
+                                               }
+                                             }
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("User: Alice Smith (alice@example.com)")
@@ -379,22 +379,22 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects missing required nested field" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 16,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "nested_tool",
-              "arguments" => {
-                "user" => {
-                  "name" => "Charlie",
-                  # Missing required email
-                  "settings" => {
-                    "theme" => "light"
-                  }
-                }
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 16,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "nested_tool",
+                                    "arguments" => {
+                                      "user" => {
+                                        "name" => "Charlie",
+                                        # Missing required email
+                                        "settings" => {
+                                          "theme" => "light"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("required")
           expect(error.details[:validation_errors].first).to include("email")
@@ -404,22 +404,22 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects invalid enum in nested object" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 17,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "nested_tool",
-              "arguments" => {
-                "user" => {
-                  "name" => "Eve",
-                  "email" => "eve@example.com",
-                  "settings" => {
-                    "theme" => "rainbow" # Invalid enum value
-                  }
-                }
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 17,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "nested_tool",
+                                    "arguments" => {
+                                      "user" => {
+                                        "name" => "Eve",
+                                        "email" => "eve@example.com",
+                                        "settings" => {
+                                          "theme" => "rainbow" # Invalid enum value
+                                        }
+                                      }
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("did not match one of")
         end
@@ -441,19 +441,19 @@ RSpec.describe "Input Schema Validation Integration" do
             "required" => ["required_param"],
             "additionalProperties" => true # Allow additional properties
           }
-        ) { |args| "Required: #{args['required_param']}, Optional keys: #{args.keys.sort}" }
+        ) { |args| "Required: #{args["required_param"]}, Optional keys: #{args.keys.sort}" }
       end
 
       it "accepts only required parameter" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 18,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "optional_tool",
-            "arguments" => { "required_param" => "value" }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 18,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "optional_tool",
+                                           "arguments" => { "required_param" => "value" }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Required: value")
@@ -461,17 +461,17 @@ RSpec.describe "Input Schema Validation Integration" do
 
       it "accepts additional properties when allowed" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 19,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "optional_tool",
-            "arguments" => {
-              "required_param" => "value",
-              "extra_field" => "allowed because additionalProperties: true"
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 19,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "optional_tool",
+                                           "arguments" => {
+                                             "required_param" => "value",
+                                             "extra_field" => "allowed because additionalProperties: true"
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Required: value")
@@ -480,18 +480,18 @@ RSpec.describe "Input Schema Validation Integration" do
       it "rejects missing required parameter even with optionals present" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 20,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "optional_tool",
-              "arguments" => {
-                "optional_string" => "present",
-                "optional_number" => 123
-                # Missing required_param
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 20,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "optional_tool",
+                                    "arguments" => {
+                                      "optional_string" => "present",
+                                      "optional_number" => 123
+                                      # Missing required_param
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("required")
           expect(error.details[:validation_errors].first).to include("required_param")
@@ -506,31 +506,31 @@ RSpec.describe "Input Schema Validation Integration" do
           name: "no_schema_tool",
           description: "Tool without input schema - should accept anything",
           input_schema: nil
-        ) { |args| "Accepted anything: #{args.keys.join(', ')}" }
+        ) { |args| "Accepted anything: #{args.keys.join(", ")}" }
 
         # Tool with empty schema (should skip validation)
         server.register_tool(
           name: "empty_schema_tool",
           description: "Tool with empty schema",
           input_schema: {}
-        ) { |args| "Empty schema accepted: #{args.keys.join(', ')}" }
+        ) { |args| "Empty schema accepted: #{args.keys.join(", ")}" }
       end
 
       it "accepts any input for tool with no schema" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 21,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "no_schema_tool",
-            "arguments" => {
-              "anything" => "goes",
-              "numbers" => 123,
-              "arrays" => [1, 2, 3],
-              "objects" => { "nested" => true }
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 21,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "no_schema_tool",
+                                           "arguments" => {
+                                             "anything" => "goes",
+                                             "numbers" => 123,
+                                             "arrays" => [1, 2, 3],
+                                             "objects" => { "nested" => true }
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Accepted anything:")
@@ -538,17 +538,17 @@ RSpec.describe "Input Schema Validation Integration" do
 
       it "accepts any input for tool with empty schema" do
         result = server.handle_message({
-          "jsonrpc" => "2.0",
-          "id" => 22,
-          "method" => "tools/call",
-          "params" => {
-            "name" => "empty_schema_tool",
-            "arguments" => {
-              "also_anything" => "works",
-              "even_invalid_types" => { "complex" => ["data", "structures"] }
-            }
-          }
-        }, session, "test-session")
+                                         "jsonrpc" => "2.0",
+                                         "id" => 22,
+                                         "method" => "tools/call",
+                                         "params" => {
+                                           "name" => "empty_schema_tool",
+                                           "arguments" => {
+                                             "also_anything" => "works",
+                                             "even_invalid_types" => { "complex" => %w[data structures] }
+                                           }
+                                         }
+                                       }, session, "test-session")
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Empty schema accepted:")
@@ -566,7 +566,7 @@ RSpec.describe "Input Schema Validation Integration" do
               "name" => { "type" => "string" },
               "age" => { "type" => "integer", "minimum" => 0 }
             },
-            "required" => ["name", "age"],
+            "required" => %w[name age],
             "additionalProperties" => false
           }
         ) { |args| "Valid input: #{args}" }
@@ -575,14 +575,14 @@ RSpec.describe "Input Schema Validation Integration" do
       it "provides detailed error messages for validation failures" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 23,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "strict_tool",
-              "arguments" => { "name" => 123 } # Wrong type and missing required field
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 23,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "strict_tool",
+                                    "arguments" => { "name" => 123 } # Wrong type and missing required field
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.message).to include("Invalid arguments for tool 'strict_tool'")
           expect(error.details).to have_key(:tool)
@@ -597,18 +597,18 @@ RSpec.describe "Input Schema Validation Integration" do
       it "handles complex validation combinations" do
         expect do
           server.handle_message({
-            "jsonrpc" => "2.0",
-            "id" => 24,
-            "method" => "tools/call",
-            "params" => {
-              "name" => "strict_tool",
-              "arguments" => {
-                "name" => 456,              # Type error
-                "age" => -5,                # Range error  
-                "extra_field" => "invalid"  # Additional property error
-              }
-            }
-          }, session, "test-session")
+                                  "jsonrpc" => "2.0",
+                                  "id" => 24,
+                                  "method" => "tools/call",
+                                  "params" => {
+                                    "name" => "strict_tool",
+                                    "arguments" => {
+                                      "name" => 456, # Type error
+                                      "age" => -5,                # Range error
+                                      "extra_field" => "invalid"  # Additional property error
+                                    }
+                                  }
+                                }, session, "test-session")
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           # Should report multiple validation errors
           expect(error.details[:validation_errors].length).to be > 1
