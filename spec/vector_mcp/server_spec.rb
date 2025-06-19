@@ -795,7 +795,7 @@ RSpec.describe VectorMCP::Server do
         # Mock the require to simulate missing dependencies
         expect(server).to receive(:require_relative).with("transport/sse").and_raise(LoadError, "no such file")
         expect(server.logger).to receive(:fatal).with(/SSE transport requires additional dependencies/)
-        
+
         expect do
           server.run(transport: :sse, options: { host: "localhost" })
         end.to raise_error(NotImplementedError, /SSE transport dependencies not available/)
@@ -804,9 +804,9 @@ RSpec.describe VectorMCP::Server do
       it "can instantiate SSE transport without hanging (fast test)" do
         # This test verifies that SSE transport can be created without actually running it
         # We use a timeout to ensure the test doesn't hang
-        require 'timeout'
-        require_relative '../../lib/vector_mcp/transport/sse'
-        
+        require "timeout"
+        require_relative "../../lib/vector_mcp/transport/sse"
+
         # Test that we can create the transport without it hanging
         expect do
           Timeout.timeout(1) do

@@ -41,12 +41,12 @@ RSpec.describe "SSE Transport Basic Integration" do
         properties: { message: { type: "string" } },
         required: ["message"]
       }
-    ) { |args| "Echo: #{args['message']}" }
+    ) { |args| "Echo: #{args["message"]}" }
 
     # Start the server in a background thread
     @server_thread = Thread.new do
       transport.run
-    rescue StandardError => e
+    rescue StandardError
       # Server stopped, this is expected during cleanup
     end
 
@@ -55,7 +55,7 @@ RSpec.describe "SSE Transport Basic Integration" do
   end
 
   after(:each) do
-    transport.stop if transport
+    transport&.stop
     @server_thread&.kill
     @server_thread&.join(2)
   end
@@ -119,10 +119,10 @@ RSpec.describe "SSE Transport Basic Integration" do
 
     it "rejects requests without session_id" do
       uri = URI("#{base_url}/mcp/message")
-      response = Net::HTTP.post(uri, { jsonrpc: "2.0", id: 1, method: "ping" }.to_json, 
-                               { "Content-Type" => "application/json" })
+      response = Net::HTTP.post(uri, { jsonrpc: "2.0", id: 1, method: "ping" }.to_json,
+                                { "Content-Type" => "application/json" })
       expect(response.code).to eq("400")
-      
+
       error_data = JSON.parse(response.body)
       expect(error_data["error"]["message"]).to eq("Missing session_id parameter")
     end
@@ -130,9 +130,9 @@ RSpec.describe "SSE Transport Basic Integration" do
     it "rejects requests with invalid session_id" do
       uri = URI("#{base_url}/mcp/message?session_id=invalid")
       response = Net::HTTP.post(uri, { jsonrpc: "2.0", id: 1, method: "ping" }.to_json,
-                               { "Content-Type" => "application/json" })
+                                { "Content-Type" => "application/json" })
       expect(response.code).to eq("404")
-      
+
       error_data = JSON.parse(response.body)
       expect(error_data["error"]["message"]).to eq("Invalid session_id")
     end
@@ -165,16 +165,16 @@ RSpec.describe "SSE Transport Basic Integration" do
   describe "JSON-RPC Message Handling" do
     it "handles malformed JSON appropriately" do
       session_id, = establish_sse_connection
-      
+
       uri = URI("#{base_url}/mcp/message?session_id=#{session_id}")
       response = Net::HTTP.post(uri, '{"invalid": json}', { "Content-Type" => "application/json" })
-      
+
       # Server should accept the POST but the response will be sent via SSE
       # For malformed JSON, the server returns 400 directly
       expect(response.code).to eq("400")
-      
+
       error_data = JSON.parse(response.body)
-      expect(error_data["error"]["code"]).to eq(-32700) # Parse error
+      expect(error_data["error"]["code"]).to eq(-32_700) # Parse error
       expect(error_data["error"]["message"]).to eq("Parse error")
     end
   end
@@ -182,22 +182,22 @@ RSpec.describe "SSE Transport Basic Integration" do
   describe "Concurrent Connections" do
     it "handles multiple simultaneous SSE connections" do
       connections = []
-      
+
       # Establish 3 concurrent connections
       3.times do |i|
         session_id, message_url = establish_sse_connection
         connections << { id: i, session_id: session_id, message_url: message_url }
       end
-      
+
       # Verify all connections have unique session IDs
       session_ids = connections.map { |c| c[:session_id] }
       expect(session_ids.uniq.size).to eq(3)
-      
+
       # Verify all session IDs are valid UUIDs
       session_ids.each do |sid|
         expect(sid).to match(/\A[0-9a-f-]{36}\z/)
       end
-      
+
       # Initialize the shared MCP session once (the transport uses a single session)
       first_conn = connections.first
       uri = URI(first_conn[:message_url])
@@ -213,9 +213,9 @@ RSpec.describe "SSE Transport Basic Integration" do
       }
       response = Net::HTTP.post(uri, init_message.to_json, { "Content-Type" => "application/json" })
       expect(response.code).to eq("202")
-      
+
       # Test that other connections can send messages (after session is initialized)
-      connections[1..-1].each do |conn|
+      connections[1..].each do |conn|
         uri = URI(conn[:message_url])
         ping_message = { jsonrpc: "2.0", id: 2, method: "ping", params: {} }
         response = Net::HTTP.post(uri, ping_message.to_json, { "Content-Type" => "application/json" })
@@ -229,17 +229,17 @@ RSpec.describe "SSE Transport Basic Integration" do
       # Server should be running
       response = Net::HTTP.get_response(URI("#{base_url}/"))
       expect(response.code).to eq("200")
-      
+
       # Stop the transport
       transport.stop
-      
+
       # Wait a moment for cleanup
       sleep 0.5
-      
+
       # Server should no longer respond
-      expect {
+      expect do
         Net::HTTP.get_response(URI("#{base_url}/"))
-      }.to raise_error(Errno::ECONNREFUSED)
+      end.to raise_error(Errno::ECONNREFUSED)
     end
   end
 
@@ -248,12 +248,10 @@ RSpec.describe "SSE Transport Basic Integration" do
   def wait_for_server_ready
     Timeout.timeout(10) do
       loop do
-        begin
-          response = Net::HTTP.get_response(URI("#{base_url}/"))
-          break if response.code == "200"
-        rescue Errno::ECONNREFUSED, Net::ReadTimeout
-          sleep 0.1
-        end
+        response = Net::HTTP.get_response(URI("#{base_url}/"))
+        break if response.code == "200"
+      rescue Errno::ECONNREFUSED, Net::ReadTimeout
+        sleep 0.1
       end
     end
   rescue Timeout::Error
@@ -277,12 +275,12 @@ RSpec.describe "SSE Transport Basic Integration" do
           line = line.strip
           next if line.empty?
 
-          if line.start_with?("data: /mcp/message?session_id=")
-            path = line.sub("data: ", "")
-            message_url = "#{base_url}#{path}"
-            session_id = path[/session_id=([^&]+)/, 1]
-            return [session_id, message_url]
-          end
+          next unless line.start_with?("data: /mcp/message?session_id=")
+
+          path = line.sub("data: ", "")
+          message_url = "#{base_url}#{path}"
+          session_id = path[/session_id=([^&]+)/, 1]
+          return [session_id, message_url]
         end
       end
     end

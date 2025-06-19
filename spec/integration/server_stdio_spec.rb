@@ -37,7 +37,6 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
   end
 
   # Helper to read a single JSON-RPC message (as hash) from server's stdout
-  # rubocop:disable Metrics/MethodLength
   def read_jsonrpc(timeout_seconds = 2)
     raw_line = nil
     begin
@@ -67,7 +66,6 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       raise e # Re-raise the EOFError
     end
   end
-  # rubocop:enable Metrics/MethodLength
   # --- Test Setup & Teardown ---
 
   before(:each) do

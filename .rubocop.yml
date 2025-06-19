@@ -15,7 +15,7 @@ Style/StringLiteralsInInterpolation:
   
 # Increase method length limits
 Metrics/MethodLength:
-  Max: 20
+  Max: 30
 
 # Increase ABC size limits
 Metrics/AbcSize:

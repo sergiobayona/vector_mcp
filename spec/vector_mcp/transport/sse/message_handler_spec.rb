@@ -40,7 +40,7 @@ RSpec.describe VectorMCP::Transport::SSE::MessageHandler do
       end
 
       it "returns 202 Accepted" do
-        status, headers, body = message_handler.handle_post_message(rack_env, client_conn)
+        status, headers, = message_handler.handle_post_message(rack_env, client_conn)
         expect(status).to eq(202)
         expect(headers["Content-Type"]).to eq("application/json")
       end

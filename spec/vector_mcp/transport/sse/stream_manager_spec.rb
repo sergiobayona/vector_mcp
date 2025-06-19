@@ -7,13 +7,13 @@ require "vector_mcp/transport/sse/client_connection"
 RSpec.describe VectorMCP::Transport::SSE::StreamManager do
   let(:session_id) { "test-session-456" }
   let(:logger) { instance_double(Logger, debug: nil, warn: nil, error: nil, info: nil) }
-  let(:client_conn) { 
-    instance_double(VectorMCP::Transport::SSE::ClientConnection, 
-                   session_id: session_id, 
-                   closed?: false,
-                   :stream_thread= => nil,
-                   stream_thread: nil) 
-  }
+  let(:client_conn) do
+    instance_double(VectorMCP::Transport::SSE::ClientConnection,
+                    session_id: session_id,
+                    closed?: false,
+                    :stream_thread= => nil,
+                    stream_thread: nil)
+  end
   let(:endpoint_url) { "/mcp/message?session_id=#{session_id}" }
 
   describe ".enqueue_message" do
@@ -130,6 +130,7 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
     end
 
     context "with successful message streaming" do
+      # rubocop:disable Style/EmptyElse
       before do
         call_count = 0
         allow(client_conn).to receive(:dequeue_message) do
@@ -140,6 +141,7 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
           else nil # End streaming
           end
         end
+        # rubocop:enable Style/EmptyElse
 
         # Mock Thread.new to execute the block immediately for testing
         allow(Thread).to receive(:new) do |&block|

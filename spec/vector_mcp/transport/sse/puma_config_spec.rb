@@ -173,7 +173,7 @@ RSpec.describe VectorMCP::Transport::SSE::PumaConfig do
         # skip if method is not present
         skip "Puma::Server does not expose some attributes; cannot assert."
       end
-      
+
       # Modern Puma versions don't support direct thread pool configuration after server creation
       # Thread pool sizing should be set via Puma config DSL before server creation
       if real_server.respond_to?(:min_threads=) && real_server.respond_to?(:max_threads=)
@@ -185,16 +185,14 @@ RSpec.describe VectorMCP::Transport::SSE::PumaConfig do
         # The configure method should have logged a warning about this (as a block)
         expect(logger).to have_received(:warn).with(no_args)
       end
-      
+
       # Test other server options that should still work
       if real_server.respond_to?(:leak_stack_on_error=)
         # If the setter exists, the value should have been set to false
         expect(real_server.leak_stack_on_error).to be false if real_server.respond_to?(:leak_stack_on_error)
-      else
+      elsif real_server.respond_to?(:leak_stack_on_error)
         # If the setter doesn't exist, we can't control the value, so just verify it's a boolean
-        if real_server.respond_to?(:leak_stack_on_error)
-          expect([true, false]).to include(real_server.leak_stack_on_error)
-        end
+        expect([true, false]).to include(real_server.leak_stack_on_error)
       end
     end
   end
@@ -217,7 +215,7 @@ RSpec.describe VectorMCP::Transport::SSE::PumaConfig do
           allow(mock_server).to receive(:respond_to?).with(:min_threads=).and_return(true)
           allow(mock_server).to receive(:respond_to?).with(:max_threads=).and_return(true)
           # Default stub for respond_to? to avoid RSpec errors for unexpected args
-          allow(mock_server).to receive(:respond_to?) { |meth| false }
+          allow(mock_server).to receive(:respond_to?) { |_meth| false }
           allow(mock_server).to receive(:respond_to?).with(:min_threads=).and_return(true)
           allow(mock_server).to receive(:respond_to?).with(:max_threads=).and_return(true)
           allow(mock_server).to receive(:respond_to?).with(:leak_stack_on_error=).and_return(true)
