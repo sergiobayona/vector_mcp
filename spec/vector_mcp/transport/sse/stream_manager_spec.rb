@@ -7,7 +7,13 @@ require "vector_mcp/transport/sse/client_connection"
 RSpec.describe VectorMCP::Transport::SSE::StreamManager do
   let(:session_id) { "test-session-456" }
   let(:logger) { instance_double(Logger, debug: nil, warn: nil, error: nil, info: nil) }
-  let(:client_conn) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: session_id, closed?: false) }
+  let(:client_conn) { 
+    instance_double(VectorMCP::Transport::SSE::ClientConnection, 
+                   session_id: session_id, 
+                   closed?: false,
+                   :stream_thread= => nil,
+                   stream_thread: nil) 
+  }
   let(:endpoint_url) { "/mcp/message?session_id=#{session_id}" }
 
   describe ".enqueue_message" do
@@ -56,6 +62,10 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
     before do
       allow(Enumerator).to receive(:new).and_yield(yielder).and_return(mock_enumerator)
       allow(client_conn).to receive(:close)
+      allow(client_conn).to receive(:stream_thread=)
+      allow(client_conn).to receive(:stream_thread).and_return(nil)
+      # Prevent actual thread creation for basic tests
+      allow(Thread).to receive(:new).and_return(double("Thread", join: nil))
     end
 
     it "returns an Enumerator" do
@@ -79,7 +89,7 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
       end
 
       it "logs the error" do
-        expect(logger).to receive(:error).
+        expect(logger).to receive(:error)
         described_class.create_sse_stream(client_conn, endpoint_url, logger)
       end
 
@@ -96,7 +106,9 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
       yielder = []
       allow(Enumerator).to receive(:new).and_yield(yielder)
       allow(client_conn).to receive(:close)
-      allow(Thread).to receive(:new) # Prevent actual thread creation
+      allow(client_conn).to receive(:stream_thread=)
+      allow(client_conn).to receive(:stream_thread).and_return(nil)
+      allow(Thread).to receive(:new).and_return(double("Thread", join: nil)) # Prevent actual thread creation
 
       described_class.create_sse_stream(client_conn, endpoint_url, logger)
 
@@ -173,7 +185,7 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
       end
 
       it "logs the error and breaks the loop" do
-        expect(logger).to receive(:error).
+        expect(logger).to receive(:error)
         described_class.create_sse_stream(client_conn, endpoint_url, logger)
 
         # Should only have the endpoint event, no message events
@@ -234,7 +246,7 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
 
   describe "thread lifecycle management" do
     let(:yielder) { [] }
-    let(:real_thread) { Thread.new { sleep(0.01) } }
+    let(:mock_thread) { double("Thread", join: nil) }
 
     before do
       allow(Enumerator).to receive(:new).and_yield(yielder)
@@ -243,14 +255,15 @@ RSpec.describe VectorMCP::Transport::SSE::StreamManager do
     end
 
     it "assigns the thread to client connection" do
-      expect(client_conn).to receive(:stream_thread=).with(an_instance_of(Thread))
+      expect(client_conn).to receive(:stream_thread=).with(mock_thread)
+      allow(Thread).to receive(:new).and_return(mock_thread)
       described_class.create_sse_stream(client_conn, endpoint_url, logger)
     end
 
     it "joins the thread before returning" do
-      # Create a real thread that we can control
-      allow(Thread).to receive(:new).and_return(real_thread)
-      expect(real_thread).to receive(:join)
+      allow(Thread).to receive(:new).and_return(mock_thread)
+      allow(client_conn).to receive(:stream_thread).and_return(mock_thread)
+      expect(mock_thread).to receive(:join)
       described_class.create_sse_stream(client_conn, endpoint_url, logger)
     end
   end
