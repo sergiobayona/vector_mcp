@@ -28,6 +28,7 @@ Gem::Specification.new do |spec|
   # Runtime dependencies
   spec.add_dependency "base64", "~> 0.2"
   spec.add_dependency "concurrent-ruby", "~> 1.2"
+  spec.add_dependency "json-schema", "~> 3.0"
   spec.add_dependency "puma", "~> 6.4"
 
   spec.metadata["rubygems_mfa_required"] = "true"

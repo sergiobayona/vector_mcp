@@ -40,8 +40,9 @@ RSpec.describe VectorMCP::Handlers::Core do
   end
 
   describe ".call_tool" do
-    let(:tool) { double("tool", handler: handler) }
+    let(:tool) { double("tool", handler: handler, input_schema: input_schema) }
     let(:handler) { proc { |_args| "raw_result" } }
+    let(:input_schema) { nil }
 
     before do
       server.tools["my_tool"] = tool
@@ -69,6 +70,95 @@ RSpec.describe VectorMCP::Handlers::Core do
           expect(err.message).to eq("Not Found")
           expect(err.details).to eq("Tool not found: unknown")
         }
+      end
+    end
+
+    context "argument validation" do
+      let(:input_schema) do
+        {
+          "type" => "object",
+          "properties" => {
+            "required_param" => { "type" => "string" },
+            "optional_param" => { "type" => "integer" }
+          },
+          "required" => ["required_param"],
+          "additionalProperties" => false
+        }
+      end
+
+      context "when arguments are valid" do
+        it "passes validation and calls the handler" do
+          params = { "name" => "my_tool", "arguments" => { "required_param" => "test" } }
+          result = described_class.call_tool(params, session, server)
+          expect(result).to eq({ isError: false, content: ["converted"] })
+        end
+
+        it "allows optional parameters" do
+          params = { "name" => "my_tool", "arguments" => { "required_param" => "test", "optional_param" => 42 } }
+          result = described_class.call_tool(params, session, server)
+          expect(result).to eq({ isError: false, content: ["converted"] })
+        end
+      end
+
+      context "when arguments are invalid" do
+        it "raises InvalidParamsError for missing required parameters" do
+          params = { "name" => "my_tool", "arguments" => {} }
+          expect do
+            described_class.call_tool(params, session, server)
+          end.to raise_error(VectorMCP::InvalidParamsError) { |err|
+            expect(err.message).to eq("Invalid arguments for tool 'my_tool'")
+            expect(err.details[:tool]).to eq("my_tool")
+            expect(err.details[:validation_errors]).to be_an(Array)
+            expect(err.details[:validation_errors]).not_to be_empty
+            expect(err.details[:validation_errors].first).to include("required_param")
+          }
+        end
+
+        it "raises InvalidParamsError for wrong parameter types" do
+          params = { "name" => "my_tool", "arguments" => { "required_param" => 123 } }
+          expect do
+            described_class.call_tool(params, session, server)
+          end.to raise_error(VectorMCP::InvalidParamsError) { |err|
+            expect(err.message).to eq("Invalid arguments for tool 'my_tool'")
+            expect(err.details[:tool]).to eq("my_tool")
+            expect(err.details[:validation_errors]).to be_an(Array)
+            expect(err.details[:validation_errors]).not_to be_empty
+            expect(err.details[:validation_errors].first).to include("type")
+          }
+        end
+
+        it "raises InvalidParamsError for additional properties when not allowed" do
+          params = { "name" => "my_tool", "arguments" => { "required_param" => "test", "extra_param" => "value" } }
+          expect do
+            described_class.call_tool(params, session, server)
+          end.to raise_error(VectorMCP::InvalidParamsError) { |err|
+            expect(err.message).to eq("Invalid arguments for tool 'my_tool'")
+            expect(err.details[:tool]).to eq("my_tool")
+            expect(err.details[:validation_errors]).to be_an(Array)
+            expect(err.details[:validation_errors]).not_to be_empty
+            expect(err.details[:validation_errors].first).to include("additional properties")
+          }
+        end
+      end
+
+      context "when tool has no input schema" do
+        let(:input_schema) { nil }
+
+        it "skips validation and calls the handler" do
+          params = { "name" => "my_tool", "arguments" => { "any" => "value" } }
+          result = described_class.call_tool(params, session, server)
+          expect(result).to eq({ isError: false, content: ["converted"] })
+        end
+      end
+
+      context "when tool has empty schema" do
+        let(:input_schema) { {} }
+
+        it "skips validation and calls the handler" do
+          params = { "name" => "my_tool", "arguments" => { "any" => "value" } }
+          result = described_class.call_tool(params, session, server)
+          expect(result).to eq({ isError: false, content: ["converted"] })
+        end
       end
     end
   end
