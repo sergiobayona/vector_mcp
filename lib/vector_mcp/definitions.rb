@@ -230,6 +230,7 @@ module VectorMCP
       # Validates that the root URI is properly formatted and secure.
       # @return [Boolean] True if the root is valid.
       # @raise [ArgumentError] If the root is invalid.
+      # rubocop:disable Naming/PredicateMethod
       def validate!
         # Validate URI format
         parsed_uri = begin
@@ -248,13 +249,14 @@ module VectorMCP
         raise ArgumentError, "Root path is not a directory: #{path}" unless File.directory?(path)
 
         # Security check: ensure we can read the directory
-        raise ArgumentError, "Root directory is not readable: #{path}" unless File.readable?(path)
 
+        raise ArgumentError, "Root directory is not readable: #{path}" unless File.readable?(path)
         # Validate against path traversal attempts in the URI itself
         raise ArgumentError, "Root path contains unsafe traversal patterns: #{path}" if path.include?("..") || path.include?("./")
 
         true
       end
+      # rubocop:enable Naming/PredicateMethod
 
       # Class method to create a root from a local directory path.
       # @param path [String] Local filesystem path to the directory.
