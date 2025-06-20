@@ -1,5 +1,33 @@
 ## Unreleased
 
+## [0.3.0] – 2025-06-20
+
+### Added
+* **Comprehensive Input Schema Validation**: Two-layer validation system for enhanced security and developer experience
+  - **Schema Validation**: Validates JSON Schema format during tool registration using `json-schema` gem
+  - **Input Validation**: Validates user arguments against defined schemas during tool execution
+  - Automatic validation for all tools with `input_schema` defined
+  - Detailed error messages with specific validation failure details
+  - Full backward compatibility - tools without schemas continue working unchanged
+  - New `validate_schema_format!` method for registration-time validation
+  - Renamed `validate_tool_arguments!` to `validate_input_arguments!` for clarity
+
+* **Enhanced Documentation and Examples**
+  - Comprehensive README section on automatic input validation with security benefits
+  - New `examples/validation_demo.rb` showcasing both validation types
+  - Complete `examples/README.md` with descriptions of all example files
+  - Updated documentation emphasizing security best practices
+
+### Changed
+* **Method Naming Improvements**: Clarified validation method names
+  - `validate_tool_arguments!` → `validate_input_arguments!` (runtime validation)
+  - Added `validate_schema_format!` (registration-time validation)
+
+### Security
+* **Injection Attack Prevention**: Centralized validation prevents malformed input from reaching tool handlers
+* **Type Safety**: Ensures all arguments match expected JSON Schema types and constraints
+* **Early Error Detection**: Invalid schemas caught during development, not runtime
+
 * **SSE Transport Implementation**: Complete HTTP/Server-Sent Events transport
   - New `VectorMCP::Transport::SSE` class with HTTP server capabilities
   - Puma-based HTTP server with concurrent request handling
