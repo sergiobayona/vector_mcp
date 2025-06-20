@@ -56,7 +56,7 @@ module VectorMCP
         raise VectorMCP::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
 
         # Validate arguments against the tool's input schema
-        validate_tool_arguments!(tool_name, tool, arguments)
+        validate_input_arguments!(tool_name, tool, arguments)
 
         # Let StandardError propagate to Server#handle_request
         result = tool.handler.call(arguments)
@@ -314,7 +314,7 @@ module VectorMCP
       # @param arguments [Hash] The arguments supplied by the client.
       # @return [void]
       # @raise [VectorMCP::InvalidParamsError] if arguments fail validation.
-      def self.validate_tool_arguments!(tool_name, tool, arguments)
+      def self.validate_input_arguments!(tool_name, tool, arguments)
         return unless tool.input_schema.is_a?(Hash)
         return if tool.input_schema.empty?
 
@@ -342,7 +342,7 @@ module VectorMCP
           }
         )
       end
-      private_class_method :validate_tool_arguments!
+      private_class_method :validate_input_arguments!
       private_class_method :raise_tool_validation_error
     end
   end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json-schema"
+
 module VectorMCP
   class Server
     # Handles registration of tools, resources, prompts, and roots
@@ -18,6 +20,9 @@ module VectorMCP
       def register_tool(name:, description:, input_schema:, &handler)
         name_s = name.to_s
         raise ArgumentError, "Tool '#{name_s}' already registered" if @tools[name_s]
+
+        # Validate schema format during registration
+        validate_schema_format!(input_schema) if input_schema
 
         @tools[name_s] = VectorMCP::Definitions::Tool.new(name_s, description, input_schema, handler)
         logger.debug("Registered tool: #{name_s}")
@@ -205,6 +210,25 @@ module VectorMCP
       end
 
       private
+
+      # Validates that the provided schema is a valid JSON Schema.
+      # @api private
+      # @param schema [Hash, nil] The JSON Schema to validate.
+      # @return [void]
+      # @raise [ArgumentError] if the schema is invalid.
+      def validate_schema_format!(schema)
+        return if schema.nil? || schema.empty?
+        return unless schema.is_a?(Hash)
+
+        # Use JSON::Validator to validate the schema format itself
+        validation_errors = JSON::Validator.fully_validate_schema(schema)
+
+        raise ArgumentError, "Invalid input_schema format: #{validation_errors.join("; ")}" unless validation_errors.empty?
+      rescue JSON::Schema::ValidationError => e
+        raise ArgumentError, "Invalid input_schema format: #{e.message}"
+      rescue JSON::Schema::SchemaError => e
+        raise ArgumentError, "Invalid input_schema structure: #{e.message}"
+      end
 
       # Validates the structure of the `arguments` array provided to {#register_prompt}.
       # @api private
