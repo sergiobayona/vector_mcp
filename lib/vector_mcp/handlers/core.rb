@@ -2,6 +2,7 @@
 
 require "json"
 require "uri"
+require "json-schema"
 
 module VectorMCP
   module Handlers
@@ -46,12 +47,16 @@ module VectorMCP
       # @return [Hash] A hash containing the tool call result or an error indication.
       #   Example success: `{ isError: false, content: [{ type: "text", ... }] }`
       # @raise [VectorMCP::NotFoundError] if the requested tool is not found.
+      # @raise [VectorMCP::InvalidParamsError] if arguments validation fails.
       def self.call_tool(params, _session, server)
         tool_name = params["name"]
         arguments = params["arguments"] || {}
 
         tool = server.tools[tool_name]
         raise VectorMCP::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
+
+        # Validate arguments against the tool's input schema
+        validate_input_arguments!(tool_name, tool, arguments)
 
         # Let StandardError propagate to Server#handle_request
         result = tool.handler.call(arguments)
@@ -301,6 +306,44 @@ module VectorMCP
         end
       end
       private_class_method :validate_prompt_response!
+
+      # Validates arguments provided for a tool against its input schema using json-schema.
+      # @api private
+      # @param tool_name [String] The name of the tool.
+      # @param tool [VectorMCP::Definitions::Tool] The tool definition.
+      # @param arguments [Hash] The arguments supplied by the client.
+      # @return [void]
+      # @raise [VectorMCP::InvalidParamsError] if arguments fail validation.
+      def self.validate_input_arguments!(tool_name, tool, arguments)
+        return unless tool.input_schema.is_a?(Hash)
+        return if tool.input_schema.empty?
+
+        validation_errors = JSON::Validator.fully_validate(tool.input_schema, arguments)
+        return if validation_errors.empty?
+
+        raise_tool_validation_error(tool_name, validation_errors)
+      rescue JSON::Schema::ValidationError => e
+        raise_tool_validation_error(tool_name, [e.message])
+      end
+
+      # Raises InvalidParamsError with formatted validation details.
+      # @api private
+      # @param tool_name [String] The name of the tool.
+      # @param validation_errors [Array<String>] The validation error messages.
+      # @return [void]
+      # @raise [VectorMCP::InvalidParamsError] Always raises with formatted details.
+      def self.raise_tool_validation_error(tool_name, validation_errors)
+        raise VectorMCP::InvalidParamsError.new(
+          "Invalid arguments for tool '#{tool_name}'",
+          details: {
+            tool: tool_name,
+            validation_errors: validation_errors,
+            message: validation_errors.join("; ")
+          }
+        )
+      end
+      private_class_method :validate_input_arguments!
+      private_class_method :raise_tool_validation_error
     end
   end
 end

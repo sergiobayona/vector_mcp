@@ -205,7 +205,81 @@ server.register_tool(
 end
 ```
 
-- `input_schema`: A JSON Schema object describing the tool's expected arguments
+#### Automatic Input Validation
+
+VectorMCP automatically validates all tool arguments against their defined `input_schema` before executing the tool handler. This provides several security and reliability benefits:
+
+- **Type Safety**: Ensures arguments match expected types (string, number, boolean, etc.)
+- **Required Fields**: Validates that all required parameters are present
+- **Format Validation**: Supports JSON Schema constraints like patterns, enums, and ranges
+- **Security**: Prevents injection attacks and malformed input from reaching your tool logic
+- **Better Error Messages**: Provides clear validation errors to help clients fix their requests
+
+```ruby
+# Example with comprehensive validation
+server.register_tool(
+  name: "process_user_data",
+  description: "Processes user information with strict validation",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { 
+        type: "string", 
+        minLength: 1, 
+        maxLength: 100,
+        pattern: "^[a-zA-Z\\s]+$"
+      },
+      age: { 
+        type: "integer", 
+        minimum: 0, 
+        maximum: 150 
+      },
+      email: { 
+        type: "string", 
+        format: "email" 
+      },
+      role: { 
+        type: "string", 
+        enum: ["admin", "user", "guest"] 
+      },
+      preferences: {
+        type: "object",
+        properties: {
+          theme: { type: "string" },
+          notifications: { type: "boolean" }
+        },
+        additionalProperties: false
+      }
+    },
+    required: ["name", "email", "role"],
+    additionalProperties: false
+  }
+) do |args, session|
+  # At this point, you can trust that:
+  # - All required fields are present
+  # - Data types are correct
+  # - String lengths and number ranges are valid
+  # - Email format is valid
+  # - Role is one of the allowed values
+  
+  "Processing user: #{args['name']} (#{args['role']})"
+end
+```
+
+**What happens with invalid input:**
+- VectorMCP returns a JSON-RPC error response with code `-32602` (Invalid params)
+- The error message includes specific details about what validation failed
+- Your tool handler is never called with invalid data
+- Clients receive clear feedback on how to fix their requests
+
+**Backward Compatibility:**
+- Tools without `input_schema` continue to work normally
+- No validation is performed if `input_schema` is not provided
+- Existing tools are unaffected by this security enhancement
+
+#### Tool Registration Options
+
+- `input_schema`: A JSON Schema object describing the tool's expected arguments (recommended for security)
 - Return value is automatically converted to MCP content format:
   - String → `{type: 'text', text: '...'}`
   - Hash with proper MCP structure → used as-is
