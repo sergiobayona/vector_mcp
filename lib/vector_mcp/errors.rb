@@ -174,4 +174,28 @@ module VectorMCP
   #     super(message, code: client_code, details: client_details, request_id: request_id)
   #   end
   # end
+
+  # --- Security Specific Errors ---
+
+  # Represents an authentication required error (-32401).
+  # Indicates the request requires authentication.
+  class UnauthorizedError < ProtocolError
+    # @param message [String] The error message.
+    # @param details [Hash, nil] Additional details for the error (optional).
+    # @param request_id [String, Integer, nil] The ID of the originating request.
+    def initialize(message = "Authentication required", details: nil, request_id: nil)
+      super(message, code: -32_401, details: details, request_id: request_id)
+    end
+  end
+
+  # Represents an authorization failed error (-32403).
+  # Indicates the authenticated user does not have permission to perform the requested action.
+  class ForbiddenError < ProtocolError
+    # @param message [String] The error message.
+    # @param details [Hash, nil] Additional details for the error (optional).
+    # @param request_id [String, Integer, nil] The ID of the originating request.
+    def initialize(message = "Access denied", details: nil, request_id: nil)
+      super(message, code: -32_403, details: details, request_id: request_id)
+    end
+  end
 end

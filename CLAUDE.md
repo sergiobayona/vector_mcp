@@ -111,4 +111,85 @@ Use VectorMCP-specific error classes:
 
 ### Version Management
 
-Version defined in `lib/vector_mcp/version.rb` (currently 0.2.0)
+Version defined in `lib/vector_mcp/version.rb` (currently 0.3.0)
+
+## Security Strategy
+
+Based on Windows MCP security recommendations and comprehensive codebase analysis (June 2025), VectorMCP requires significant security enhancements:
+
+### Critical Vulnerabilities Identified
+
+**HIGH RISK:**
+- **No Authentication/Authorization** - Any client can connect and use tools (`lib/vector_mcp/transport/sse.rb:handle_sse_connection`)
+- **Code Injection Risks** - Tools execute with full server privileges (`lib/vector_mcp/handlers/core.rb:62`)
+- **Privilege Escalation** - No sandboxing or capability restrictions
+
+**MEDIUM RISK:**
+- **Session Management** - Weak session handling, no timeouts (`lib/vector_mcp/session.rb:25`)
+- **Cross-Prompt Injection** - No content sanitization for LLM consumption (`lib/vector_mcp/util.rb:43-48`)
+- **Resource Access Control** - No access policies on resources (`lib/vector_mcp/handlers/core.rb:91-98`)
+
+### Security Implementation Plan
+
+**Phase 1: Authentication & Authorization Framework**
+```ruby
+# Planned: API key authentication
+class VectorMCP::Security::Authenticator
+  def authenticate(request)
+    api_key = request.headers['X-API-Key']
+    raise UnauthorizedError unless valid_key?(api_key)
+  end
+end
+
+# Planned: Tool-level permissions
+server.register_tool(name: 'file_read', permissions: ['file:read']) do |args|
+  # Tool implementation with capability checks
+end
+```
+
+**Phase 2: Tool Execution Security**
+```ruby
+# Planned: Sandboxed tool execution
+class VectorMCP::Security::ToolSandbox
+  def execute(tool, args)
+    container = create_container(tool.permissions)
+    container.execute(tool.handler, args)
+  end
+end
+```
+
+**Phase 3: Content Security**
+```ruby
+# Planned: Cross-prompt injection prevention
+class VectorMCP::Security::ContentFilter
+  def sanitize_output(content)
+    # Remove prompt injection patterns
+    # Escape dangerous characters
+    # Validate content safety
+  end
+end
+```
+
+### Windows-Inspired Security Controls
+
+1. **Proxy-Mediated Communication** - Route through security proxy
+2. **Tool Signing** - Require cryptographic signatures for tools
+3. **Granular Permissions** - Per-tool capability declarations
+4. **Runtime Isolation** - Container-based tool execution
+5. **User Consent** - Explicit approval for sensitive operations
+
+### Current Security Measures
+
+**Implemented:**
+- JSON Schema input validation (`lib/vector_mcp/handlers/core.rb:317-327`)
+- Basic path traversal protection (`lib/vector_mcp/definitions.rb:255`)
+- Structured error handling without stack trace leakage (`lib/vector_mcp/errors.rb`)
+
+**Security Testing Required:**
+- Authentication bypass tests
+- Authorization boundary tests
+- Input validation fuzzing
+- Path traversal tests
+- Cross-prompt injection tests
+
+This strategy addresses attack vectors identified in Microsoft's Windows MCP security analysis while maintaining framework usability.
