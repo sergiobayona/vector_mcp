@@ -6,18 +6,25 @@ require "vector_mcp/handlers/core"
 RSpec.describe VectorMCP::Handlers::Core do
   let(:logger) { instance_double(Logger, debug: nil, info: nil, error: nil) }
   let(:session) { double("session") }
+  let(:security_middleware) { double("security_middleware") }
   let(:server) do
     # Default empty registries
     tools = {}
     resources = {}
     prompts = {}
-    double("server", tools: tools, resources: resources, prompts: prompts, logger: logger)
+    double("server", tools: tools, resources: resources, prompts: prompts, logger: logger, security_middleware: security_middleware)
   end
 
   before do
     # Stub global logger for methods using VectorMCP.logger
     allow(VectorMCP).to receive(:logger).and_return(logger)
     allow(logger).to receive(:level=)
+
+    # Mock security middleware to allow all requests by default
+    allow(security_middleware).to receive(:process_request).and_return({
+                                                                         success: true,
+                                                                         session_context: double("session_context")
+                                                                       })
   end
 
   describe ".ping" do

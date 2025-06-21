@@ -42,24 +42,35 @@ module VectorMCP
       #
       # @param params [Hash] The request parameters.
       #   Expected keys: "name" (String), "arguments" (Hash, optional).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing the tool call result or an error indication.
       #   Example success: `{ isError: false, content: [{ type: "text", ... }] }`
       # @raise [VectorMCP::NotFoundError] if the requested tool is not found.
       # @raise [VectorMCP::InvalidParamsError] if arguments validation fails.
-      def self.call_tool(params, _session, server)
+      # @raise [VectorMCP::UnauthorizedError] if authentication fails.
+      # @raise [VectorMCP::ForbiddenError] if authorization fails.
+      def self.call_tool(params, session, server)
         tool_name = params["name"]
         arguments = params["arguments"] || {}
 
         tool = server.tools[tool_name]
         raise VectorMCP::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
 
+        # Security check: authenticate and authorize the request
+        security_result = check_tool_security(session, tool, server)
+        handle_security_failure(security_result) unless security_result[:success]
+
         # Validate arguments against the tool's input schema
         validate_input_arguments!(tool_name, tool, arguments)
 
         # Let StandardError propagate to Server#handle_request
-        result = tool.handler.call(arguments)
+        # Pass session_context only if the handler supports it (for backward compatibility)
+        result = if [1, -1].include?(tool.handler.arity)
+                   tool.handler.call(arguments)
+                 else
+                   tool.handler.call(arguments, security_result[:session_context])
+                 end
         {
           isError: false,
           content: VectorMCP::Util.convert_to_mcp_content(result)
@@ -83,18 +94,30 @@ module VectorMCP
       #
       # @param params [Hash] The request parameters.
       #   Expected key: "uri" (String).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing an array of content items from the resource.
       #   Example: `{ contents: [{ type: "text", text: "...", uri: "memory://data" }] }`
       # @raise [VectorMCP::NotFoundError] if the requested resource URI is not found.
-      def self.read_resource(params, _session, server)
+      # @raise [VectorMCP::UnauthorizedError] if authentication fails.
+      # @raise [VectorMCP::ForbiddenError] if authorization fails.
+      def self.read_resource(params, session, server)
         uri_s = params["uri"]
         raise VectorMCP::NotFoundError.new("Not Found", details: "Resource not found: #{uri_s}") unless server.resources[uri_s]
 
         resource = server.resources[uri_s]
+
+        # Security check: authenticate and authorize the request
+        security_result = check_resource_security(session, resource, server)
+        handle_security_failure(security_result) unless security_result[:success]
+
         # Let StandardError propagate to Server#handle_request
-        content_raw = resource.handler.call(params)
+        # Pass session_context only if the handler supports it (for backward compatibility)
+        content_raw = if [1, -1].include?(resource.handler.arity)
+                        resource.handler.call(params)
+                      else
+                        resource.handler.call(params, security_result[:session_context])
+                      end
         contents = VectorMCP::Util.convert_to_mcp_content(content_raw, mime_type: resource.mime_type)
         contents.each do |item|
           # Add URI to each content item if not already present
@@ -344,6 +367,66 @@ module VectorMCP
       end
       private_class_method :validate_input_arguments!
       private_class_method :raise_tool_validation_error
+
+      # Security helper methods
+
+      # Check security for tool access
+      # @api private
+      # @param session [VectorMCP::Session] The current session
+      # @param tool [VectorMCP::Definitions::Tool] The tool being accessed
+      # @param server [VectorMCP::Server] The server instance
+      # @return [Hash] Security check result
+      def self.check_tool_security(session, tool, server)
+        # Extract request context from session for security middleware
+        request = extract_request_from_session(session)
+        server.security_middleware.process_request(request, action: :call, resource: tool)
+      end
+      private_class_method :check_tool_security
+
+      # Check security for resource access
+      # @api private
+      # @param session [VectorMCP::Session] The current session
+      # @param resource [VectorMCP::Definitions::Resource] The resource being accessed
+      # @param server [VectorMCP::Server] The server instance
+      # @return [Hash] Security check result
+      def self.check_resource_security(session, resource, server)
+        request = extract_request_from_session(session)
+        server.security_middleware.process_request(request, action: :read, resource: resource)
+      end
+      private_class_method :check_resource_security
+
+      # Extract request context from session for security processing
+      # @api private
+      # @param session [VectorMCP::Session] The current session
+      # @return [Hash] Request context for security middleware
+      def self.extract_request_from_session(session)
+        # Extract security context from session
+        # This will be enhanced as we integrate with transport layers
+        {
+          headers: session.instance_variable_get(:@request_headers) || {},
+          params: session.instance_variable_get(:@request_params) || {},
+          session_id: session.respond_to?(:id) ? session.id : "test-session"
+        }
+      end
+      private_class_method :extract_request_from_session
+
+      # Handle security failure by raising appropriate error
+      # @api private
+      # @param security_result [Hash] The security check result
+      # @return [void]
+      # @raise [VectorMCP::UnauthorizedError, VectorMCP::ForbiddenError]
+      def self.handle_security_failure(security_result)
+        case security_result[:error_code]
+        when "AUTHENTICATION_REQUIRED"
+          raise VectorMCP::UnauthorizedError, security_result[:error]
+        when "AUTHORIZATION_FAILED"
+          raise VectorMCP::ForbiddenError, security_result[:error]
+        else
+          # Fallback to generic unauthorized error
+          raise VectorMCP::UnauthorizedError, security_result[:error] || "Security check failed"
+        end
+      end
+      private_class_method :handle_security_failure
     end
   end
 end

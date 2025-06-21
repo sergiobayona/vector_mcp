@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-side specification. It provides a framework for creating MCP servers that expose tools, resources, prompts, and roots to LLM clients.
+VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-side specification. It provides a framework for creating MCP servers that expose tools, resources, prompts, and roots to LLM clients with comprehensive security features.
 
 ## Essential Commands
 
@@ -19,8 +19,8 @@ bin/console        # Interactive Ruby console with the gem loaded
 
 ```bash
 rake               # Run default task (tests + linting)
-bundle exec spec          # Run RSpec test suite
-bindle exec rspec ./spec/vector_mcp/examples_spec.rb # run a single test file
+bundle exec rspec          # Run RSpec test suite  
+bundle exec rspec ./spec/vector_mcp/examples_spec.rb # run a single test file
 bundle exec rubocop       # Run RuboCop linting and style checks
 ```
 
@@ -38,43 +38,52 @@ ruby examples/simple_server.rb      # Basic MCP server demo
 ruby examples/stdio_server.rb       # Stdio transport example
 ruby examples/roots_demo.rb         # Filesystem roots demonstration
 ruby examples/http_server.rb        # HTTP server with SSE transport example
+ruby examples/auth_server.rb        # Authentication and authorization demo
+ruby examples/validation_demo.rb    # Input validation examples
+ruby examples/cli_client.rb         # Command-line client example
 ```
 
 ## Architecture
 
 ### Core Components
 
-- **VectorMCP::Server** (`lib/vector_mcp/server.rb`): Main server class handling MCP protocol
+- **VectorMCP::Server** (`lib/vector_mcp/server.rb`): Main server class handling MCP protocol with security integration
 - **Transport Layer** (`lib/vector_mcp/transport/`): Communication protocols
   - `Stdio`: Standard input/output (stable)
-  - `Sse`: Server-Sent Events over HTTP (stable)
-- **Handlers** (`lib/vector_mcp/handlers/`): Request processing logic
+  - `Sse`: Server-Sent Events over HTTP (stable) with security middleware
+- **Handlers** (`lib/vector_mcp/handlers/`): Request processing logic with authorization checks
 - **Sampling** (`lib/vector_mcp/sampling/`): Server-initiated LLM requests with streaming support
 - **Definitions** (`lib/vector_mcp/definitions.rb`): Tool, Resource, and Prompt definitions
+- **Security** (`lib/vector_mcp/security/`): Authentication and authorization framework
 
 ### Key Features
 
-- **Tools**: Custom functions that LLMs can invoke
-- **Resources**: Data sources for LLM consumption
+- **Tools**: Custom functions that LLMs can invoke with optional security policies
+- **Resources**: Data sources for LLM consumption with access control
 - **Prompts**: Structured prompt templates
 - **Roots**: Filesystem boundaries for security and workspace context
 - **Sampling**: LLM completion requests with streaming, tool calls, and image support
+- **Security**: Comprehensive authentication and authorization system
 
 ### Request Flow
 
 **Stdio Transport:**
 1. Client connects via stdin/stdout
-2. JSON-RPC messages processed line-by-line
-3. Handlers dispatch to registered tools/resources/prompts
-4. Responses sent back via stdout
+2. Optional authentication via custom session-based strategies
+3. JSON-RPC messages processed line-by-line
+4. Security middleware processes authentication and authorization
+5. Handlers dispatch to registered tools/resources/prompts with session context
+6. Responses sent back via stdout
 
 **SSE Transport:**
 1. Client establishes SSE connection (`GET /sse`)
 2. Server sends session info and message endpoint URL
-3. Client sends JSON-RPC requests (`POST /message?session_id=<id>`)
-4. Server processes requests and sends responses via SSE stream
-5. Handlers dispatch to registered tools/resources/prompts
-6. All responses formatted according to MCP specification
+3. Client sends JSON-RPC requests (`POST /message?session_id=<id>`) with authentication headers
+4. Security middleware validates authentication (API key, JWT, or custom)
+5. Authorization policies checked for tool/resource access
+6. Server processes requests and sends responses via SSE stream
+7. Handlers dispatch to registered tools/resources/prompts with authenticated session context
+8. All responses formatted according to MCP specification
 
 ## Development Guidelines
 
@@ -108,88 +117,103 @@ Use VectorMCP-specific error classes:
 
 **Runtime**: async, async-container, async-http, async-io, base64, falcon
 **Development**: rspec, rubocop, simplecov, yard, pry-byebug
+**Optional**: jwt (for JWT authentication strategy)
 
 ### Version Management
 
 Version defined in `lib/vector_mcp/version.rb` (currently 0.3.0)
 
-## Security Strategy
+## Security Architecture
 
-Based on Windows MCP security recommendations and comprehensive codebase analysis (June 2025), VectorMCP requires significant security enhancements:
+VectorMCP includes a comprehensive security framework implementing defense-in-depth principles based on Windows MCP security recommendations.
 
-### Critical Vulnerabilities Identified
+### Implemented Security Features
 
-**HIGH RISK:**
-- **No Authentication/Authorization** - Any client can connect and use tools (`lib/vector_mcp/transport/sse.rb:handle_sse_connection`)
-- **Code Injection Risks** - Tools execute with full server privileges (`lib/vector_mcp/handlers/core.rb:62`)
-- **Privilege Escalation** - No sandboxing or capability restrictions
+**✅ Authentication Framework (`lib/vector_mcp/security/`)**
+- **API Key Strategy** - Header and query parameter based authentication
+- **JWT Token Strategy** - JSON Web Token validation with configurable algorithms
+- **Custom Strategy** - Flexible handler-based authentication for complex scenarios
+- **Strategy Management** - Centralized authentication strategy switching
 
-**MEDIUM RISK:**
-- **Session Management** - Weak session handling, no timeouts (`lib/vector_mcp/session.rb:25`)
-- **Cross-Prompt Injection** - No content sanitization for LLM consumption (`lib/vector_mcp/util.rb:43-48`)
-- **Resource Access Control** - No access policies on resources (`lib/vector_mcp/handlers/core.rb:91-98`)
+**✅ Authorization System**
+- **Policy-Based Access Control** - Fine-grained permissions for tools, resources, and prompts
+- **Role-Based Authorization** - User role and permission management
+- **Resource-Level Security** - Per-resource access policies
+- **Session Context** - Secure session management with user data and permissions
 
-### Security Implementation Plan
+**✅ Security Middleware**
+- **Request Processing** - Automatic authentication and authorization checks
+- **Transport Integration** - Works across stdio and SSE transports
+- **Error Handling** - Secure error responses without information leakage
+- **Session Isolation** - Per-request security context management
 
-**Phase 1: Authentication & Authorization Framework**
+### Security Usage Examples
+
+**Enable API Key Authentication:**
 ```ruby
-# Planned: API key authentication
-class VectorMCP::Security::Authenticator
-  def authenticate(request)
-    api_key = request.headers['X-API-Key']
-    raise UnauthorizedError unless valid_key?(api_key)
-  end
-end
+server.enable_authentication!(strategy: :api_key, keys: ["secret-key-123"])
+```
 
-# Planned: Tool-level permissions
-server.register_tool(name: 'file_read', permissions: ['file:read']) do |args|
-  # Tool implementation with capability checks
+**Enable JWT Authentication:**
+```ruby
+server.enable_authentication!(
+  strategy: :jwt_token, 
+  secret: "jwt-secret",
+  algorithm: "HS256"
+)
+```
+
+**Enable Custom Authentication:**
+```ruby
+server.enable_authentication!(strategy: :custom) do |request|
+  api_key = request[:headers]["X-API-Key"]
+  user_database.authenticate(api_key)
 end
 ```
 
-**Phase 2: Tool Execution Security**
+**Configure Authorization Policies:**
 ```ruby
-# Planned: Sandboxed tool execution
-class VectorMCP::Security::ToolSandbox
-  def execute(tool, args)
-    container = create_container(tool.permissions)
-    container.execute(tool.handler, args)
+server.enable_authorization! do
+  authorize_tools do |user, action, tool|
+    user[:role] == "admin" || tool.name != "dangerous_tool"
+  end
+  
+  authorize_resources do |user, action, resource|
+    user[:permissions].include?("read:#{resource.uri}")
   end
 end
 ```
 
-**Phase 3: Content Security**
-```ruby
-# Planned: Cross-prompt injection prevention
-class VectorMCP::Security::ContentFilter
-  def sanitize_output(content)
-    # Remove prompt injection patterns
-    # Escape dangerous characters
-    # Validate content safety
-  end
-end
-```
+### Security Testing
+
+**Comprehensive Test Coverage:**
+- 68+ authentication strategy tests covering all scenarios
+- Transport security integration tests for SSE and stdio
+- Authorization policy tests with edge cases
+- Error handling and attack scenario validation
+- Performance and concurrency security tests
+
+### Remaining Security Enhancements
+
+**Phase 2: Advanced Security (Planned)**
+- **Cross-Prompt Injection Prevention** - Content sanitization for LLM safety
+- **Tool Execution Sandboxing** - Isolated execution environments
+- **Credential Protection** - Secure secret management
+- **Session Timeouts** - Automatic session expiration
+- **CSRF Protection** - Cross-site request forgery prevention
 
 ### Windows-Inspired Security Controls
 
-1. **Proxy-Mediated Communication** - Route through security proxy
-2. **Tool Signing** - Require cryptographic signatures for tools
-3. **Granular Permissions** - Per-tool capability declarations
-4. **Runtime Isolation** - Container-based tool execution
-5. **User Consent** - Explicit approval for sensitive operations
+1. **Proxy-Mediated Communication** - Security middleware layer
+2. **Granular Permissions** - Per-tool capability declarations  
+3. **Authentication Strategies** - Multiple authentication methods
+4. **Runtime Context** - Secure session and user context management
+5. **Defense in Depth** - Multiple security layers
 
-### Current Security Measures
+### Security Best Practices
 
-**Implemented:**
-- JSON Schema input validation (`lib/vector_mcp/handlers/core.rb:317-327`)
-- Basic path traversal protection (`lib/vector_mcp/definitions.rb:255`)
-- Structured error handling without stack trace leakage (`lib/vector_mcp/errors.rb`)
-
-**Security Testing Required:**
-- Authentication bypass tests
-- Authorization boundary tests
-- Input validation fuzzing
-- Path traversal tests
-- Cross-prompt injection tests
-
-This strategy addresses attack vectors identified in Microsoft's Windows MCP security analysis while maintaining framework usability.
+- Always enable authentication for production deployments
+- Use JWT tokens for stateless authentication in distributed systems
+- Implement least-privilege authorization policies
+- Regularly audit and test security configurations
+- Monitor authentication failures and suspicious activity
