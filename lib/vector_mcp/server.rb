@@ -12,6 +12,13 @@ require_relative "util" # Needed if not using Handlers::Core
 require_relative "server/registry"
 require_relative "server/capabilities"
 require_relative "server/message_handling"
+require_relative "security/auth_manager"
+require_relative "security/authorization"
+require_relative "security/middleware"
+require_relative "security/session_context"
+require_relative "security/strategies/api_key"
+require_relative "security/strategies/jwt_token"
+require_relative "security/strategies/custom"
 
 module VectorMCP
   # The `Server` class is the central component for an MCP server implementation.
@@ -62,7 +69,8 @@ module VectorMCP
     # The specific version of the Model Context Protocol this server implements.
     PROTOCOL_VERSION = "2024-11-05"
 
-    attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests
+    attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests,
+                :auth_manager, :authorization, :security_middleware
     attr_accessor :transport
 
     # Initializes a new VectorMCP server.
@@ -108,6 +116,11 @@ module VectorMCP
       # Configure sampling capabilities
       @sampling_config = configure_sampling_capabilities(options[:sampling_config] || {})
 
+      # Initialize security components
+      @auth_manager = Security::AuthManager.new
+      @authorization = Security::Authorization.new
+      @security_middleware = Security::Middleware.new(@auth_manager, @authorization)
+
       setup_default_handlers
 
       @logger.info("Server instance '#{@name}' v#{@version} (MCP Protocol: #{@protocol_version}, Gem: v#{VectorMCP::VERSION}) initialized.")
@@ -147,6 +160,133 @@ module VectorMCP
                          end
       self.transport = active_transport
       active_transport.run
+    end
+
+    # --- Security Configuration ---
+
+    # Enable authentication with specified strategy and configuration
+    # @param strategy [Symbol] the authentication strategy (:api_key, :jwt, :custom)
+    # @param options [Hash] strategy-specific configuration options
+    # @return [void]
+    def enable_authentication!(strategy: :api_key, **options, &block)
+      # Clear existing strategies when switching to a new configuration
+      clear_auth_strategies unless @auth_manager.strategies.empty?
+
+      @auth_manager.enable!(default_strategy: strategy)
+
+      case strategy
+      when :api_key
+        add_api_key_auth(options[:keys] || [])
+      when :jwt
+        add_jwt_auth(options)
+      when :custom
+        handler = block || options[:handler]
+        raise ArgumentError, "Custom authentication strategy requires a handler block" unless handler
+
+        add_custom_auth(&handler)
+
+      else
+        raise ArgumentError, "Unknown authentication strategy: #{strategy}"
+      end
+
+      @logger.info("Authentication enabled with strategy: #{strategy}")
+    end
+
+    # Disable authentication (return to pass-through mode)
+    # @return [void]
+    def disable_authentication!
+      @auth_manager.disable!
+      @logger.info("Authentication disabled")
+    end
+
+    # Enable authorization with optional policy configuration block
+    # @param block [Proc] optional block for configuring authorization policies
+    # @return [void]
+    def enable_authorization!(&)
+      @authorization.enable!
+      instance_eval(&) if block_given?
+      @logger.info("Authorization enabled")
+    end
+
+    # Disable authorization (return to pass-through mode)
+    # @return [void]
+    def disable_authorization!
+      @authorization.disable!
+      @logger.info("Authorization disabled")
+    end
+
+    # Add authorization policy for tools
+    # @param block [Proc] policy block that receives (user, action, tool)
+    # @return [void]
+    def authorize_tools(&)
+      @authorization.add_policy(:tool, &)
+    end
+
+    # Add authorization policy for resources
+    # @param block [Proc] policy block that receives (user, action, resource)
+    # @return [void]
+    def authorize_resources(&)
+      @authorization.add_policy(:resource, &)
+    end
+
+    # Add authorization policy for prompts
+    # @param block [Proc] policy block that receives (user, action, prompt)
+    # @return [void]
+    def authorize_prompts(&)
+      @authorization.add_policy(:prompt, &)
+    end
+
+    # Add authorization policy for roots
+    # @param block [Proc] policy block that receives (user, action, root)
+    # @return [void]
+    def authorize_roots(&)
+      @authorization.add_policy(:root, &)
+    end
+
+    # Check if security features are enabled
+    # @return [Boolean] true if authentication or authorization is enabled
+    def security_enabled?
+      @security_middleware.security_enabled?
+    end
+
+    # Get current security status for debugging/monitoring
+    # @return [Hash] security configuration status
+    def security_status
+      @security_middleware.security_status
+    end
+
+    private
+
+    # Add API key authentication strategy
+    # @param keys [Array<String>] array of valid API keys
+    # @return [void]
+    def add_api_key_auth(keys)
+      strategy = Security::Strategies::ApiKey.new(keys: keys)
+      @auth_manager.add_strategy(:api_key, strategy)
+    end
+
+    # Add JWT authentication strategy
+    # @param options [Hash] JWT configuration options
+    # @return [void]
+    def add_jwt_auth(options)
+      strategy = Security::Strategies::JwtToken.new(**options)
+      @auth_manager.add_strategy(:jwt, strategy)
+    end
+
+    # Add custom authentication strategy
+    # @param handler [Proc] custom authentication handler block
+    # @return [void]
+    def add_custom_auth(&)
+      strategy = Security::Strategies::Custom.new(&)
+      @auth_manager.add_strategy(:custom, strategy)
+    end
+
+    # Clear all authentication strategies
+    # @return [void]
+    def clear_auth_strategies
+      @auth_manager.strategies.each_key do |strategy_name|
+        @auth_manager.remove_strategy(strategy_name)
+      end
     end
   end
 

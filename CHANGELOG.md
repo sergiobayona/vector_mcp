@@ -1,5 +1,90 @@
 ## Unreleased
 
+### Added
+* **Comprehensive Security Framework**: Production-ready authentication and authorization system
+  - **Authentication Strategies**: Multiple authentication methods with pluggable architecture
+    - **API Key Authentication**: Header and query parameter support with multiple key management
+    - **JWT Token Authentication**: JSON Web Token validation with configurable algorithms and secret management
+    - **Custom Authentication**: Flexible handler-based authentication for complex integration scenarios
+  - **Authorization System**: Fine-grained access control with policy-based permissions
+    - **Resource-Level Authorization**: Separate policies for tools, resources, prompts, and roots
+    - **Role-Based Access Control**: User role and permission management with session context
+    - **Action-Based Permissions**: Granular control over read, write, execute, and administrative actions
+  - **Security Middleware**: Comprehensive request processing pipeline
+    - **Request Normalization**: Consistent security processing across stdio and SSE transports
+    - **Session Context Management**: Secure user session tracking with authentication state
+    - **Error Handling**: Secure error responses without information leakage
+  - **Transport Integration**: Seamless security across all transport layers
+    - **SSE Transport Security**: Full HTTP header and query parameter authentication support
+    - **Stdio Transport Security**: Header simulation for desktop application authentication
+    - **Rack Environment Processing**: Native HTTP request processing with proper header extraction
+
+* **Enhanced Core Handlers**: Security-aware request processing
+  - **Tool Execution Security**: Authentication and authorization checks for tool calls
+  - **Resource Access Security**: Protected resource reading with access control policies
+  - **Backward Compatibility**: Automatic detection of security-aware vs legacy tool handlers
+  - **Session Context Injection**: Optional session context parameter for security-aware handlers
+
+* **New Security Error Types**: Proper MCP error codes for security scenarios
+  - **UnauthorizedError (-32401)**: Authentication required error with proper MCP formatting
+  - **ForbiddenError (-32403)**: Authorization failed error for access control violations
+
+* **Security Examples and Documentation**
+  - **Authentication Example Server** (`examples/auth_server.rb`): Complete demonstration of all security features
+  - **Comprehensive Security Guide** (`security/README.md`): 400+ line documentation covering all security aspects
+  - **Updated Main Documentation**: Enhanced README with security feature overview and quick start examples
+  - **CLAUDE.md Integration**: Updated project documentation with security architecture details
+
+### Changed
+* **Opt-In Security Design**: Security features are disabled by default for maximum compatibility
+  - Existing servers continue working without modification
+  - Security features enabled explicitly via `enable_authentication!` and `enable_authorization!`
+  - Zero-configuration default maintains backward compatibility
+
+* **Server Architecture Enhancement**: Security integration into core server functionality
+  - **Security Middleware Integration**: Built-in security processing pipeline
+  - **Strategy Management**: Centralized authentication strategy switching and cleanup
+  - **Session Context Tracking**: Per-request security state management
+
+* **Enhanced Error Handling**: Security-aware error processing throughout the stack
+  - Proper MCP error codes for authentication and authorization failures
+  - Secure error messages that don't leak sensitive information
+  - Graceful degradation with detailed logging for debugging
+
+### Security
+* **Defense in Depth**: Multiple security layers following enterprise security principles
+  - **Authentication Layer**: Verify user identity before granting access
+  - **Authorization Layer**: Fine-grained permission checking for all resources
+  - **Transport Security**: Secure communication across all transport mechanisms
+  - **Input Validation**: Continued protection against injection attacks via existing schema validation
+
+* **Secure Defaults**: Security-first configuration options
+  - Authentication disabled by default (explicit opt-in required)
+  - Authorization uses allowlist approach (deny by default, explicit permissions required)
+  - Secure error handling without information disclosure
+  - Automatic session isolation and cleanup
+
+* **Enterprise Security Features**: Production-ready security controls
+  - **Session Management**: Secure user session tracking with authentication state
+  - **Permission Framework**: Flexible role-based and resource-based access control
+  - **Error Recovery**: Graceful handling of authentication failures, timeouts, and edge cases
+  - **Audit Trail**: Comprehensive logging of authentication and authorization events
+
+### Testing
+* **Comprehensive Security Test Suite**: 68+ tests covering all security scenarios
+  - **Authentication Strategy Tests**: Complete coverage of API key, JWT, and custom authentication
+  - **Authorization Policy Tests**: Fine-grained permission testing with edge cases
+  - **Transport Security Integration**: End-to-end security testing across stdio and SSE transports
+  - **Error Handling Tests**: Security failure scenarios and attack vector validation
+  - **Concurrency Tests**: Thread safety and concurrent access security validation
+  - **Performance Tests**: Memory management and resource cleanup under load
+
+### Technical Details
+* **Dependencies**: Optional JWT gem support for JWT authentication strategy
+* **API Compatibility**: All security features maintain full backward compatibility
+* **Performance**: Minimal overhead when security is disabled, efficient processing when enabled
+* **Documentation**: Extensive security documentation with real-world examples and best practices
+
 ## [0.3.0] – 2025-06-20
 
 ### Added
