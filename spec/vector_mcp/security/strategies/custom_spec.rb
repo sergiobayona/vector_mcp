@@ -5,13 +5,13 @@ require "spec_helper"
 RSpec.describe VectorMCP::Security::Strategies::Custom do
   describe "#initialize" do
     it "requires a block handler" do
-      expect {
+      expect do
         described_class.new
-      }.to raise_error(ArgumentError, "Custom authentication strategy requires a block")
+      end.to raise_error(ArgumentError, "Custom authentication strategy requires a block")
     end
 
     it "accepts a proc handler" do
-      handler = proc { |req| { user_id: 123 } }
+      handler = proc { |_req| { user_id: 123 } }
       strategy = described_class.new(&handler)
       expect(strategy.handler).to eq(handler)
     end
@@ -22,7 +22,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
     context "with successful hash result" do
       let(:strategy) do
-        described_class.new do |req|
+        described_class.new do |_req|
           { user_id: 123, email: "test@example.com" }
         end
       end
@@ -41,7 +41,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
     context "with string result" do
       let(:strategy) do
-        described_class.new { |req| "user123" }
+        described_class.new { |_req| "user123" }
       end
 
       it "wraps string in user field" do
@@ -57,7 +57,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
     context "with false result" do
       let(:strategy) do
-        described_class.new { |req| false }
+        described_class.new { |_req| false }
       end
 
       it "returns false" do
@@ -68,7 +68,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
     context "with nil result" do
       let(:strategy) do
-        described_class.new { |req| nil }
+        described_class.new { |_req| nil }
       end
 
       it "returns false" do
@@ -79,7 +79,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
     context "with handler error" do
       let(:strategy) do
-        described_class.new { |req| raise StandardError, "Auth error" }
+        described_class.new { |_req| raise StandardError, "Auth error" }
       end
 
       it "returns false on error" do
@@ -91,7 +91,7 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
 
   describe "#configured?" do
     it "returns true when handler is present" do
-      strategy = described_class.new { |req| true }
+      strategy = described_class.new { |_req| true }
       expect(strategy.configured?).to be true
     end
   end

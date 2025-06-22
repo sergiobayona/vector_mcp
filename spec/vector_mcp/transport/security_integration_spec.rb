@@ -25,12 +25,12 @@ RSpec.describe "Transport Security Integration" do
     let(:transport) { VectorMCP::Transport::Sse.new(server) }
 
     before do
-      server.enable_authentication!(strategy: :api_key, keys: ["valid-api-key", "admin-key"])
+      server.enable_authentication!(strategy: :api_key, keys: %w[valid-api-key admin-key])
       server.enable_authorization! do
-        authorize_tools do |user, action, tool|
+        authorize_tools do |user, _action, tool|
           case tool.name
           when "secure_tool"
-            user && (user[:api_key] == "valid-api-key" || user[:api_key] == "admin-key")
+            user && %w[valid-api-key admin-key].include?(user[:api_key])
           else
             true
           end
@@ -223,10 +223,10 @@ RSpec.describe "Transport Security Integration" do
       end
 
       server.enable_authorization! do
-        authorize_tools do |user, action, tool|
+        authorize_tools do |user, _action, tool|
           case tool.name
           when "secure_tool"
-            user && (user[:role] == "user" || user[:role] == "admin")
+            user && %w[user admin].include?(user[:role])
           else
             true
           end
@@ -322,7 +322,7 @@ RSpec.describe "Transport Security Integration" do
     before do
       server.enable_authentication!(strategy: :api_key, keys: [api_key])
       server.enable_authorization! do
-        authorize_tools do |user, action, tool|
+        authorize_tools do |user, _action, _tool|
           user && user[:api_key] == "cross-transport-key"
         end
       end
@@ -357,9 +357,9 @@ RSpec.describe "Transport Security Integration" do
       let(:tool) { server.tools["secure_tool"] }
 
       it "applies same authorization rules across transports" do
-        sse_request = { 
+        sse_request = {
           "REQUEST_METHOD" => "POST",
-          "HTTP_X_API_KEY" => api_key 
+          "HTTP_X_API_KEY" => api_key
         }
         stdio_request = { headers: { "X-API-Key" => api_key } }
 
@@ -457,12 +457,10 @@ RSpec.describe "Transport Security Integration" do
       before do
         server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
         server.enable_authorization! do
-          authorize_tools do |user, action, tool|
-            if tool.name == "error_tool"
-              raise StandardError, "Policy evaluation error"
-            else
-              true
-            end
+          authorize_tools do |_user, _action, tool|
+            raise StandardError, "Policy evaluation error" if tool.name == "error_tool"
+
+            true
           end
         end
 
@@ -476,7 +474,7 @@ RSpec.describe "Transport Security Integration" do
       it "handles authorization policy errors gracefully" do
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
-        
+
         error_tool = server.tools["error_tool"]
         auth_result = server.security_middleware.authorize_action(
           security_result[:session_context], :call, error_tool
@@ -500,7 +498,7 @@ RSpec.describe "Transport Security Integration" do
       end
 
       start_time = Time.now
-      
+
       threads = requests.map do |request|
         Thread.new do
           server.security_middleware.process_request(request)
@@ -521,11 +519,11 @@ RSpec.describe "Transport Security Integration" do
       end
 
       start_time = Time.now
-      
+
       requests.each do |request|
         server.security_middleware.process_request(request)
       end
-      
+
       end_time = Time.now
 
       # Performance should scale reasonably
@@ -535,7 +533,7 @@ RSpec.describe "Transport Security Integration" do
 
   describe "Security Context Isolation" do
     before do
-      server.enable_authentication!(strategy: :api_key, keys: ["user1-key", "user2-key"])
+      server.enable_authentication!(strategy: :api_key, keys: %w[user1-key user2-key])
     end
 
     it "maintains separate security contexts for different requests" do

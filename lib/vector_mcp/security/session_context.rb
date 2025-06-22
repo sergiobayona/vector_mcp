@@ -120,7 +120,7 @@ module VectorMCP
         return anonymous unless auth_result&.dig(:authenticated)
 
         user_data = auth_result[:user]
-        
+
         # Handle special marker for authenticated nil user
         if user_data == :authenticated_nil_user
           new(
@@ -133,7 +133,7 @@ module VectorMCP
           # Extract strategy and authenticated_at only if user_data is a Hash
           strategy = user_data.is_a?(Hash) ? user_data[:strategy] : nil
           auth_time = user_data.is_a?(Hash) ? user_data[:authenticated_at] : nil
-          
+
           new(
             user: user_data,
             authenticated: true,

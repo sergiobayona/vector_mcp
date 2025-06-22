@@ -171,7 +171,7 @@ module VectorMCP
     def enable_authentication!(strategy: :api_key, **options, &block)
       # Clear existing strategies when switching to a new configuration
       clear_auth_strategies unless @auth_manager.strategies.empty?
-      
+
       @auth_manager.enable!(default_strategy: strategy)
 
       case strategy
@@ -181,11 +181,10 @@ module VectorMCP
         add_jwt_auth(options)
       when :custom
         handler = block || options[:handler]
-        if handler
-          add_custom_auth(&handler)
-        else
-          raise ArgumentError, "Custom authentication strategy requires a handler block"
-        end
+        raise ArgumentError, "Custom authentication strategy requires a handler block" unless handler
+
+        add_custom_auth(&handler)
+
       else
         raise ArgumentError, "Unknown authentication strategy: #{strategy}"
       end
@@ -285,7 +284,7 @@ module VectorMCP
     # Clear all authentication strategies
     # @return [void]
     def clear_auth_strategies
-      @auth_manager.strategies.keys.each do |strategy_name|
+      @auth_manager.strategies.each_key do |strategy_name|
         @auth_manager.remove_strategy(strategy_name)
       end
     end

@@ -11,7 +11,7 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     unless defined?(JWT)
       stub_const("JWT", Module.new)
       JWT.singleton_class.class_eval do
-        def decode(token, secret, verify, options = {})
+        def decode(token, _secret, _verify, _options = {})
           case token
           when "valid.jwt.token"
             [{ "user_id" => 123, "email" => "test@example.com" }, { "alg" => "HS256" }]
@@ -30,7 +30,7 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
           end
         end
 
-        def encode(payload, secret, algorithm = "HS256")
+        def encode(_payload, _secret, _algorithm = "HS256")
           "encoded.jwt.token"
         end
       end
@@ -71,9 +71,9 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     it "raises error when JWT gem is not available and we don't mock it" do
       hide_const("JWT")
 
-      expect {
+      expect do
         described_class.new(secret: "test-secret")
-      }.to raise_error(LoadError, "JWT gem is required for JWT authentication strategy")
+      end.to raise_error(LoadError, "JWT gem is required for JWT authentication strategy")
     end
   end
 

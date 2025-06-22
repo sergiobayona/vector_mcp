@@ -18,9 +18,9 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       end
 
       it "handles extremely long API keys gracefully" do
-        long_key = "a" * 10000
+        long_key = "a" * 10_000
         request = { headers: { "X-API-Key" => long_key } }
-        
+
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be false
@@ -30,7 +30,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "handles API keys with special characters" do
         special_key = "key-with-symbols!@#$%^&*()_+-=[]{}|;:,.<>?"
         request = { headers: { "X-API-Key" => special_key } }
-        
+
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be false
@@ -40,7 +40,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "handles API keys with unicode characters" do
         unicode_key = "key-with-unicode-🔑-characters"
         request = { headers: { "X-API-Key" => unicode_key } }
-        
+
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be false
@@ -50,7 +50,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "handles null bytes in API keys" do
         null_key = "key\x00with\x00nulls"
         request = { headers: { "X-API-Key" => null_key } }
-        
+
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be false
@@ -60,7 +60,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "handles binary data as API keys" do
         binary_key = "\x80\x81\x82\x83\x84\x85"
         request = { headers: { "X-API-Key" => binary_key } }
-        
+
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be false
@@ -118,32 +118,30 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
         it "handles timeout errors gracefully" do
           timeout_request = { headers: { "X-Simulate-Timeout" => "true" } }
-          
-          expect {
+
+          expect do
             result = server.security_middleware.process_request(timeout_request)
             expect(result[:success]).to be false
-          }.not_to raise_error
+          end.not_to raise_error
         end
       end
 
       context "with memory exhaustion scenarios" do
         before do
           server.enable_authentication!(strategy: :custom) do |request|
-            if request[:headers]["X-Simulate-Memory-Error"]
-              raise NoMemoryError, "Out of memory"
-            else
-              { user_id: "normal-user" }
-            end
+            raise NoMemoryError, "Out of memory" if request[:headers]["X-Simulate-Memory-Error"]
+
+            { user_id: "normal-user" }
           end
         end
 
         it "handles memory errors gracefully" do
           memory_error_request = { headers: { "X-Simulate-Memory-Error" => "true" } }
-          
-          expect {
+
+          expect do
             result = server.security_middleware.process_request(memory_error_request)
             expect(result[:success]).to be false
-          }.not_to raise_error
+          end.not_to raise_error
         end
       end
     end
@@ -152,7 +150,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
   describe "Authorization Policy Error Recovery" do
     before do
       server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
-      
+
       server.register_tool(
         name: "normal_tool",
         description: "A normal tool",
@@ -169,7 +167,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
     describe "policy execution failures" do
       before do
         server.enable_authorization! do
-          authorize_tools do |user, action, tool|
+          authorize_tools do |_user, _action, tool|
             case tool.name
             when "error_prone_tool"
               raise StandardError, "Policy database is down"
@@ -185,7 +183,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "denies access when policy raises an error" do
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
-        
+
         error_tool = server.tools["error_prone_tool"]
         auth_result = server.security_middleware.authorize_action(
           security_result[:session_context], :call, error_tool
@@ -198,7 +196,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
         session_context = security_result[:session_context]
-        
+
         # First tool causes error
         error_tool = server.tools["error_prone_tool"]
         error_auth = server.security_middleware.authorize_action(
@@ -220,13 +218,11 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       before do
         server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
         server.enable_authorization! do
-          authorize_tools do |user, action, tool|
+          authorize_tools do |_user, _action, tool|
             # Simulate error when accessing tool properties
-            if tool.respond_to?(:name) && tool.name == "corrupted_tool"
-              raise NoMethodError, "Tool object is corrupted"
-            else
-              true
-            end
+            raise NoMethodError, "Tool object is corrupted" if tool.respond_to?(:name) && tool.name == "corrupted_tool"
+
+            true
           end
         end
 
@@ -242,7 +238,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "handles corrupted tool objects gracefully" do
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
-        
+
         corrupted_tool = server.tools["corrupted_tool"]
         auth_result = server.security_middleware.authorize_action(
           security_result[:session_context], :call, corrupted_tool
@@ -265,7 +261,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
           when "string_user"
             { user: "just_a_string" }
           when "array_user"
-            { user: ["invalid", "array"] }
+            { user: %w[invalid array] }
           when "circular_reference"
             circular = {}
             circular[:self] = circular
@@ -308,17 +304,17 @@ RSpec.describe "Security Error Handling and Edge Cases" do
         result = server.security_middleware.process_request(request)
 
         expect(result[:success]).to be true
-        expect(result[:session_context].user).to eq(["invalid", "array"])
+        expect(result[:session_context].user).to eq(%w[invalid array])
         expect(result[:session_context].user_identifier).to eq("authenticated_user")
       end
 
       it "handles circular reference user data" do
         request = { headers: { "X-User-Type" => "circular_reference" } }
-        
-        expect {
+
+        expect do
           result = server.security_middleware.process_request(request)
           expect(result[:success]).to be true
-        }.not_to raise_error
+        end.not_to raise_error
       end
     end
 
@@ -326,13 +322,13 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       let(:session_context) { VectorMCP::Security::SessionContext.new }
 
       it "handles extremely large permission sets" do
-        large_permissions = (1..10000).map { |i| "permission_#{i}" }
-        
-        expect {
-          session_context.add_permissions(large_permissions)
-        }.not_to raise_error
+        large_permissions = (1..10_000).map { |i| "permission_#{i}" }
 
-        expect(session_context.permissions.size).to eq(10000)
+        expect do
+          session_context.add_permissions(large_permissions)
+        end.not_to raise_error
+
+        expect(session_context.permissions.size).to eq(10_000)
         expect(session_context.can?("permission_5000")).to be true
       end
 
@@ -353,11 +349,11 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       end
 
       it "handles unicode permissions" do
-        unicode_permissions = [
-          "读取文件",
-          "書き込み権限",
-          "administración",
-          "доступ_к_файлам"
+        unicode_permissions = %w[
+          读取文件
+          書き込み権限
+          administración
+          доступ_к_файлам
         ]
 
         session_context.add_permissions(unicode_permissions)
@@ -369,10 +365,10 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
       it "handles extremely long permission names" do
         long_permission = "a" * 1000
-        
-        expect {
+
+        expect do
           session_context.add_permission(long_permission)
-        }.not_to raise_error
+        end.not_to raise_error
 
         expect(session_context.can?(long_permission)).to be true
       end
@@ -396,7 +392,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
         invalid_requests.each do |invalid_request|
           result = server.security_middleware.process_request(invalid_request)
-          
+
           expect(result[:success]).to be false
           expect(result[:error]).to eq("Authentication required")
         end
@@ -411,7 +407,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
         requests_with_nils.each do |request|
           result = server.security_middleware.process_request(request)
-          
+
           expect(result[:success]).to be false
           expect(result[:error]).to eq("Authentication required")
         end
@@ -420,13 +416,11 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
     describe "concurrent error scenarios" do
       before do
-        server.enable_authentication!(strategy: :custom) do |request|
+        server.enable_authentication!(strategy: :custom) do |_request|
           # Simulate random failures in 30% of requests
-          if rand < 0.3
-            raise StandardError, "Random authentication failure"
-          else
-            { user_id: Thread.current.object_id }
-          end
+          raise StandardError, "Random authentication failure" if rand < 0.3
+
+          { user_id: Thread.current.object_id }
         end
       end
 
@@ -439,14 +433,14 @@ RSpec.describe "Security Error Handling and Edge Cases" do
         end
 
         results = threads.map(&:value)
-        
+
         # Some should succeed, some should fail, but none should raise errors
         expect(results).to all(be_a(Hash))
         expect(results).to all(have_key(:success))
-        
+
         successful = results.count { |r| r[:success] }
         failed = results.count { |r| !r[:success] }
-        
+
         expect(successful).to be > 0
         expect(failed).to be > 0
         expect(successful + failed).to eq(20)
@@ -457,11 +451,11 @@ RSpec.describe "Security Error Handling and Edge Cases" do
   describe "Security Configuration Edge Cases" do
     describe "authentication strategy conflicts" do
       it "handles multiple enable calls gracefully" do
-        expect {
+        expect do
           server.enable_authentication!(strategy: :api_key, keys: ["key1"])
           server.enable_authentication!(strategy: :api_key, keys: ["key2"])
           server.enable_authentication!(strategy: :api_key, keys: ["key3"])
-        }.not_to raise_error
+        end.not_to raise_error
 
         # Should use the last configuration
         strategy = server.auth_manager.strategies[:api_key]
@@ -470,8 +464,8 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
       it "handles switching between different strategies" do
         server.enable_authentication!(strategy: :api_key, keys: ["api-key"])
-        
-        server.enable_authentication!(strategy: :custom) do |request|
+
+        server.enable_authentication!(strategy: :custom) do |_request|
           { user_id: "custom-user" }
         end
 
@@ -487,7 +481,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
     describe "authorization policy conflicts" do
       before do
         server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
-        
+
         server.register_tool(
           name: "conflict_tool",
           description: "Tool to test policy conflicts",
@@ -496,24 +490,24 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       end
 
       it "handles multiple authorization policy registrations" do
-        expect {
+        expect do
           server.enable_authorization! do
-            authorize_tools { |user, action, tool| true }
+            authorize_tools { |_user, _action, _tool| true }
           end
 
           server.enable_authorization! do
-            authorize_tools { |user, action, tool| false }
+            authorize_tools { |_user, _action, _tool| false }
           end
 
           server.enable_authorization! do
-            authorize_tools { |user, action, tool| user && true }
+            authorize_tools { |user, _action, _tool| user && true }
           end
-        }.not_to raise_error
+        end.not_to raise_error
 
         # Should use the last policy
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
-        
+
         tool = server.tools["conflict_tool"]
         auth_result = server.security_middleware.authorize_action(
           security_result[:session_context], :call, tool
@@ -526,7 +520,7 @@ RSpec.describe "Security Error Handling and Edge Cases" do
     describe "empty configuration edge cases" do
       it "handles authentication with empty key list" do
         server.enable_authentication!(strategy: :api_key, keys: [])
-        
+
         request = { headers: { "X-API-Key" => "any-key" } }
         result = server.security_middleware.process_request(request)
 
@@ -540,12 +534,12 @@ RSpec.describe "Security Error Handling and Edge Cases" do
 
         request = { headers: { "X-API-Key" => "test-key" } }
         security_result = server.security_middleware.process_request(request)
-        
+
         # Create a dummy tool
         dummy_tool = VectorMCP::Definitions::Tool.new(
           name: "dummy", description: "Test", input_schema: {}, handler: proc {}
         )
-        
+
         auth_result = server.security_middleware.authorize_action(
           security_result[:session_context], :call, dummy_tool
         )
@@ -560,23 +554,23 @@ RSpec.describe "Security Error Handling and Edge Cases" do
     describe "session context memory usage" do
       it "handles large numbers of session contexts without memory leaks" do
         server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
-        
+
         initial_memory = GC.stat(:total_allocated_objects)
-        
+
         # Create many session contexts
         1000.times do |i|
           request = { headers: { "X-API-Key" => "test-key", "Request-ID" => i.to_s } }
           server.security_middleware.process_request(request)
         end
-        
+
         # Force garbage collection
         GC.start
-        
+
         final_memory = GC.stat(:total_allocated_objects)
         memory_growth = final_memory - initial_memory
-        
+
         # Memory growth should be reasonable (allowing for some test overhead)
-        expect(memory_growth).to be < 50000
+        expect(memory_growth).to be < 50_000
       end
     end
 
@@ -584,12 +578,12 @@ RSpec.describe "Security Error Handling and Edge Cases" do
       it "properly cleans up resources when switching strategies" do
         # Start with API key
         server.enable_authentication!(strategy: :api_key, keys: (1..1000).map(&:to_s))
-        
+
         # Switch to custom strategy
-        server.enable_authentication!(strategy: :custom) do |request|
+        server.enable_authentication!(strategy: :custom) do |_request|
           { user_id: "test" }
         end
-        
+
         # Old API key strategy should be cleaned up
         expect(server.auth_manager.strategies.keys).to eq([:custom])
       end

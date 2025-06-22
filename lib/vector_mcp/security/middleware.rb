@@ -136,16 +136,16 @@ module VectorMCP
         # Extract headers (HTTP_ prefixed in Rack env)
         headers = {}
         env.each do |key, value|
-          if key.start_with?("HTTP_")
-            # Convert HTTP_X_API_KEY to X-API-Key format
-            header_name = key[5..].split("_").map do |part|
-              case part.upcase
-              when "API" then "API"  # Keep API in all caps
-              else part.capitalize
-              end
-            end.join("-")
-            headers[header_name] = value
-          end
+          next unless key.start_with?("HTTP_")
+
+          # Convert HTTP_X_API_KEY to X-API-Key format
+          header_name = key[5..].split("_").map do |part|
+            case part.upcase
+            when "API" then "API" # Keep API in all caps
+            else part.capitalize
+            end
+          end.join("-")
+          headers[header_name] = value
         end
 
         # Add special headers
