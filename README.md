@@ -130,9 +130,13 @@ server.register_prompt(
 end
 ```
 
-## Built-in Security
+## Security Features
 
-VectorMCP automatically validates all inputs against your schemas:
+VectorMCP provides comprehensive, **opt-in security** for production applications:
+
+### Built-in Input Validation
+
+All inputs are automatically validated against your schemas:
 
 ```ruby
 # This tool is protected against invalid inputs
@@ -153,6 +157,64 @@ server.register_tool(
 # ❌ { age: -5 }                   -> Missing required field
 # ✅ { email: "user@example.com" } -> Passes validation
 ```
+
+### Authentication & Authorization
+
+Secure your MCP server with flexible authentication strategies:
+
+```ruby
+# API Key Authentication
+server.enable_authentication!(
+  strategy: :api_key,
+  keys: ["your-secret-key", "another-key"]
+)
+
+# JWT Token Authentication  
+server.enable_authentication!(
+  strategy: :jwt,
+  secret: ENV["JWT_SECRET"]
+)
+
+# Custom Authentication Logic
+server.enable_authentication!(strategy: :custom) do |request|
+  api_key = request[:headers]["X-API-Key"]
+  User.find_by(api_key: api_key) ? { user_id: user.id } : false
+end
+```
+
+### Fine-Grained Authorization
+
+Control access to tools, resources, and prompts:
+
+```ruby
+server.enable_authorization! do
+  # Tool-level access control
+  authorize_tools do |user, action, tool|
+    case user[:role]
+    when "admin" then true
+    when "user" then !tool.name.start_with?("admin_")
+    else false
+    end
+  end
+  
+  # Resource-level permissions
+  authorize_resources do |user, action, resource|
+    user[:tenant_id] == resource.tenant_id
+  end
+end
+```
+
+### Transport Security
+
+Security works seamlessly across all transport layers:
+
+- **Stdio**: Header simulation for desktop applications
+- **SSE**: Full HTTP header and query parameter support
+- **Request Pipeline**: Automatic authentication and authorization checking
+
+**👉 [Complete Security Guide →](./security/README.md)**
+
+Our comprehensive security documentation covers authentication strategies, authorization policies, session management, and real-world examples.
 
 ## Real-World Examples
 
