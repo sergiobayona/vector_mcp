@@ -24,27 +24,11 @@ module VectorMCP
 
           # Ensure result includes strategy info if it's successful
           if result && result != false
-            case result
-            when Hash
-              # If result has a :user key, extract it and use as main user data
-              if result.key?(:user)
-                user_data = result[:user]
-                # For nil user, return a marker that will become nil in session context
-                user_data.nil? ? :authenticated_nil_user : user_data
-              else
-                result.merge(strategy: "custom", authenticated_at: Time.now)
-              end
-            else
-              {
-                user: result,
-                strategy: "custom",
-                authenticated_at: Time.now
-              }
-            end
+            format_successful_result(result)
           else
             false
           end
-        rescue StandardError, Timeout::Error, NoMemoryError
+        rescue NoMemoryError, StandardError
           # Log error but return false for security
           false
         end
@@ -53,6 +37,33 @@ module VectorMCP
         # @return [Boolean] true if handler is present
         def configured?
           !@handler.nil?
+        end
+
+        private
+
+        # Format successful authentication result with strategy metadata
+        # @param result [Object] the result from the custom handler
+        # @return [Object] formatted result with strategy metadata
+        def format_successful_result(result)
+          case result
+          when Hash
+            # If result has a :user key, extract it and use as main user data
+            if result.key?(:user)
+              user_data = result[:user]
+              # For nil user, return a marker that will become nil in session context
+              return :authenticated_nil_user if user_data.nil?
+
+              user_data
+            else
+              result.merge(strategy: "custom", authenticated_at: Time.now)
+            end
+          else
+            {
+              user: result,
+              strategy: "custom",
+              authenticated_at: Time.now
+            }
+          end
         end
       end
     end
