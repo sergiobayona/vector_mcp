@@ -25,8 +25,6 @@ module VectorMCP
           case @config[:stream]&.to_s&.downcase
           when "stdout"
             $stdout
-          when "stderr"
-            $stderr
           else
             $stderr # Default to stderr for logging
           end

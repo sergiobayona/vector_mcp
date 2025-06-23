@@ -89,7 +89,6 @@ module VectorMCP
       end
     end
 
-
     class LegacyAdapter
       def initialize(core)
         @core = core
@@ -125,13 +124,7 @@ module VectorMCP
         @core.configuration.set_component_level(@component, new_level)
       end
 
-      def progname
-        @progname
-      end
-
-      def progname=(name)
-        @progname = name
-      end
+      attr_accessor :progname
 
       def add(severity, message = nil, progname = nil, &block)
         actual_message = message || block&.call || progname
@@ -141,11 +134,13 @@ module VectorMCP
       # For backward compatibility with Logger interface checks
       def is_a?(klass)
         return true if klass == Logger
+
         super
       end
 
       def kind_of?(klass)
         return true if klass == Logger
+
         super
       end
 

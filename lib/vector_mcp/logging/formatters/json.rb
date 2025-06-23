@@ -60,12 +60,13 @@ module VectorMCP
 
         def sanitize_value(value, depth = 0)
           return "<max_depth_reached>" if depth > 5
-          
+
           case value
           when String, Numeric, TrueClass, FalseClass, NilClass
             value
           when Array
             return "<complex_array>" if depth > 3
+
             value.first(10).map { |v| sanitize_value(v, depth + 1) }
           when Hash
             sanitize_context(value, depth)

@@ -63,7 +63,7 @@ RSpec.describe VectorMCP::Logging do
     it "sets up logging with configuration" do
       config = { level: "WARN", format: "json" }
       core = VectorMCP.setup_logging(config)
-      
+
       expect(core).to be_a(VectorMCP::Logging::Core)
       expect(core.configuration.config[:level]).to eq("WARN")
       expect(core.configuration.config[:format]).to eq("json")
@@ -81,23 +81,23 @@ RSpec.describe VectorMCP::Logging do
     it "loads from environment variables" do
       ENV["VECTORMCP_LOG_LEVEL"] = "DEBUG"
       ENV["VECTORMCP_LOG_FORMAT"] = "json"
-      
+
       config = VectorMCP::Logging::Configuration.from_env
       expect(config.config[:level]).to eq("DEBUG")
       expect(config.config[:format]).to eq("json")
-      
+
       ENV.delete("VECTORMCP_LOG_LEVEL")
       ENV.delete("VECTORMCP_LOG_FORMAT")
     end
 
     it "validates configuration" do
-      expect {
+      expect do
         VectorMCP::Logging::Configuration.new(level: "INVALID")
-      }.to raise_error(VectorMCP::Logging::ConfigurationError)
-      
-      expect {
+      end.to raise_error(VectorMCP::Logging::ConfigurationError)
+
+      expect do
         VectorMCP::Logging::Configuration.new(format: "invalid")
-      }.to raise_error(VectorMCP::Logging::ConfigurationError)
+      end.to raise_error(VectorMCP::Logging::ConfigurationError)
     end
   end
 
@@ -142,7 +142,7 @@ RSpec.describe VectorMCP::Logging do
         sleep(0.01)
         "test result"
       end
-      
+
       expect(result).to eq("test result")
     end
   end
@@ -155,7 +155,7 @@ RSpec.describe VectorMCP::Logging do
         component: "test",
         message: "Test message",
         context: { key: "value" },
-        thread_id: 12345
+        thread_id: 12_345
       )
     end
 
@@ -163,7 +163,7 @@ RSpec.describe VectorMCP::Logging do
       it "formats text output" do
         formatter = VectorMCP::Logging::Formatters::Text.new
         output = formatter.format(log_entry)
-        
+
         expect(output).to include("INFO")
         expect(output).to include("test")
         expect(output).to include("Test message")
@@ -174,7 +174,7 @@ RSpec.describe VectorMCP::Logging do
       it "supports colorization" do
         formatter = VectorMCP::Logging::Formatters::Text.new(colorize: true)
         output = formatter.format(log_entry)
-        
+
         expect(output).to include("\e[32m") # Green for INFO
         expect(output).to include("\e[0m")  # Reset
       end
@@ -184,7 +184,7 @@ RSpec.describe VectorMCP::Logging do
       it "formats JSON output" do
         formatter = VectorMCP::Logging::Formatters::Json.new
         output = formatter.format(log_entry)
-        
+
         parsed = JSON.parse(output.strip)
         expect(parsed["level"]).to eq("INFO")
         expect(parsed["component"]).to eq("test")
@@ -196,19 +196,19 @@ RSpec.describe VectorMCP::Logging do
         # Create a context with a circular reference to force JSON serialization failure
         circular_ref = {}
         circular_ref[:self] = circular_ref
-        
+
         bad_entry = VectorMCP::Logging::LogEntry.new(
           timestamp: Time.now,
           level: VectorMCP::Logging::LEVELS[:INFO],
           component: "test",
           message: "Test message",
           context: { circular: circular_ref },
-          thread_id: 12345
+          thread_id: 12_345
         )
 
         formatter = VectorMCP::Logging::Formatters::Json.new
         output = formatter.format(bad_entry)
-        
+
         parsed = JSON.parse(output.strip)
         expect(parsed["message"]).to include("JSON serialization failed")
         expect(parsed["original_message"]).to eq("Test message")

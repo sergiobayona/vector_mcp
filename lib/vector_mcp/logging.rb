@@ -42,13 +42,13 @@ module VectorMCP
     class LogEntry
       attr_reader :timestamp, :level, :component, :message, :context, :thread_id
 
-      def initialize(timestamp:, level:, component:, message:, context:, thread_id:)
-        @timestamp = timestamp
-        @level = level
-        @component = component
-        @message = message
-        @context = context || {}
-        @thread_id = thread_id
+      def initialize(attributes = {})
+        @timestamp = attributes[:timestamp]
+        @level = attributes[:level]
+        @component = attributes[:component]
+        @message = attributes[:message]
+        @context = attributes[:context] || {}
+        @thread_id = attributes[:thread_id]
       end
 
       def level_name

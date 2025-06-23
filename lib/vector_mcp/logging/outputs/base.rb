@@ -47,7 +47,7 @@ module VectorMCP
 
         def create_formatter
           format_type = @config[:format] || "text"
-          formatter_options = @config.reject { |k, _| k == :format }
+          formatter_options = @config.except(:format)
 
           case format_type.to_s.downcase
           when "json"
