@@ -1,6 +1,17 @@
 ## Unreleased
 
 ### Added
+* **Enhanced Structured Logging System**: Production-ready logging framework with comprehensive observability features
+  - **Component-Based Logging**: Hierarchical logger system with component-specific configuration (`server`, `transport.stdio`, `security.auth`)
+  - **Multiple Output Formats**: Text (with colors) and JSON formatters for different deployment needs
+  - **Flexible Configuration**: Support for environment variables, YAML files, and programmatic configuration
+  - **Context Management**: Structured context passing with `with_context` blocks and persistent context addition
+  - **Performance Measurement**: Built-in `measure` method for operation timing and performance monitoring
+  - **Log Level Management**: Component-specific log levels with runtime configuration changes
+  - **Legacy Compatibility**: Seamless backward compatibility with existing `VectorMCP.logger` usage
+  - **Thread Safety**: Concurrent logging support with proper synchronization
+  - **Security Logging**: Dedicated security log level for authentication and authorization events
+
 * **Comprehensive Security Framework**: Production-ready authentication and authorization system
   - **Authentication Strategies**: Multiple authentication methods with pluggable architecture
     - **API Key Authentication**: Header and query parameter support with multiple key management
@@ -36,6 +47,14 @@
   - **CLAUDE.md Integration**: Updated project documentation with security architecture details
 
 ### Changed
+* **Code Quality Improvements**: Enhanced maintainability and consistency across the logging system
+  - **Constants Refactoring**: Extracted magic numbers to named constants for better maintainability
+    - Created `VectorMCP::Logging::Constants` module with self-documenting constant names
+    - Replaced hardcoded values (5, 3, 1000, etc.) with meaningful names (`MAX_SERIALIZATION_DEPTH`, `DEFAULT_MAX_MESSAGE_LENGTH`)
+    - Centralized configuration limits for JSON serialization, text formatting, and timestamp precision
+  - **Enhanced Error Handling**: Improved JSON serialization fallback mechanisms with data sanitization
+  - **Consistent Formatting**: Standardized width and truncation behavior across all formatters
+
 * **Opt-In Security Design**: Security features are disabled by default for maximum compatibility
   - Existing servers continue working without modification
   - Security features enabled explicitly via `enable_authentication!` and `enable_authorization!`
