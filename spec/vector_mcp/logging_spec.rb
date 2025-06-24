@@ -149,14 +149,14 @@ RSpec.describe VectorMCP::Logging do
 
   describe VectorMCP::Logging::Formatters do
     let(:log_entry) do
-      VectorMCP::Logging::LogEntry.new(
-        timestamp: Time.parse("2025-01-01 12:00:00"),
-        level: VectorMCP::Logging::LEVELS[:INFO],
-        component: "test",
-        message: "Test message",
-        context: { key: "value" },
-        thread_id: 12_345
-      )
+      VectorMCP::Logging::LogEntry.new({
+                                         timestamp: Time.parse("2025-01-01 12:00:00"),
+                                         level: VectorMCP::Logging::LEVELS[:INFO],
+                                         component: "test",
+                                         message: "Test message",
+                                         context: { key: "value" },
+                                         thread_id: 12_345
+                                       })
     end
 
     describe VectorMCP::Logging::Formatters::Text do
@@ -197,14 +197,14 @@ RSpec.describe VectorMCP::Logging do
         circular_ref = {}
         circular_ref[:self] = circular_ref
 
-        bad_entry = VectorMCP::Logging::LogEntry.new(
-          timestamp: Time.now,
-          level: VectorMCP::Logging::LEVELS[:INFO],
-          component: "test",
-          message: "Test message",
-          context: { circular: circular_ref },
-          thread_id: 12_345
-        )
+        bad_entry = VectorMCP::Logging::LogEntry.new({
+                                                       timestamp: Time.now,
+                                                       level: VectorMCP::Logging::LEVELS[:INFO],
+                                                       component: "test",
+                                                       message: "Test message",
+                                                       context: { circular: circular_ref },
+                                                       thread_id: 12_345
+                                                     })
 
         formatter = VectorMCP::Logging::Formatters::Json.new
         output = formatter.format(bad_entry)

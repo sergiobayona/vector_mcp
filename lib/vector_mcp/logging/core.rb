@@ -34,14 +34,14 @@ module VectorMCP
       def log(level, component, message, context = {})
         return unless should_log?(level, component)
 
-        log_entry = Logging::LogEntry.new(
-          timestamp: Time.now,
-          level: level,
-          component: component,
-          message: message,
-          context: context,
-          thread_id: Thread.current.object_id
-        )
+        log_entry = Logging::LogEntry.new({
+                                            timestamp: Time.now,
+                                            level: level,
+                                            component: component,
+                                            message: message,
+                                            context: context,
+                                            thread_id: Thread.current.object_id
+                                          })
 
         @outputs.each do |output|
           output.write(log_entry)
