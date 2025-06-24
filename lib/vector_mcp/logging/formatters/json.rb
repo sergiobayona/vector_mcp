@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "../constants"
 
 module VectorMCP
   module Logging
@@ -14,7 +15,7 @@ module VectorMCP
 
         def format(log_entry)
           data = {
-            timestamp: log_entry.timestamp.iso8601(3),
+            timestamp: log_entry.timestamp.iso8601(Constants::TIMESTAMP_PRECISION),
             level: log_entry.level_name,
             component: log_entry.component,
             message: log_entry.message
@@ -36,7 +37,7 @@ module VectorMCP
 
         def fallback_format(log_entry, error)
           safe_data = {
-            timestamp: log_entry.timestamp.iso8601(3),
+            timestamp: log_entry.timestamp.iso8601(Constants::TIMESTAMP_PRECISION),
             level: log_entry.level_name,
             component: log_entry.component,
             message: "JSON serialization failed: #{error.message}",
@@ -48,7 +49,7 @@ module VectorMCP
         end
 
         def sanitize_context(context, depth = 0)
-          return "<max_depth_reached>" if depth > 5
+          return "<max_depth_reached>" if depth > Constants::MAX_SERIALIZATION_DEPTH
           return {} unless context.is_a?(Hash)
 
           context.each_with_object({}) do |(key, value), sanitized|
@@ -59,15 +60,15 @@ module VectorMCP
         end
 
         def sanitize_value(value, depth = 0)
-          return "<max_depth_reached>" if depth > 5
+          return "<max_depth_reached>" if depth > Constants::MAX_SERIALIZATION_DEPTH
 
           case value
           when String, Numeric, TrueClass, FalseClass, NilClass
             value
           when Array
-            return "<complex_array>" if depth > 3
+            return "<complex_array>" if depth > Constants::MAX_ARRAY_SERIALIZATION_DEPTH
 
-            value.first(10).map { |v| sanitize_value(v, depth + 1) }
+            value.first(Constants::MAX_ARRAY_ELEMENTS_TO_SERIALIZE).map { |v| sanitize_value(v, depth + 1) }
           when Hash
             sanitize_context(value, depth)
           else

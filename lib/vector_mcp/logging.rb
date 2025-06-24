@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "logging/constants"
 require_relative "logging/core"
 require_relative "logging/configuration"
 require_relative "logging/component"
@@ -57,7 +58,7 @@ module VectorMCP
 
       def to_h
         {
-          timestamp: @timestamp.iso8601(3),
+          timestamp: @timestamp.iso8601(Constants::TIMESTAMP_PRECISION),
           level: level_name,
           component: @component,
           message: @message,

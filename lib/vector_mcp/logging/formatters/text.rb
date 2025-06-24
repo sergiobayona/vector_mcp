@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../constants"
+
 module VectorMCP
   module Logging
     module Formatters
@@ -22,7 +24,7 @@ module VectorMCP
           @include_timestamp = options.fetch(:include_timestamp, true)
           @include_thread = options.fetch(:include_thread, false)
           @include_component = options.fetch(:include_component, true)
-          @max_message_length = options.fetch(:max_message_length, 1000)
+          @max_message_length = options.fetch(:max_message_length, Constants::DEFAULT_MAX_MESSAGE_LENGTH)
         end
 
         def format(log_entry)
@@ -49,7 +51,7 @@ module VectorMCP
         end
 
         def format_level_part(level_name)
-          level_str = format_level(level_name.to_s, 8)
+          level_str = format_level(level_name.to_s, Constants::DEFAULT_LEVEL_WIDTH)
           if @colorize && COLORS[level_name.to_sym]
             "#{COLORS[level_name.to_sym]}#{level_str}#{RESET_COLOR}"
           else
@@ -58,7 +60,7 @@ module VectorMCP
         end
 
         def format_component_part(component)
-          format_component(component, 20)
+          format_component(component, Constants::DEFAULT_COMPONENT_WIDTH)
         end
 
         def format_thread_part(thread_id)

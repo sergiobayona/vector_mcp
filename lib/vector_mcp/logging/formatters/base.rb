@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../constants"
+
 module VectorMCP
   module Logging
     module Formatters
@@ -15,16 +17,16 @@ module VectorMCP
         protected
 
         def format_timestamp(timestamp)
-          timestamp.strftime("%Y-%m-%d %H:%M:%S.%3N")
+          timestamp.strftime("%Y-%m-%d %H:%M:%S.%#{Constants::TIMESTAMP_PRECISION}N")
         end
 
-        def format_level(level_name, width = 8)
+        def format_level(level_name, width = Constants::DEFAULT_LEVEL_WIDTH)
           level_name.ljust(width)
         end
 
-        def format_component(component, width = 20)
+        def format_component(component, width = Constants::DEFAULT_COMPONENT_WIDTH)
           if component.length > width
-            "#{component[0..(width - 4)]}..."
+            "#{component[0..(width - Constants::TRUNCATION_SUFFIX_LENGTH)]}..."
           else
             component.ljust(width)
           end
@@ -39,10 +41,10 @@ module VectorMCP
           " (#{pairs.join(", ")})"
         end
 
-        def truncate_message(message, max_length = 1000)
+        def truncate_message(message, max_length = Constants::DEFAULT_MAX_MESSAGE_LENGTH)
           return message if message.length <= max_length
 
-          "#{message[0..(max_length - 4)]}..."
+          "#{message[0..(max_length - Constants::TRUNCATION_SUFFIX_LENGTH)]}..."
         end
       end
     end
