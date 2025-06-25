@@ -1,4 +1,4 @@
-## Unreleased
+## [0.3.1] – 2025-06-25
 
 ### Added
 * **Enhanced Structured Logging System**: Production-ready logging framework with comprehensive observability features
@@ -46,15 +46,16 @@
   - **Updated Main Documentation**: Enhanced README with security feature overview and quick start examples
   - **CLAUDE.md Integration**: Updated project documentation with security architecture details
 
-### Changed
+### Fixed
+* Added missing runtime dependencies to gemspec for proper gem installation
+  - Added `jwt` gem dependency (~> 2.7) for JWT authentication strategy
+  - Added `rack` gem dependency (~> 3.0) for SSE transport
+  - Fixed JWT exception handling for compatibility with jwt gem 2.7+
 
-* **Code Quality Improvements**: Enhanced maintainability and consistency across the logging system
-  * **Constants Refactoring**: Extracted magic numbers to named constants for better maintainability
-    * Created `VectorMCP::Logging::Constants` module with self-documenting constant names
-    * Replaced hardcoded values (5, 3, 1000, etc.) with meaningful names (`MAX_SERIALIZATION_DEPTH`, `DEFAULT_MAX_MESSAGE_LENGTH`)
-    * Centralized configuration limits for JSON serialization, text formatting, and timestamp precision
-  * **Enhanced Error Handling**: Improved JSON serialization fallback mechanisms with data sanitization
-  * **Consistent Formatting**: Standardized width and truncation behavior across all formatters
+### Changed
+* Enhanced gemspec description for better gem discovery
+* Added CHANGELOG.md to packaged gem files
+* Improved gemspec metadata for RubyGems.org listing
 
 * **Opt-In Security Design**: Security features are disabled by default for maximum compatibility
   * Existing servers continue working without modification
@@ -107,6 +108,42 @@
 * **API Compatibility**: All security features maintain full backward compatibility
 * **Performance**: Minimal overhead when security is disabled, efficient processing when enabled
 * **Documentation**: Extensive security documentation with real-world examples and best practices
+
+## [0.3.0] – 2025-06-20
+
+### Added
+* **Comprehensive Input Schema Validation**: Two-layer validation system for enhanced security and developer experience
+  - **Schema Validation**: Validates JSON Schema format during tool registration using `json-schema` gem
+  - **Input Validation**: Validates user arguments against defined schemas during tool execution
+  - Automatic validation for all tools with `input_schema` defined
+  - Detailed error messages with specific validation failure details
+  - Full backward compatibility - tools without schemas continue working unchanged
+  - New `validate_schema_format!` method for registration-time validation
+  - Renamed `validate_tool_arguments!` to `validate_input_arguments!` for clarity
+
+* **Enhanced Documentation and Examples**
+  - Comprehensive README section on automatic input validation with security benefits
+  - New `examples/validation_demo.rb` showcasing both validation types
+  - Complete `examples/README.md` with descriptions of all example files
+  - Updated documentation emphasizing security best practices
+
+### Changed
+* **Method Naming Improvements**: Clarified validation method names
+  - `validate_tool_arguments!` → `validate_input_arguments!` (runtime validation)
+  - Added `validate_schema_format!` (registration-time validation)
+
+### Security
+* **Injection Attack Prevention**: Centralized validation prevents malformed input from reaching tool handlers
+* **Type Safety**: Ensures all arguments match expected JSON Schema types and constraints
+* **Early Error Detection**: Invalid schemas caught during development, not runtime
+
+* **SSE Transport Implementation**: Complete HTTP/Server-Sent Events transport
+  - New `VectorMCP::Transport::SSE` class with HTTP server capabilities
+  - Puma-based HTTP server with concurrent request handling
+  - Bi-directional communication: SSE for server-to-client, HTTP POST for client-to-server
+  - Session management with unique session IDs and connection tracking
+  - Support for web browsers and HTTP-based MCP clients
+  - Configurable host, port, and path prefix options
 
 ## [0.3.0] – 2025-06-20
 

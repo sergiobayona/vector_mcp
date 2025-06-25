@@ -51,7 +51,7 @@ module VectorMCP
               authenticated_at: Time.now,
               jwt_headers: headers
             }
-          rescue JWT::ExpiredSignature, JWT::InvalidIssuerError, JWT::InvalidAudienceError,
+          rescue JWT::ExpiredSignature, JWT::InvalidIssuerError,
                  JWT::DecodeError, StandardError
             false # Token validation failed
           end
