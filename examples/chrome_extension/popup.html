@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2563eb;
+      margin-bottom: 5px;
+    }
+    
+    .tagline {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .status.connected {
+      background: #dcfce7;
+      color: #166534;
+    }
+    
+    .status.disconnected {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .connected .status-dot {
+      background: #16a34a;
+    }
+    
+    .disconnected .status-dot {
+      background: #dc2626;
+    }
+    
+    .info {
+      margin-bottom: 15px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    .info-item {
+      margin-bottom: 5px;
+    }
+    
+    .info-label {
+      font-weight: 500;
+    }
+    
+    .info-value {
+      word-break: break-all;
+    }
+    
+    .button {
+      width: 100%;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    
+    .button.primary {
+      background: #2563eb;
+      color: white;
+    }
+    
+    .button.primary:hover {
+      background: #1d4ed8;
+    }
+    
+    .button.secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    
+    .button.secondary:hover {
+      background: #e5e7eb;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">VectorMCP</div>
+    <div class="tagline">Browser Automation</div>
+  </div>
+
+  <div id="status" class="status disconnected">
+    <div class="status-dot"></div>
+    <div id="status-text">Connecting...</div>
+  </div>
+
+  <div class="info">
+    <div class="info-item">
+      <span class="info-label">Server:</span>
+      <span id="server-url" class="info-value">localhost:8000</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Current Tab:</span>
+      <span id="current-tab" class="info-value">Loading...</span>
+    </div>
+  </div>
+
+  <button id="toggle-btn" class="button primary">Connect</button>
+  <button id="test-btn" class="button secondary">Test Connection</button>
+
+  <div class="footer">
+    <div>VectorMCP Browser Automation v1.0</div>
+    <div>Ruby MCP Server Framework</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

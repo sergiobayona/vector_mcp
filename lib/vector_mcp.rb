@@ -14,6 +14,7 @@ require_relative "vector_mcp/transport/stdio"
 # require_relative "vector_mcp/transport/sse" # Load on demand to avoid async dependencies
 require_relative "vector_mcp/logging"
 require_relative "vector_mcp/server"
+require_relative "vector_mcp/browser"
 
 # The VectorMCP module provides a full-featured, opinionated Ruby implementation
 # of the **Model Context Protocol (MCP)**.  It gives developers everything needed
