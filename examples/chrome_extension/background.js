@@ -213,7 +213,7 @@ class VectorMCPClient {
         
         return { success: true, text };
       },
-      args: [text, selector, coordinate]
+      args: [text, selector || null, coordinate || null]
     });
     
     return results[0].result;
