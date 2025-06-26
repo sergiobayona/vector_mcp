@@ -21,7 +21,8 @@ module VectorMCP
       # @param _server [VectorMCP::Server] The server instance (ignored).
       # @return [Hash] An empty hash, as per MCP spec for ping.
       def self.ping(_params, _session, _server)
-        VectorMCP.logger.debug("Handling ping request")
+        logger = VectorMCP.logger_for("handlers.core")
+        logger.debug("Handling ping request")
         {}
       end
 

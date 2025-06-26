@@ -36,10 +36,11 @@ RSpec.describe VectorMCP do
     end
 
     it "accepts options" do
-      server = VectorMCP.new(name: "test_server", version: "1.0.0", log_level: Logger::DEBUG)
+      server = VectorMCP.new(name: "test_server", version: "1.0.0")
       expect(server).to be_a(VectorMCP::Server)
       expect(server.version).to eq("1.0.0")
-      expect(server.logger.level).to eq(Logger::DEBUG)
+      # NOTE: log level is now configured via VectorMCP.configure_logging, not server options
+      expect(server.logger).to respond_to(:info)
     end
   end
 

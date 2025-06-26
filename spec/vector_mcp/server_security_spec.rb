@@ -9,6 +9,7 @@ RSpec.describe VectorMCP::Server, "Security Features" do
   before do
     allow(logger_double).to receive(:level=)
     allow(VectorMCP).to receive(:logger).and_return(logger_double)
+    allow(VectorMCP).to receive(:logger_for).and_return(logger_double)
   end
 
   describe "security component initialization" do

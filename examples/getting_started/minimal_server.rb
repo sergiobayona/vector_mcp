@@ -6,8 +6,11 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "vector_mcp"
 
-# Configure the shared logger level if desired
-VectorMCP.logger.level = Logger::DEBUG
+# Configure logging using the new structured logging system
+VectorMCP.configure_logging do
+  level "DEBUG"
+  console colorize: true, include_timestamp: true
+end
 
 # Create an instance of the server
 server = VectorMCP.new(name: "VectorMCP::ExampleSSE_Server", version: "0.0.1")
@@ -36,12 +39,15 @@ server.register_prompt(
 begin
   server.run(transport: :sse, options: { host: "localhost", port: 8080, path_prefix: "/mcp" })
 rescue VectorMCP::Error => e
-  VectorMCP.logger.fatal("VectorMCP Error: #{e.message}")
+  logger = VectorMCP.logger_for("server")
+  logger.fatal("VectorMCP Error: #{e.message}")
   exit 1
 rescue Interrupt
-  VectorMCP.logger.info("Server interrupted.")
+  logger = VectorMCP.logger_for("server")
+  logger.info("Server interrupted.")
   exit 0
 rescue StandardError => e
-  VectorMCP.logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
+  logger = VectorMCP.logger_for("server")
+  logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
   exit 1
 end

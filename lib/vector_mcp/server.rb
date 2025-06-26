@@ -98,8 +98,8 @@ module VectorMCP
       @name = name_pos || name || "UnnamedServer"
       @version = version
       @protocol_version = options[:protocol_version] || PROTOCOL_VERSION
-      @logger = VectorMCP.logger
-      @logger.level = options[:log_level] if options[:log_level]
+      @logger = VectorMCP.logger_for("server")
+      # NOTE: log level should be configured via VectorMCP.configure_logging instead
 
       @transport = nil
       @tools = {}

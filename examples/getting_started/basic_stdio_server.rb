@@ -6,8 +6,11 @@
 
 require_relative "../../lib/vector_mcp"
 
-# Set debug logging level for development
-VectorMCP.logger.level = Logger::DEBUG
+# Configure logging using the new structured logging system
+VectorMCP.configure_logging do
+  level "DEBUG"
+  console colorize: true, include_timestamp: true
+end
 
 # Create a server instance with a name/version
 server = VectorMCP.new(name: "VectorMCP::ExampleServer", version: "0.0.1")
@@ -58,12 +61,15 @@ end
 begin
   server.run # By default, uses stdio transport
 rescue VectorMCP::Error => e
-  VectorMCP.logger.fatal("VectorMCP Error: #{e.message}")
+  logger = VectorMCP.logger_for("server")
+  logger.fatal("VectorMCP Error: #{e.message}")
   exit(1)
 rescue Interrupt
-  VectorMCP.logger.info("Server interrupted.")
+  logger = VectorMCP.logger_for("server")
+  logger.info("Server interrupted.")
   exit(0)
 rescue StandardError => e
-  VectorMCP.logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
+  logger = VectorMCP.logger_for("server")
+  logger.fatal("Unexpected Error: #{e.message}\n#{e.backtrace.join("\n")}")
   exit(1)
 end
