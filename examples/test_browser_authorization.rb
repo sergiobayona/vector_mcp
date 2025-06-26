@@ -19,11 +19,11 @@ class BrowserAuthorizationTester
     puts "=" * 60
 
     test_admin_user
-    test_browser_user  
+    test_browser_user
     test_demo_user
     test_readonly_user
     test_invalid_auth
-    
+
     print_summary
   end
 
@@ -32,9 +32,9 @@ class BrowserAuthorizationTester
   def test_admin_user
     puts "\n👑 Testing: Admin User (admin-key-123)"
     puts "-" * 40
-    
+
     api_key = "admin-key-123"
-    
+
     # Admin should have access to all browser tools
     test_endpoint("Navigate", "/browser/navigate", { url: "https://example.com" }, api_key, should_succeed: true)
     test_endpoint("Click", "/browser/click", { selector: "button" }, api_key, should_succeed: true)
@@ -47,9 +47,9 @@ class BrowserAuthorizationTester
   def test_browser_user
     puts "\n🔧 Testing: Browser User (browser-key-456)"
     puts "-" * 40
-    
+
     api_key = "browser-key-456"
-    
+
     # Browser user should have access to all browser tools
     test_endpoint("Navigate", "/browser/navigate", { url: "https://example.com" }, api_key, should_succeed: true)
     test_endpoint("Click", "/browser/click", { selector: "button" }, api_key, should_succeed: true)
@@ -62,13 +62,13 @@ class BrowserAuthorizationTester
   def test_demo_user
     puts "\n🎮 Testing: Demo User (demo-key-789)"
     puts "-" * 40
-    
+
     api_key = "demo-key-789"
-    
+
     # Demo user should only have access to navigation and snapshots
     test_endpoint("Navigate", "/browser/navigate", { url: "https://example.com" }, api_key, should_succeed: true)
     test_endpoint("Snapshot", "/browser/snapshot", {}, api_key, should_succeed: true)
-    
+
     # These should be denied
     test_endpoint("Click", "/browser/click", { selector: "button" }, api_key, should_succeed: false)
     test_endpoint("Type", "/browser/type", { text: "test", selector: "input" }, api_key, should_succeed: false)
@@ -79,14 +79,14 @@ class BrowserAuthorizationTester
   def test_readonly_user
     puts "\n👁️  Testing: Read-Only User (readonly-key-000)"
     puts "-" * 40
-    
+
     api_key = "readonly-key-000"
-    
+
     # Read-only user should have access to navigation, snapshots, and screenshots
     test_endpoint("Navigate", "/browser/navigate", { url: "https://example.com" }, api_key, should_succeed: true)
     test_endpoint("Snapshot", "/browser/snapshot", {}, api_key, should_succeed: true)
     test_endpoint("Screenshot", "/browser/screenshot", {}, api_key, should_succeed: true)
-    
+
     # These should be denied
     test_endpoint("Click", "/browser/click", { selector: "button" }, api_key, should_succeed: false)
     test_endpoint("Type", "/browser/type", { text: "test", selector: "input" }, api_key, should_succeed: false)
@@ -96,10 +96,10 @@ class BrowserAuthorizationTester
   def test_invalid_auth
     puts "\n❌ Testing: Invalid Authentication"
     puts "-" * 40
-    
+
     # No API key
     test_endpoint("Navigate (No Auth)", "/browser/navigate", { url: "https://example.com" }, nil, should_succeed: false, expected_code: 401)
-    
+
     # Invalid API key
     test_endpoint("Navigate (Bad Key)", "/browser/navigate", { url: "https://example.com" }, "invalid-key", should_succeed: false, expected_code: 401)
   end
@@ -109,7 +109,7 @@ class BrowserAuthorizationTester
     headers["X-API-Key"] = api_key if api_key
 
     response = make_request(endpoint, method: "POST", data: params, headers: headers)
-    
+
     success = case response.code.to_i
               when 200
                 true
@@ -124,7 +124,7 @@ class BrowserAuthorizationTester
 
     expected_outcome = should_succeed ? "ALLOW" : "DENY"
     actual_outcome = success ? "ALLOWED" : "DENIED"
-    
+
     if success == should_succeed
       status = "✅ PASS"
       @test_results << { test: test_name, status: "PASS", expected: expected_outcome, actual: actual_outcome }
@@ -147,21 +147,21 @@ class BrowserAuthorizationTester
                     end
 
     puts "  #{status} #{test_name}: #{response_info}"
-    
+
     # Show error details for unexpected failures
-    if success != should_succeed && response.code.to_i != 503
-      begin
-        error_data = JSON.parse(response.body)
-        puts "    Details: #{error_data["error"]}"
-      rescue JSON::ParserError
-        puts "    Raw response: #{response.body}"
-      end
+    return unless success != should_succeed && response.code.to_i != 503
+
+    begin
+      error_data = JSON.parse(response.body)
+      puts "    Details: #{error_data["error"]}"
+    rescue JSON::ParserError
+      puts "    Raw response: #{response.body}"
     end
   end
 
   def make_request(path, method: "GET", data: nil, headers: {})
     uri = URI("#{@server_url}#{path}")
-    
+
     case method.upcase
     when "GET"
       request = Net::HTTP::Get.new(uri)
@@ -173,7 +173,7 @@ class BrowserAuthorizationTester
 
     # Set headers
     headers.each { |key, value| request[key] = value }
-    
+
     # Set body for POST requests
     request.body = data.to_json if data && method.upcase == "POST"
 
@@ -189,7 +189,7 @@ class BrowserAuthorizationTester
   end
 
   def print_summary
-    puts "\n" + "=" * 60
+    puts "\n#{"=" * 60}"
     puts "📊 Authorization Test Summary"
     puts "=" * 60
 
@@ -202,7 +202,7 @@ class BrowserAuthorizationTester
     puts "❌ Failed: #{failed}"
     puts "Success Rate: #{((passed.to_f / total) * 100).round(1)}%"
 
-    if failed > 0
+    if failed.positive?
       puts "\nFailed Tests:"
       @test_results.select { |r| r[:status] == "FAIL" }.each do |result|
         puts "  ❌ #{result[:test]} (Expected: #{result[:expected]}, Got: #{result[:actual]})"
@@ -223,7 +223,7 @@ rescue StandardError
 end
 
 # Main execution
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   puts "🔐 VectorMCP Browser Authorization Tester"
   puts
 
@@ -234,7 +234,7 @@ if __FILE__ == $0
   end
 
   puts "✅ Server detected at http://localhost:8001"
-  
+
   tester = BrowserAuthorizationTester.new
   tester.test_all_authorization_scenarios
 end

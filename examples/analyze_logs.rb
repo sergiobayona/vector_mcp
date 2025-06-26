@@ -41,20 +41,18 @@ class LogAnalyzer
     end
 
     File.readlines(@log_file).each do |line|
-      begin
-        event = JSON.parse(line.strip)
-        @events << event if event.is_a?(Hash)
-      rescue JSON::ParserError
-        # Skip invalid JSON lines
-      end
+      event = JSON.parse(line.strip)
+      @events << event if event.is_a?(Hash)
+    rescue JSON::ParserError
+      # Skip invalid JSON lines
     end
 
     puts "📄 Loaded #{@events.length} log events"
-    
-    if @events.empty?
-      puts "   No valid events found. Try generating some activity first:"
-      puts "   ruby examples/test_structured_logging.rb"
-    end
+
+    return unless @events.empty?
+
+    puts "   No valid events found. Try generating some activity first:"
+    puts "   ruby examples/test_structured_logging.rb"
   end
 
   def analyze_components
@@ -62,7 +60,7 @@ class LogAnalyzer
     puts "-" * 30
 
     by_component = @events.group_by { |e| e["component"] || "unknown" }
-    
+
     by_component.each do |component, events|
       levels = events.group_by { |e| e["level"] || "INFO" }
       level_summary = levels.map { |level, evts| "#{level}: #{evts.length}" }.join(", ")
@@ -82,21 +80,21 @@ class LogAnalyzer
     return puts "  No performance data found" if performance_events.empty?
 
     times = performance_events.map { |e| e.dig("context", "execution_time_ms") }.compact
-    
+
     puts "  Total operations tracked: #{performance_events.length}"
     puts "  Average execution time: #{(times.sum.to_f / times.length).round(2)}ms"
     puts "  Fastest operation: #{times.min}ms"
     puts "  Slowest operation: #{times.max}ms"
-    
+
     # Show slow operations
     slow_ops = performance_events.select { |e| e.dig("context", "execution_time_ms") > 1000 }
-    if slow_ops.any?
-      puts "  Slow operations (>1s): #{slow_ops.length}"
-      slow_ops.first(3).each do |op|
-        tool = op.dig("context", "tool") || "unknown"
-        time = op.dig("context", "execution_time_ms")
-        puts "    - #{tool}: #{time}ms"
-      end
+    return unless slow_ops.any?
+
+    puts "  Slow operations (>1s): #{slow_ops.length}"
+    slow_ops.first(3).each do |op|
+      tool = op.dig("context", "tool") || "unknown"
+      time = op.dig("context", "execution_time_ms")
+      puts "    - #{tool}: #{time}ms"
     end
   end
 
@@ -108,11 +106,11 @@ class LogAnalyzer
     return puts "  No user activity found" if user_events.empty?
 
     by_user = user_events.group_by { |e| e.dig("context", "user_id") }
-    
+
     by_user.each do |user_id, events|
       user_role = events.first&.dig("context", "user_role") || "unknown"
       tools_used = events.map { |e| e.dig("context", "tool") }.compact.uniq
-      
+
       puts "  #{user_id} (#{user_role}): #{events.length} actions"
       puts "    Tools used: #{tools_used.join(", ")}" if tools_used.any?
     end
@@ -124,19 +122,19 @@ class LogAnalyzer
 
     error_events = @events.select { |e| e["level"] == "ERROR" }
     warn_events = @events.select { |e| e["level"] == "WARN" }
-    
+
     puts "  Errors: #{error_events.length}"
     puts "  Warnings: #{warn_events.length}"
-    
-    if error_events.any?
-      error_types = error_events.map { |e| e.dig("context", "error") || e["message"] }.compact
-      unique_errors = error_types.uniq
-      
-      puts "  Error types:"
-      unique_errors.first(5).each do |error|
-        count = error_types.count(error)
-        puts "    - #{error} (#{count}x)"
-      end
+
+    return unless error_events.any?
+
+    error_types = error_events.map { |e| e.dig("context", "error") || e["message"] }.compact
+    unique_errors = error_types.uniq
+
+    puts "  Error types:"
+    unique_errors.first(5).each do |error|
+      count = error_types.count(error)
+      puts "    - #{error} (#{count}x)"
     end
   end
 
@@ -145,9 +143,9 @@ class LogAnalyzer
     puts "-" * 30
 
     browser_events = @events.select do |e|
-      e["component"]&.start_with?("browser.") || 
-      e.dig("context", "tool")&.start_with?("browser_") ||
-      e["message"]&.include?("Browser")
+      e["component"]&.start_with?("browser.") ||
+        e.dig("context", "tool")&.start_with?("browser_") ||
+        e["message"]&.include?("Browser")
     end
 
     return puts "  No browser operations found" if browser_events.empty?
@@ -166,15 +164,15 @@ class LogAnalyzer
 
     # Navigation analysis
     nav_events = browser_events.select { |e| e["message"]&.include?("navigation") }
-    if nav_events.any?
-      urls = nav_events.map { |e| e.dig("context", "url") }.compact.uniq
-      puts "  Unique URLs visited: #{urls.length}"
-      urls.first(3).each { |url| puts "    - #{url}" }
-    end
+    return unless nav_events.any?
+
+    urls = nav_events.map { |e| e.dig("context", "url") }.compact.uniq
+    puts "  Unique URLs visited: #{urls.length}"
+    urls.first(3).each { |url| puts "    - #{url}" }
   end
 
   def print_summary
-    puts "\n" + "=" * 50
+    puts "\n#{"=" * 50}"
     puts "📋 Summary"
     puts "=" * 50
 
@@ -183,12 +181,12 @@ class LogAnalyzer
 
     components = @events.map { |e| e["component"] }.compact.uniq.length
     puts "Components active: #{components}"
-    
+
     errors = @events.count { |e| e["level"] == "ERROR" }
     warnings = @events.count { |e| e["level"] == "WARN" }
-    
+
     puts "Error rate: #{errors} errors, #{warnings} warnings in #{@events.length} events"
-    
+
     puts
     puts "💡 Useful analysis commands:"
     puts "  # Real-time monitoring"
@@ -215,8 +213,8 @@ class LogAnalyzer
       earliest = Time.parse(timestamps.min)
       latest = Time.parse(timestamps.max)
       duration = latest - earliest
-      
-      "#{earliest.strftime('%H:%M:%S')} - #{latest.strftime('%H:%M:%S')} (#{duration.round(1)}s)"
+
+      "#{earliest.strftime("%H:%M:%S")} - #{latest.strftime("%H:%M:%S")} (#{duration.round(1)}s)"
     rescue StandardError
       nil
     end
@@ -224,9 +222,9 @@ class LogAnalyzer
 end
 
 # Main execution
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   log_file = ARGV[0] || "/tmp/vectormcp_operations.log"
-  
+
   analyzer = LogAnalyzer.new(log_file)
   analyzer.analyze
 end

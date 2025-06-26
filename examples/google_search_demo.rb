@@ -22,14 +22,14 @@ class BrowserAutomationClient
   # Connect to the MCP server via SSE
   def connect
     puts "🔗 Connecting to VectorMCP server at #{@base_url}..."
-    
+
     # Connect to SSE endpoint to get session info
     uri = URI("#{@base_url}/mcp/sse")
     http = Net::HTTP.new(uri.host, uri.port)
     http.open_timeout = 5
-    
+
     request = Net::HTTP::Get.new(uri)
-    response = http.request(request) do |res|
+    http.request(request) do |res|
       res.read_body do |chunk|
         # Parse SSE events to get the message endpoint
         if chunk.include?("event: endpoint")
@@ -37,7 +37,7 @@ class BrowserAutomationClient
           data_line = lines.find { |line| line.start_with?("data: ") }
           if data_line
             endpoint_data = JSON.parse(data_line.sub("data: ", ""))
-            @message_endpoint = "#{@base_url}#{endpoint_data['uri']}"
+            @message_endpoint = "#{@base_url}#{endpoint_data["uri"]}"
             # Extract session ID from the endpoint URL
             @session_id = URI.decode_www_form(URI.parse(@message_endpoint).query).to_h["session_id"]
             puts "✅ Connected! Session ID: #{@session_id}"
@@ -47,7 +47,7 @@ class BrowserAutomationClient
         end
       end
     end
-    
+
     false
   rescue StandardError => e
     puts "❌ Connection failed: #{e.message}"
@@ -76,22 +76,22 @@ class BrowserAutomationClient
     http = Net::HTTP.new(uri.host, uri.port)
     http.open_timeout = 10
     http.read_timeout = 45 # Browser operations can take time
-    
+
     request = Net::HTTP::Post.new(uri)
     request["Content-Type"] = "application/json"
     request.body = message.to_json
-    
+
     response = http.request(request)
-    
+
     if response.code == "202"
       puts "✅ Tool call accepted, waiting for result..."
       # In a real implementation, you'd listen to the SSE stream for the response
       # For this demo, we'll simulate getting the response
       sleep(2) # Simulate processing time
-      return simulate_tool_response(tool_name, arguments)
+      simulate_tool_response(tool_name, arguments)
     else
       puts "❌ Tool call failed: #{response.code} #{response.message}"
-      return nil
+      nil
     end
   rescue StandardError => e
     puts "❌ Tool call error: #{e.message}"
@@ -103,7 +103,7 @@ class BrowserAutomationClient
   def simulate_tool_response(tool_name, arguments)
     case tool_name
     when "browser_status"
-      { 
+      {
         extension_connected: false, # Chrome extension not actually connected in this demo
         stats: { pending_commands: 0, completed_commands: 0 }
       }
@@ -116,12 +116,12 @@ class BrowserAutomationClient
     when "browser_wait"
       { message: "Wait completed" }
     when "browser_snapshot"
-      { 
+      {
         snapshot: <<~YAML
           # Simulated ARIA snapshot
           - role: searchbox
             name: "Search"
-            value: "#{arguments.dig('search_term') || 'vector_mcp gem'}"
+            value: "#{arguments["search_term"] || "vector_mcp gem"}"
           - role: button
             name: "Google Search"
           - role: link
@@ -148,7 +148,7 @@ def main
   puts "This demo shows how to use VectorMCP's browser automation tools"
   puts "to perform a Google search for the vector_mcp gem."
   puts ""
-  
+
   # Create client
   client = BrowserAutomationClient.new
 
@@ -178,13 +178,11 @@ def main
 
   # Step 2: Navigate to Google
   puts "\n2️⃣ Navigating to Google..."
-  nav_result = client.call_tool("browser_navigate", { 
-    url: "https://www.google.com",
-    include_snapshot: true 
-  })
-  if nav_result
-    puts "✅ Navigated to: #{nav_result[:url]}"
-  end
+  nav_result = client.call_tool("browser_navigate", {
+                                  url: "https://www.google.com",
+                                  include_snapshot: true
+                                })
+  puts "✅ Navigated to: #{nav_result[:url]}" if nav_result
 
   # Step 3: Wait for page to load
   puts "\n3️⃣ Waiting for page to load..."
@@ -193,19 +191,17 @@ def main
   # Step 4: Type search query
   puts "\n4️⃣ Typing search query: 'vector_mcp gem'..."
   type_result = client.call_tool("browser_type", {
-    text: "vector_mcp gem",
-    selector: "input[name='q']", # Google search box
-    include_snapshot: true
-  })
-  if type_result
-    puts "✅ Search query entered"
-  end
+                                   text: "vector_mcp gem",
+                                   selector: "input[name='q']", # Google search box
+                                   include_snapshot: true
+                                 })
+  puts "✅ Search query entered" if type_result
 
   # Step 5: Submit search (press Enter or click search button)
   puts "\n5️⃣ Submitting search..."
   client.call_tool("browser_click", {
-    selector: "input[value='Google Search']"
-  })
+                     selector: "input[value='Google Search']"
+                   })
 
   # Step 6: Wait for search results
   puts "\n6️⃣ Waiting for search results..."
@@ -222,12 +218,10 @@ def main
   # Step 8: Click first organic search result
   puts "\n8️⃣ Clicking first organic search result..."
   click_result = client.call_tool("browser_click", {
-    selector: "h3", # First search result heading
-    include_snapshot: true
-  })
-  if click_result
-    puts "✅ Clicked on first search result"
-  end
+                                    selector: "h3", # First search result heading
+                                    include_snapshot: true
+                                  })
+  puts "✅ Clicked on first search result" if click_result
 
   # Step 9: Wait and take final snapshot
   puts "\n9️⃣ Waiting for page to load..."

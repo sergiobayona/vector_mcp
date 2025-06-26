@@ -22,7 +22,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       allow(mock).to receive(:error)
       allow(mock).to receive(:debug)
     end
-    
+
     allow(VectorMCP).to receive(:logger_for).with("browser.queue").and_return(mock_queue_logger)
     allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(mock_security_logger)
   end
@@ -77,12 +77,12 @@ RSpec.describe VectorMCP::Browser::HttpServer do
           allow(mock).to receive(:error)
           allow(mock).to receive(:debug)
         end
-        
+
         # Replace the server's security logger with our mock
         server.instance_variable_set(:@security_logger, security_logger)
-        
+
         expect(security_logger).to receive(:warn).with("Chrome extension disconnected", context: hash_including(:last_ping, :timeout_seconds))
-        
+
         server.extension_connected?
       end
     end
@@ -173,10 +173,10 @@ RSpec.describe VectorMCP::Browser::HttpServer do
 
     context "with security middleware enabled" do
       let(:security_middleware) do
-        instance_double("SecurityMiddleware", 
-                       security_enabled?: true,
-                       normalize_request: { headers: {}, params: {} },
-                       process_request: { success: true })
+        instance_double("SecurityMiddleware",
+                        security_enabled?: true,
+                        normalize_request: { headers: {}, params: {} },
+                        process_request: { success: true })
       end
 
       before do
@@ -192,10 +192,10 @@ RSpec.describe VectorMCP::Browser::HttpServer do
           allow(mock).to receive(:error)
           allow(mock).to receive(:debug)
         end
-        
+
         allow(VectorMCP).to receive(:logger_for).with("browser.queue").and_return(mock_queue_logger)
         allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(mock_security_logger)
-        
+
         # Set the security logger for this context
         @mock_security_logger = mock_security_logger
       end
@@ -203,13 +203,13 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "processes request through security middleware" do
         expect(security_middleware).to receive(:normalize_request).with(env)
         expect(security_middleware).to receive(:process_request)
-        
+
         server.send(:check_security, env, :navigate)
       end
 
       it "logs security check" do
         expect(@mock_security_logger).to receive(:info).with("Browser automation security check", context: hash_including(:action, :ip_address))
-        
+
         server.send(:check_security, env, :navigate)
       end
     end
@@ -246,7 +246,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "executes browser command when conditions are met" do
         allow(server).to receive(:check_security).and_return({ success: true })
         expect(server).to receive(:execute_browser_command).with(env, "navigate")
-        
+
         server.send(:handle_navigate_command, env)
       end
 
@@ -256,18 +256,18 @@ RSpec.describe VectorMCP::Browser::HttpServer do
         it "checks security before execution" do
           expect(server).to receive(:check_security).with(env, :navigate).and_return({ success: true })
           expect(server).to receive(:execute_browser_command)
-          
+
           server.send(:handle_navigate_command, env)
         end
 
         it "returns security error on failure" do
-          expect(server).to receive(:check_security).and_return({ 
-            success: false, 
-            error: "Unauthorized", 
-            error_code: "AUTHENTICATION_REQUIRED" 
-          })
+          expect(server).to receive(:check_security).and_return({
+                                                                  success: false,
+                                                                  error: "Unauthorized",
+                                                                  error_code: "AUTHENTICATION_REQUIRED"
+                                                                })
           expect(server).to receive(:security_error_response)
-          
+
           server.send(:handle_navigate_command, env)
         end
       end
@@ -285,7 +285,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "executes click command" do
         allow(server).to receive(:check_security).and_return({ success: true })
         expect(server).to receive(:execute_browser_command).with(env, "click")
-        
+
         server.send(:handle_click_command, env)
       end
     end
@@ -302,13 +302,13 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "executes type command" do
         allow(server).to receive(:check_security).and_return({ success: true })
         expect(server).to receive(:execute_browser_command).with(env, "type")
-        
+
         server.send(:handle_type_command, env)
       end
     end
   end
 
-  describe "#execute_browser_command", :skip => "Tests hang due to real command execution" do
+  describe "#execute_browser_command", skip: "Tests hang due to real command execution" do
     let(:env) do
       {
         "REQUEST_METHOD" => "POST",
@@ -328,15 +328,15 @@ RSpec.describe VectorMCP::Browser::HttpServer do
     it "enqueues command to queue" do
       expect(command_queue).to receive(:enqueue_command).with(hash_including(:id, :action, :params))
       expect(command_queue).to receive(:wait_for_result).and_return({ success: true, result: { url: "https://example.com" } })
-      
+
       server.send(:execute_browser_command, env, "navigate")
     end
 
     it "waits for command result" do
       allow(command_queue).to receive(:enqueue_command)
       expect(command_queue).to receive(:wait_for_result).with(anything, timeout: 30)
-        .and_return({ success: true, result: { url: "https://example.com" } })
-      
+                                                        .and_return({ success: true, result: { url: "https://example.com" } })
+
       server.send(:execute_browser_command, env, "navigate")
     end
 
@@ -344,7 +344,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       allow(command_queue).to receive(:enqueue_command)
       allow(command_queue).to receive(:wait_for_result)
         .and_return({ success: true, result: { url: "https://example.com" } })
-      
+
       response = server.send(:execute_browser_command, env, "navigate")
       expect(response[0]).to eq(200)
     end
@@ -353,14 +353,14 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       allow(command_queue).to receive(:enqueue_command)
       allow(command_queue).to receive(:wait_for_result)
         .and_return({ success: false, error: "Navigation failed" })
-      
+
       response = server.send(:execute_browser_command, env, "navigate")
       expect(response[0]).to eq(500)
     end
 
     it "handles JSON parsing errors" do
       env["rack.input"] = StringIO.new("invalid json")
-      
+
       response = server.send(:execute_browser_command, env, "navigate")
       expect(response[0]).to eq(400)
       expect(JSON.parse(response[2][0])).to include("error" => "Invalid JSON")
@@ -370,7 +370,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       allow(command_queue).to receive(:enqueue_command)
       allow(command_queue).to receive(:wait_for_result)
         .and_raise(VectorMCP::Browser::CommandQueue::TimeoutError)
-      
+
       response = server.send(:execute_browser_command, env, "navigate")
       expect(response[0]).to eq(408)
       expect(JSON.parse(response[2][0])).to include("error" => "Command timed out")
@@ -380,10 +380,10 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       allow(command_queue).to receive(:enqueue_command)
       allow(command_queue).to receive(:wait_for_result)
         .and_return({ success: true, result: {} })
-      
+
       expect(logger).to receive(:info).with("Browser command executed", context: hash_including(:command_id, :action, :user_id))
       expect(logger).to receive(:info).with("Browser command completed", context: hash_including(:success, :execution_time_ms))
-      
+
       server.send(:execute_browser_command, env, "navigate")
     end
   end
@@ -406,7 +406,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "updates last ping time" do
         freeze_time = Time.now
         allow(Time).to receive(:now).and_return(freeze_time)
-        
+
         server.send(:handle_extension_ping, env)
         expect(server.instance_variable_get(:@extension_last_ping)).to eq(freeze_time)
       end
@@ -420,7 +420,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "logs connection event for new connections" do
         security_logger = VectorMCP.logger_for("security.browser")
         expect(security_logger).to receive(:info).with("Chrome extension connected", context: hash_including(:ip_address))
-        
+
         server.send(:handle_extension_ping, env)
       end
     end
@@ -443,7 +443,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "returns pending commands" do
         commands = [{ id: "123", action: "navigate" }]
         allow(command_queue).to receive(:get_pending_commands).and_return(commands)
-        
+
         response = server.send(:handle_extension_poll, env)
         expect(response[0]).to eq(200)
         # JSON converts symbol keys to string keys
@@ -472,16 +472,16 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       end
 
       it "completes command in queue" do
-        allow(command_queue).to receive(:complete_command).with("123", true, {"url" => "https://example.com"}, nil)
-        
+        allow(command_queue).to receive(:complete_command).with("123", true, { "url" => "https://example.com" }, nil)
+
         response = server.send(:handle_extension_result, env)
         expect(response[0]).to eq(200)
-        expect(command_queue).to have_received(:complete_command).with("123", true, {"url" => "https://example.com"}, nil)
+        expect(command_queue).to have_received(:complete_command).with("123", true, { "url" => "https://example.com" }, nil)
       end
 
       it "handles JSON parsing errors" do
         env["rack.input"] = StringIO.new("invalid json")
-        
+
         response = server.send(:handle_extension_result, env)
         expect(response[0]).to eq(400)
       end
@@ -506,25 +506,25 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       start_time = Time.now
       response = server.send(:handle_wait_command, env)
       end_time = Time.now
-      
+
       expect(response[0]).to eq(200)
       expect(end_time - start_time).to be >= 1.0
     end
 
     it "uses default duration when not specified" do
-      env["rack.input"] = StringIO.new('{}')
-      
+      env["rack.input"] = StringIO.new("{}")
+
       start_time = Time.now
       response = server.send(:handle_wait_command, env)
       end_time = Time.now
-      
+
       expect(response[0]).to eq(200)
       expect(end_time - start_time).to be >= 1.0
     end
 
     it "handles JSON parsing errors" do
       env["rack.input"] = StringIO.new("invalid json")
-      
+
       response = server.send(:handle_wait_command, env)
       expect(response[0]).to eq(400)
     end
@@ -535,7 +535,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "redacts sensitive fields" do
         params = { "url" => "https://example.com", "password" => "secret123" }
         result = server.send(:sanitize_params_for_logging, params)
-        
+
         expect(result["url"]).to eq("https://example.com")
         expect(result["password"]).to eq("[REDACTED]")
       end
@@ -544,7 +544,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
         long_text = "A" * 1500
         params = { "text" => long_text }
         result = server.send(:sanitize_params_for_logging, params)
-        
+
         expect(result["text"]).to include("[TRUNCATED]")
         expect(result["text"].length).to be < long_text.length
       end
@@ -559,7 +559,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "returns 401 for authentication required" do
         security_result = { error_code: "AUTHENTICATION_REQUIRED", error: "Auth required" }
         response = server.send(:security_error_response, security_result)
-        
+
         expect(response[0]).to eq(401)
         expect(JSON.parse(response[2][0])).to include("error" => "Auth required")
       end
@@ -567,7 +567,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "returns 403 for authorization failed" do
         security_result = { error_code: "AUTHORIZATION_FAILED", error: "Access denied" }
         response = server.send(:security_error_response, security_result)
-        
+
         expect(response[0]).to eq(403)
         expect(JSON.parse(response[2][0])).to include("error" => "Access denied")
       end
@@ -575,7 +575,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
       it "defaults to 401 for unknown error codes" do
         security_result = { error_code: "UNKNOWN", error: "Unknown error" }
         response = server.send(:security_error_response, security_result)
-        
+
         expect(response[0]).to eq(401)
       end
     end

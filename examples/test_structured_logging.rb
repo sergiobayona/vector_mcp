@@ -34,10 +34,10 @@ class StructuredLoggingTester
 
     test_extension_connection_events
     test_browser_operations_logging
-    test_security_events_logging  
+    test_security_events_logging
     test_error_conditions_logging
     test_performance_scenarios
-    
+
     print_summary
   end
 
@@ -46,16 +46,16 @@ class StructuredLoggingTester
   def test_extension_connection_events
     puts "\n🔌 Testing: Extension Connection Events"
     puts "-" * 50
-    
+
     # Simulate extension connection
     test_event("Extension Initial Connection", "/browser/ping", { timestamp: Time.now.to_f })
-    
+
     # Multiple heartbeats
     3.times do |i|
       test_event("Extension Heartbeat #{i + 1}", "/browser/ping", { timestamp: Time.now.to_f })
       sleep(0.5)
     end
-    
+
     # Test command polling
     test_event("Extension Command Poll", "/browser/poll", nil, method: "GET")
   end
@@ -63,37 +63,37 @@ class StructuredLoggingTester
   def test_browser_operations_logging
     puts "\n🌐 Testing: Browser Operations Logging"
     puts "-" * 50
-    
+
     api_key = "demo-full-access-2024"
-    
+
     # Navigation operations
     test_operation("Navigation to Example.com", api_key, "/browser/navigate", {
-      url: "https://example.com",
-      include_snapshot: false
-    })
-    
+                     url: "https://example.com",
+                     include_snapshot: false
+                   })
+
     test_operation("Navigation with Snapshot", api_key, "/browser/navigate", {
-      url: "https://httpbin.org/json",
-      include_snapshot: true
-    })
-    
+                     url: "https://httpbin.org/json",
+                     include_snapshot: true
+                   })
+
     # Interaction operations
     test_operation("Click Operation", api_key, "/browser/click", {
-      selector: "button.primary",
-      include_snapshot: true
-    })
-    
+                     selector: "button.primary",
+                     include_snapshot: true
+                   })
+
     test_operation("Type Operation", api_key, "/browser/type", {
-      text: "This is test text for logging demonstration",
-      selector: "input[type=text]",
-      include_snapshot: true
-    })
-    
+                     text: "This is test text for logging demonstration",
+                     selector: "input[type=text]",
+                     include_snapshot: true
+                   })
+
     # Information gathering
     test_operation("Page Snapshot", api_key, "/browser/snapshot", {})
     test_operation("Screenshot Capture", api_key, "/browser/screenshot", {})
     test_operation("Console Logs", api_key, "/browser/console", {})
-    
+
     # Utility operations
     test_operation("Wait Operation", api_key, "/browser/wait", { duration: 1500 })
   end
@@ -101,77 +101,77 @@ class StructuredLoggingTester
   def test_security_events_logging
     puts "\n🔐 Testing: Security Events Logging"
     puts "-" * 50
-    
+
     # Test with full access user
     test_security_event("Full Access User - Navigation", "demo-full-access-2024", "/browser/navigate", {
-      url: "https://example.com"
-    })
-    
+                          url: "https://example.com"
+                        })
+
     test_security_event("Full Access User - Click", "demo-full-access-2024", "/browser/click", {
-      selector: "button"
-    })
-    
+                          selector: "button"
+                        })
+
     # Test with limited access user
     test_security_event("Limited User - Allowed Navigation", "demo-limited-access-2024", "/browser/navigate", {
-      url: "https://example.com"
-    })
-    
+                          url: "https://example.com"
+                        })
+
     test_security_event("Limited User - Allowed Snapshot", "demo-limited-access-2024", "/browser/snapshot", {})
-    
+
     test_security_event("Limited User - Denied Click", "demo-limited-access-2024", "/browser/click", {
-      selector: "button"
-    })
-    
+                          selector: "button"
+                        })
+
     test_security_event("Limited User - Denied Type", "demo-limited-access-2024", "/browser/type", {
-      text: "test", selector: "input"
-    })
-    
+                          text: "test", selector: "input"
+                        })
+
     # Authentication failures
     test_security_event("Invalid API Key", "invalid-key-123", "/browser/navigate", {
-      url: "https://example.com"
-    })
-    
+                          url: "https://example.com"
+                        })
+
     test_security_event("No Authentication", nil, "/browser/navigate", {
-      url: "https://example.com"
-    })
+                          url: "https://example.com"
+                        })
   end
 
   def test_error_conditions_logging
     puts "\n⚠️  Testing: Error Conditions Logging"
     puts "-" * 50
-    
+
     api_key = "demo-full-access-2024"
-    
+
     # Invalid JSON payload
     test_error_condition("Invalid JSON Payload", api_key, "/browser/navigate", "invalid-json-data")
-    
+
     # Missing required parameters
     test_error_condition("Missing URL Parameter", api_key, "/browser/navigate", {})
-    
+
     # Invalid endpoint
     test_error_condition("Invalid Endpoint", api_key, "/browser/invalid", { test: true })
-    
+
     # Very large payload (test parameter sanitization)
     large_text = "A" * 2000
     test_operation("Large Text Input", api_key, "/browser/type", {
-      text: large_text,
-      selector: "input"
-    })
+                     text: large_text,
+                     selector: "input"
+                   })
   end
 
   def test_performance_scenarios
     puts "\n📈 Testing: Performance Scenarios"
     puts "-" * 50
-    
+
     api_key = "demo-full-access-2024"
-    
+
     # Rapid consecutive operations
     puts "  🔄 Rapid consecutive operations..."
     5.times do |i|
       test_operation("Rapid Operation #{i + 1}", api_key, "/browser/wait", { duration: 100 })
       sleep(0.1)
     end
-    
+
     # Concurrent-like operations (as fast as possible)
     puts "  ⚡ High-frequency operations..."
     10.times do |i|
@@ -182,25 +182,25 @@ class StructuredLoggingTester
   def test_event(test_name, endpoint, data, method: "POST")
     headers = { "Content-Type" => "application/json" }
     response = make_request(endpoint, method: method, data: data, headers: headers)
-    
+
     success = [200, 202].include?(response.code.to_i)
     record_result(test_name, success, "event")
-    
+
     status = success ? "✅" : "❌"
     puts "  #{status} #{test_name}"
   end
 
   def test_operation(test_name, api_key, endpoint, data)
     headers = { "Content-Type" => "application/json", "X-API-Key" => api_key }
-    
+
     start_time = Time.now
     response = make_request(endpoint, method: "POST", data: data, headers: headers)
     execution_time = ((Time.now - start_time) * 1000).round(2)
-    
+
     # Consider success if not authentication/authorization failure
     success = ![401, 403].include?(response.code.to_i)
     record_result(test_name, success, "operation")
-    
+
     status = success ? "✅" : "❌"
     result = case response.code.to_i
              when 200
@@ -214,19 +214,19 @@ class StructuredLoggingTester
              else
                "ERROR #{response.code}"
              end
-    
+
     puts "  #{status} #{test_name}: #{result} (#{execution_time}ms)"
   end
 
   def test_security_event(test_name, api_key, endpoint, data)
     headers = { "Content-Type" => "application/json" }
     headers["X-API-Key"] = api_key if api_key
-    
+
     response = make_request(endpoint, method: "POST", data: data, headers: headers)
-    
+
     # Record for tracking but all security events are "successful" for logging purposes
     record_result(test_name, true, "security")
-    
+
     result = case response.code.to_i
              when 200
                "🟢 ALLOWED"
@@ -239,24 +239,24 @@ class StructuredLoggingTester
              else
                "⚠️ ERROR #{response.code}"
              end
-    
+
     puts "  📝 #{test_name}: #{result}"
   end
 
   def test_error_condition(test_name, api_key, endpoint, data)
     headers = { "Content-Type" => "application/json", "X-API-Key" => api_key }
-    
-    if data.is_a?(String)
-      # Send raw string for JSON parsing error
-      response = make_raw_request(endpoint, body: data, headers: headers)
-    else
-      response = make_request(endpoint, method: "POST", data: data, headers: headers)
-    end
-    
+
+    response = if data.is_a?(String)
+                 # Send raw string for JSON parsing error
+                 make_raw_request(endpoint, body: data, headers: headers)
+               else
+                 make_request(endpoint, method: "POST", data: data, headers: headers)
+               end
+
     # Error conditions are expected to fail
     error_occurred = [400, 404, 500].include?(response.code.to_i)
     record_result(test_name, error_occurred, "error")
-    
+
     status = error_occurred ? "✅" : "❌"
     result = case response.code.to_i
              when 400
@@ -268,13 +268,13 @@ class StructuredLoggingTester
              else
                "UNEXPECTED #{response.code}"
              end
-    
+
     puts "  #{status} #{test_name}: #{result}"
   end
 
   def make_request(path, method: "GET", data: nil, headers: {})
     uri = URI("#{@server_url}#{path}")
-    
+
     case method.upcase
     when "GET"
       request = Net::HTTP::Get.new(uri)
@@ -320,7 +320,7 @@ class StructuredLoggingTester
   end
 
   def print_summary
-    puts "\n" + "=" * 60
+    puts "\n#{"=" * 60}"
     puts "📊 Structured Logging Test Summary"
     puts "=" * 60
 
@@ -328,7 +328,7 @@ class StructuredLoggingTester
     total_events = @test_results.length
 
     puts "Total Events Generated: #{total_events}"
-    
+
     by_category.each do |category, results|
       successful = results.count { |r| r[:success] }
       total = results.length
@@ -356,7 +356,7 @@ class StructuredLoggingTester
     puts
     puts "  # Error analysis"
     puts "  jq 'select(.level == \"ERROR\")' /tmp/vectormcp_operations.log"
-    
+
     puts
     puts "🎉 Structured logging test completed!"
     puts "   Check the log files to see detailed structured data for each event."
@@ -373,7 +373,7 @@ rescue StandardError
 end
 
 # Main execution
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   puts "📊 VectorMCP Structured Logging Tester"
   puts
 
@@ -384,7 +384,7 @@ if __FILE__ == $0
   end
 
   puts "✅ Structured logging demo server detected at http://localhost:8004"
-  
+
   tester = StructuredLoggingTester.new
   tester.run_comprehensive_logging_test
 end

@@ -20,31 +20,31 @@ module VectorMCP
       def enqueue_command(command)
         @pending_commands << command
         @logger.debug("Enqueued command: #{command[:id]} (#{command[:action]})")
-        
+
         # Log command queuing with structured data
         @queue_logger.info("Command queued", context: {
-          command_id: command[:id],
-          action: command[:action],
-          queue_size: @pending_commands.size,
-          timestamp: Time.now.iso8601
-        })
+                             command_id: command[:id],
+                             action: command[:action],
+                             queue_size: @pending_commands.size,
+                             timestamp: Time.now.iso8601
+                           })
       end
 
       # Get all pending commands (called by extension)
       def get_pending_commands
         commands = @pending_commands.to_a
         @pending_commands.clear
-        
+
         # Log command dispatch to extension
         if commands.any?
           @queue_logger.info("Commands dispatched to extension", context: {
-            command_count: commands.size,
-            command_ids: commands.map { |cmd| cmd[:id] },
-            actions: commands.map { |cmd| cmd[:action] },
-            timestamp: Time.now.iso8601
-          })
+                               command_count: commands.size,
+                               command_ids: commands.map { |cmd| cmd[:id] },
+                               actions: commands.map { |cmd| cmd[:action] },
+                               timestamp: Time.now.iso8601
+                             })
         end
-        
+
         commands
       end
 
@@ -62,12 +62,12 @@ module VectorMCP
 
         # Log command completion with structured data
         @queue_logger.info("Command completed by extension", context: {
-          command_id: command_id,
-          success: success,
-          error: error,
-          result_size: result.is_a?(Hash) ? result.to_json.length : 0,
-          timestamp: Time.now.iso8601
-        })
+                             command_id: command_id,
+                             success: success,
+                             error: error,
+                             result_size: result.is_a?(Hash) ? result.to_json.length : 0,
+                             timestamp: Time.now.iso8601
+                           })
 
         # Signal any waiting threads
         condition = @result_conditions[command_id]
@@ -77,9 +77,7 @@ module VectorMCP
       # Wait for a command result with timeout
       def wait_for_result(command_id, timeout: 30)
         # Check if result is already available
-        if @completed_commands.key?(command_id)
-          return @completed_commands.delete(command_id)
-        end
+        return @completed_commands.delete(command_id) if @completed_commands.key?(command_id)
 
         # Create condition variable for this command
         condition = Concurrent::Event.new

@@ -22,7 +22,7 @@ class BrowserAuthTester
     test_valid_auth_browser_user
     test_valid_auth_demo_user
     test_unauthorized_action
-    
+
     puts "\n✅ All authentication tests completed!"
   end
 
@@ -31,7 +31,7 @@ class BrowserAuthTester
   def test_no_auth
     puts "\n1️⃣ Testing: No Authentication"
     response = make_request("/browser/ping", method: "POST", data: { timestamp: Time.now.to_f })
-    
+
     if response.code == "401"
       puts "✅ PASS: Request rejected with 401 Unauthorized"
       puts "   Response: #{JSON.parse(response.body)["error"]}"
@@ -44,7 +44,7 @@ class BrowserAuthTester
     puts "\n2️⃣ Testing: Invalid API Key"
     headers = { "X-API-Key" => "invalid-key-123" }
     response = make_request("/browser/ping", method: "POST", data: { timestamp: Time.now.to_f }, headers: headers)
-    
+
     if response.code == "401"
       puts "✅ PASS: Invalid key rejected with 401 Unauthorized"
       puts "   Response: #{JSON.parse(response.body)["error"]}"
@@ -57,14 +57,14 @@ class BrowserAuthTester
     puts "\n3️⃣ Testing: Valid Authentication (Browser User)"
     headers = { "X-API-Key" => "browser-automation-key-123" }
     response = make_request("/browser/ping", method: "POST", data: { timestamp: Time.now.to_f }, headers: headers)
-    
+
     if response.code == "200"
       puts "✅ PASS: Browser user authenticated successfully"
       puts "   Response: #{JSON.parse(response.body)}"
-      
+
       # Test navigation access
-      nav_response = make_request("/browser/navigate", method: "POST", 
-                                  data: { url: "https://example.com" }, headers: headers)
+      nav_response = make_request("/browser/navigate", method: "POST",
+                                                       data: { url: "https://example.com" }, headers: headers)
       if nav_response.code == "503" # Extension not connected, but auth passed
         puts "✅ PASS: Navigation authorized (extension not connected)"
       elsif nav_response.code == "200"
@@ -81,7 +81,7 @@ class BrowserAuthTester
     puts "\n4️⃣ Testing: Valid Authentication (Demo User)"
     headers = { "X-API-Key" => "demo-key-456" }
     response = make_request("/browser/ping", method: "POST", data: { timestamp: Time.now.to_f }, headers: headers)
-    
+
     if response.code == "200"
       puts "✅ PASS: Demo user authenticated successfully"
       puts "   Response: #{JSON.parse(response.body)}"
@@ -93,12 +93,12 @@ class BrowserAuthTester
   def test_unauthorized_action
     puts "\n5️⃣ Testing: Authorized User, Unauthorized Action"
     headers = { "X-API-Key" => "demo-key-456" }
-    
+
     # Demo user should have limited permissions (only navigate and snapshot)
     # Test clicking which should be denied
     response = make_request("/browser/click", method: "POST",
-                           data: { selector: "button" }, headers: headers)
-    
+                                              data: { selector: "button" }, headers: headers)
+
     if response.code == "403"
       puts "✅ PASS: Limited user denied access to restricted action"
       puts "   Response: #{JSON.parse(response.body)["error"]}"
@@ -113,7 +113,7 @@ class BrowserAuthTester
 
   def make_request(path, method: "GET", data: nil, headers: {})
     uri = URI("#{@server_url}#{path}")
-    
+
     case method.upcase
     when "GET"
       request = Net::HTTP::Get.new(uri)
@@ -126,7 +126,7 @@ class BrowserAuthTester
     # Set headers
     request["Content-Type"] = "application/json"
     headers.each { |key, value| request[key] = value }
-    
+
     # Set body for POST requests
     request.body = data.to_json if data && method.upcase == "POST"
 
@@ -151,7 +151,7 @@ rescue StandardError
 end
 
 # Main execution
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   puts "🔒 VectorMCP Browser Authentication Tester"
   puts
 
@@ -162,7 +162,7 @@ if __FILE__ == $0
   end
 
   puts "✅ Server detected at http://localhost:8000"
-  
+
   tester = BrowserAuthTester.new
   tester.test_all_scenarios
 end

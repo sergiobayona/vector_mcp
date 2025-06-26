@@ -18,7 +18,7 @@ class SecurityOptOutTest
     puts
     test_with_security
     puts
-    
+
     print_comparison
   end
 
@@ -27,28 +27,28 @@ class SecurityOptOutTest
   def test_without_security
     puts "🔓 Test 1: Browser Automation WITHOUT Security"
     puts "-" * 50
-    
+
     # Create server without enabling security
     server = VectorMCP::Server.new("test-no-security", version: "1.0.0")
     server.register_browser_tools
-    
+
     # Check security status
     puts "Security Status:"
-    puts "  Authentication: #{server.auth_manager.required? ? 'ENABLED' : 'DISABLED'}"
-    puts "  Authorization: #{server.authorization.required? ? 'ENABLED' : 'DISABLED'}"
-    puts "  Overall Security: #{server.security_enabled? ? 'ENABLED' : 'DISABLED'}"
-    
+    puts "  Authentication: #{server.auth_manager.required? ? "ENABLED" : "DISABLED"}"
+    puts "  Authorization: #{server.authorization.required? ? "ENABLED" : "DISABLED"}"
+    puts "  Overall Security: #{server.security_enabled? ? "ENABLED" : "DISABLED"}"
+
     # Test browser tools registration
     browser_tools = server.tools.keys.select { |name| name.start_with?("browser_") }
     puts "  Browser Tools: #{browser_tools.length} registered"
     puts "    #{browser_tools.join(", ")}"
-    
+
     if server.security_enabled?
       puts "❌ FAIL: Security should be DISABLED but it's enabled!"
     else
       puts "✅ PASS: Security is properly DISABLED"
     end
-    
+
     @no_security_result = {
       auth_enabled: server.auth_manager.required?,
       authz_enabled: server.authorization.required?,
@@ -60,40 +60,40 @@ class SecurityOptOutTest
   def test_with_security
     puts "🔒 Test 2: Browser Automation WITH Security"
     puts "-" * 50
-    
+
     # Create server with security enabled
     server = VectorMCP::Server.new("test-with-security", version: "1.0.0")
-    
+
     # Enable authentication
     server.enable_authentication!(strategy: :api_key, keys: ["test-key-123"])
-    
+
     # Enable authorization
     server.enable_authorization! do
-      authorize_tools do |user, action, tool|
+      authorize_tools do |user, _action, tool|
         tool.name.start_with?("browser_") ? user[:role] == "browser_user" : true
       end
     end
-    
+
     # Register browser tools AFTER enabling security
     server.register_browser_tools
-    
+
     # Check security status
     puts "Security Status:"
-    puts "  Authentication: #{server.auth_manager.required? ? 'ENABLED' : 'DISABLED'}"
-    puts "  Authorization: #{server.authorization.required? ? 'ENABLED' : 'DISABLED'}"
-    puts "  Overall Security: #{server.security_enabled? ? 'ENABLED' : 'DISABLED'}"
-    
+    puts "  Authentication: #{server.auth_manager.required? ? "ENABLED" : "DISABLED"}"
+    puts "  Authorization: #{server.authorization.required? ? "ENABLED" : "DISABLED"}"
+    puts "  Overall Security: #{server.security_enabled? ? "ENABLED" : "DISABLED"}"
+
     # Test browser tools registration
     browser_tools = server.tools.keys.select { |name| name.start_with?("browser_") }
     puts "  Browser Tools: #{browser_tools.length} registered"
     puts "    #{browser_tools.join(", ")}"
-    
-    if !server.security_enabled?
-      puts "❌ FAIL: Security should be ENABLED but it's disabled!"
-    else
+
+    if server.security_enabled?
       puts "✅ PASS: Security is properly ENABLED"
+    else
+      puts "❌ FAIL: Security should be ENABLED but it's disabled!"
     end
-    
+
     @with_security_result = {
       auth_enabled: server.auth_manager.required?,
       authz_enabled: server.authorization.required?,
@@ -108,24 +108,30 @@ class SecurityOptOutTest
 
     puts "| Feature                | Without Security | With Security   |"
     puts "|------------------------|------------------|-----------------|"
-    puts "| Authentication         | #{'%-16s' % (@no_security_result[:auth_enabled] ? 'ENABLED' : 'DISABLED')} | #{'%-15s' % (@with_security_result[:auth_enabled] ? 'ENABLED' : 'DISABLED')} |"
-    puts "| Authorization          | #{'%-16s' % (@no_security_result[:authz_enabled] ? 'ENABLED' : 'DISABLED')} | #{'%-15s' % (@with_security_result[:authz_enabled] ? 'ENABLED' : 'DISABLED')} |"
-    puts "| Overall Security       | #{'%-16s' % (@no_security_result[:security_enabled] ? 'ENABLED' : 'DISABLED')} | #{'%-15s' % (@with_security_result[:security_enabled] ? 'ENABLED' : 'DISABLED')} |"
-    puts "| Browser Tools Count    | #{'%-16s' % @no_security_result[:tools_count]} | #{'%-15s' % @with_security_result[:tools_count]} |"
+    puts "| Authentication         | #{format("%-16s",
+                                              (@no_security_result[:auth_enabled] ? "ENABLED" : "DISABLED"))} | #{format("%-15s",
+                                                                                                                         (@with_security_result[:auth_enabled] ? "ENABLED" : "DISABLED"))} |"
+    puts "| Authorization          | #{format("%-16s",
+                                              (@no_security_result[:authz_enabled] ? "ENABLED" : "DISABLED"))} | #{format("%-15s",
+                                                                                                                          (@with_security_result[:authz_enabled] ? "ENABLED" : "DISABLED"))} |"
+    puts "| Overall Security       | #{format("%-16s",
+                                              (@no_security_result[:security_enabled] ? "ENABLED" : "DISABLED"))} | #{format("%-15s",
+                                                                                                                             (@with_security_result[:security_enabled] ? "ENABLED" : "DISABLED"))} |"
+    puts "| Browser Tools Count    | #{"%-16s" % @no_security_result[:tools_count]} | #{"%-15s" % @with_security_result[:tools_count]} |"
 
     puts
     puts "🔍 Analysis:"
-    
+
     # Check if tools are available in both scenarios
-    if @no_security_result[:tools_count] == @with_security_result[:tools_count] && 
-       @no_security_result[:tools_count] > 0
+    if @no_security_result[:tools_count] == @with_security_result[:tools_count] &&
+       @no_security_result[:tools_count].positive?
       puts "  ✅ Browser tools are available in BOTH scenarios"
       puts "     → Users can opt out of security and still use browser automation"
     else
       puts "  ❌ Browser tools availability differs between scenarios"
       puts "     → This indicates a problem with security opt-out functionality"
     end
-    
+
     # Check security states
     if !@no_security_result[:security_enabled] && @with_security_result[:security_enabled]
       puts "  ✅ Security can be properly enabled/disabled"
@@ -133,16 +139,16 @@ class SecurityOptOutTest
     else
       puts "  ❌ Security state is not working as expected"
     end
-    
+
     puts
     puts "🎯 Key Findings:"
-    puts "  1. Browser automation works with security DISABLED: #{@no_security_result[:tools_count] > 0 ? '✅ YES' : '❌ NO'}"
-    puts "  2. Browser automation works with security ENABLED: #{@with_security_result[:tools_count] > 0 ? '✅ YES' : '❌ NO'}"
-    puts "  3. Security can be opted out: #{!@no_security_result[:security_enabled] ? '✅ YES' : '❌ NO'}"
-    puts "  4. Same functionality in both modes: #{@no_security_result[:tools_count] == @with_security_result[:tools_count] ? '✅ YES' : '❌ NO'}"
-    
+    puts "  1. Browser automation works with security DISABLED: #{@no_security_result[:tools_count].positive? ? "✅ YES" : "❌ NO"}"
+    puts "  2. Browser automation works with security ENABLED: #{@with_security_result[:tools_count].positive? ? "✅ YES" : "❌ NO"}"
+    puts "  3. Security can be opted out: #{@no_security_result[:security_enabled] ? "❌ NO" : "✅ YES"}"
+    puts "  4. Same functionality in both modes: #{@no_security_result[:tools_count] == @with_security_result[:tools_count] ? "✅ YES" : "❌ NO"}"
+
     puts
-    if @no_security_result[:tools_count] > 0 && !@no_security_result[:security_enabled]
+    if @no_security_result[:tools_count].positive? && !@no_security_result[:security_enabled]
       puts "🎉 SUCCESS: Users CAN opt out of security features while keeping full browser automation!"
     else
       puts "⚠️  ISSUE: Security opt-out may not be working correctly."
@@ -172,7 +178,7 @@ class SimpleHTTPTest
 end
 
 # Main execution
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   puts "🔒🔓 VectorMCP Security Opt-Out Test"
   puts
   puts "This test verifies that browser automation works both:"
@@ -182,7 +188,7 @@ if __FILE__ == $0
 
   test = SecurityOptOutTest.new
   test.test_both_scenarios
-  
+
   puts
   puts "💡 Next Steps:"
   puts "  - Start server without security: ruby examples/simple_browser_server_no_security.rb"

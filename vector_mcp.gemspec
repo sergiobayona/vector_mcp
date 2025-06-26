@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "json-schema", "~> 3.0"
   spec.add_dependency "puma", "~> 6.4"
   spec.add_dependency "rack", "~> 3.0"
-  
+
   # Optional dependencies
   spec.add_dependency "jwt", "~> 2.7"
 

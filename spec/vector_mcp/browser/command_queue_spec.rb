@@ -26,7 +26,7 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     it "initializes empty command collections" do
       pending_commands = queue.instance_variable_get(:@pending_commands)
       completed_commands = queue.instance_variable_get(:@completed_commands)
-      
+
       expect(pending_commands).to be_empty
       expect(completed_commands).to be_empty
     end
@@ -53,7 +53,7 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
 
     it "adds command to pending queue" do
       queue.enqueue_command(command)
-      
+
       pending_commands = queue.instance_variable_get(:@pending_commands)
       expect(pending_commands).to include(command)
     end
@@ -61,17 +61,17 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     it "logs command enqueuing" do
       expect(logger).to receive(:debug).with(/Enqueued command: test-command-123/)
       expect(mock_queue_logger).to receive(:info).with("Command queued", context: hash_including(:command_id, :action, :queue_size))
-      
+
       queue.enqueue_command(command)
     end
 
     it "tracks queue size in logs" do
       queue.enqueue_command(command)
-      
+
       another_command = command.merge(id: "test-command-456")
-      
+
       expect(mock_queue_logger).to receive(:info).with("Command queued", context: hash_including(queue_size: 2))
-      
+
       queue.enqueue_command(another_command)
     end
   end
@@ -96,33 +96,33 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
 
     it "clears pending commands after retrieval" do
       queue.get_pending_commands
-      
+
       pending_commands = queue.instance_variable_get(:@pending_commands)
       expect(pending_commands).to be_empty
     end
 
     it "logs command dispatch when commands exist" do
-      expect(mock_queue_logger).to receive(:info).with("Commands dispatched to extension", 
-        context: hash_including(
-          command_count: 2,
-          command_ids: ["cmd-1", "cmd-2"],
-          actions: ["navigate", "click"]
-        ))
-      
+      expect(mock_queue_logger).to receive(:info).with("Commands dispatched to extension",
+                                                       context: hash_including(
+                                                         command_count: 2,
+                                                         command_ids: %w[cmd-1 cmd-2],
+                                                         actions: %w[navigate click]
+                                                       ))
+
       queue.get_pending_commands
     end
 
     it "does not log when no commands are pending" do
       queue.get_pending_commands # Clear existing commands
-      
+
       expect(logger).not_to receive(:info).with(/Commands dispatched/)
-      
+
       queue.get_pending_commands
     end
 
     it "returns empty array when no commands pending" do
       queue.get_pending_commands # Clear existing
-      
+
       result = queue.get_pending_commands
       expect(result).to eq([])
     end
@@ -138,10 +138,10 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
 
     it "stores completion data" do
       queue.complete_command(command_id, true, result_data, nil)
-      
+
       completed_commands = queue.instance_variable_get(:@completed_commands)
       completion_data = completed_commands[command_id]
-      
+
       expect(completion_data[:success]).to be(true)
       expect(completion_data[:result]).to eq(result_data)
       expect(completion_data[:error]).to be_nil
@@ -150,37 +150,37 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
 
     it "logs command completion" do
       expect(logger).to receive(:debug).with(/Completed command: #{command_id}/)
-      expect(mock_queue_logger).to receive(:info).with("Command completed by extension", 
-        context: hash_including(
-          command_id: command_id,
-          success: true,
-          error: nil
-        ))
-      
+      expect(mock_queue_logger).to receive(:info).with("Command completed by extension",
+                                                       context: hash_including(
+                                                         command_id: command_id,
+                                                         success: true,
+                                                         error: nil
+                                                       ))
+
       queue.complete_command(command_id, true, result_data, nil)
     end
 
     it "logs error information for failed commands" do
       error_message = "Navigation failed"
-      
+
       expect(mock_queue_logger).to receive(:info).with("Command completed by extension",
-        context: hash_including(
-          command_id: command_id,
-          success: false,
-          error: error_message
-        ))
-      
+                                                       context: hash_including(
+                                                         command_id: command_id,
+                                                         success: false,
+                                                         error: error_message
+                                                       ))
+
       queue.complete_command(command_id, false, nil, error_message)
     end
 
     it "calculates result size for logging" do
       large_result = { data: "A" * 1000 }
-      
+
       expect(mock_queue_logger).to receive(:info).with("Command completed by extension",
-        context: hash_including(
-          result_size: be > 1000
-        ))
-      
+                                                       context: hash_including(
+                                                         result_size: be > 1000
+                                                       ))
+
       queue.complete_command(command_id, true, large_result, nil)
     end
 
@@ -189,9 +189,9 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
       result_conditions = queue.instance_variable_get(:@result_conditions)
       condition = Concurrent::Event.new
       result_conditions[command_id] = condition
-      
+
       expect(condition).to receive(:set)
-      
+
       queue.complete_command(command_id, true, result_data, nil)
     end
   end
@@ -241,9 +241,9 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
       end
 
       it "raises timeout error when command takes too long" do
-        expect {
+        expect do
           queue.wait_for_result(command_id, timeout: 0.1)
-        }.to raise_error(VectorMCP::Browser::CommandQueue::TimeoutError)
+        end.to raise_error(VectorMCP::Browser::CommandQueue::TimeoutError)
       end
 
       it "cleans up condition after timeout" do
@@ -261,7 +261,7 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     context "with concurrent access" do
       it "handles multiple commands concurrently" do
         command_ids = (1..5).map { |i| "command-#{i}" }
-        
+
         # Start multiple waiters
         futures = command_ids.map do |cmd_id|
           Concurrent::Future.execute do
@@ -286,15 +286,15 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     let(:command_id) { "test-command-123" }
 
     it "handles invalid command completion gracefully" do
-      expect {
+      expect do
         queue.complete_command(nil, true, {}, nil)
-      }.not_to raise_error
+      end.not_to raise_error
     end
 
     it "handles waiting for non-existent command" do
-      expect {
+      expect do
         queue.wait_for_result("non-existent", timeout: 0.1)
-      }.to raise_error(VectorMCP::Browser::CommandQueue::TimeoutError)
+      end.to raise_error(VectorMCP::Browser::CommandQueue::TimeoutError)
     end
   end
 

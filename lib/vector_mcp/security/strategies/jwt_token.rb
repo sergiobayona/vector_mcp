@@ -98,6 +98,7 @@ module VectorMCP
 
           token = auth_header[7..] # Remove 'Bearer ' prefix
           return nil if token.nil? || token.strip.empty?
+
           token.strip
         end
 

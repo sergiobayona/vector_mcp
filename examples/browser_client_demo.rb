@@ -19,16 +19,16 @@ class MCPBrowserClient
   # Connect to the MCP server and establish session
   def connect
     puts "🔗 Connecting to MCP server at #{@server_url}..."
-    
+
     # Step 1: Connect to SSE endpoint
     uri = URI("#{@server_url}/mcp/sse")
     http = Net::HTTP.new(uri.host, uri.port)
     http.open_timeout = 10
-    
+
     request = Net::HTTP::Get.new(uri)
-    
+
     # Parse SSE stream to get session info
-    response = http.request(request) do |res|
+    http.request(request) do |res|
       if res.code != "200"
         puts "❌ Failed to connect: #{res.code} #{res.message}"
         return false
@@ -38,32 +38,32 @@ class MCPBrowserClient
       buffer = ""
       res.read_body do |chunk|
         buffer += chunk
-        
+
         # Look for the endpoint event
         if buffer.include?("event: endpoint")
           lines = buffer.split("\n")
           data_line = lines.find { |line| line.start_with?("data: ") }
-          
+
           if data_line
             # The data is the raw endpoint URL, not JSON
             endpoint_url = data_line.sub("data: ", "").strip
             @message_url = "#{@server_url}#{endpoint_url}"
-            
+
             # Extract session ID from URL
             query_params = URI.decode_www_form(URI.parse(@message_url).query).to_h
             @session_id = query_params["session_id"]
-            
+
             puts "✅ Connected! Session: #{@session_id}"
             puts "📡 Message URL: #{@message_url}"
             return true
           end
         end
-        
+
         # Break after getting endpoint to avoid hanging
         break if @message_url
       end
     end
-    
+
     false
   rescue StandardError => e
     puts "❌ Connection error: #{e.message}"
@@ -73,16 +73,16 @@ class MCPBrowserClient
   # Send MCP initialize request
   def initialize_mcp
     send_request("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {
-        roots: { listChanged: false },
-        sampling: {}
-      },
-      clientInfo: {
-        name: "VectorMCP Browser Demo",
-        version: "1.0.0"
-      }
-    })
+                   protocolVersion: "2024-11-05",
+                   capabilities: {
+                     roots: { listChanged: false },
+                     sampling: {}
+                   },
+                   clientInfo: {
+                     name: "VectorMCP Browser Demo",
+                     version: "1.0.0"
+                   }
+                 })
   end
 
   # List available tools
@@ -93,9 +93,9 @@ class MCPBrowserClient
   # Call a tool
   def call_tool(name, arguments = {})
     send_request("tools/call", {
-      name: name,
-      arguments: arguments
-    })
+                   name: name,
+                   arguments: arguments
+                 })
   end
 
   # Send a request to the MCP server
@@ -117,17 +117,17 @@ class MCPBrowserClient
     http = Net::HTTP.new(uri.host, uri.port)
     http.open_timeout = 10
     http.read_timeout = 60
-    
+
     request = Net::HTTP::Post.new(uri)
     request["Content-Type"] = "application/json"
     request.body = message.to_json
-    
+
     response = http.request(request)
-    
+
     case response.code
     when "202"
       puts "✅ Request accepted"
-      # Note: In a real implementation, you'd need to listen to the SSE stream
+      # NOTE: In a real implementation, you'd need to listen to the SSE stream
       # for the actual response. For this demo, we'll return a success indicator.
       { success: true, message: "Request sent successfully" }
     when "200"
@@ -171,9 +171,7 @@ def demonstrate_google_search
   # List available tools
   puts "\n🔧 Listing available tools..."
   tools_result = client.list_tools
-  if tools_result && tools_result[:success]
-    puts "✅ Tools available (browser automation tools should be listed)"
-  end
+  puts "✅ Tools available (browser automation tools should be listed)" if tools_result && tools_result[:success]
 
   puts "\n🎯 Starting Google search automation sequence..."
   puts "   (Note: This demo shows the MCP protocol calls)"
@@ -189,7 +187,7 @@ def demonstrate_google_search
     },
     {
       step: "2️⃣ Navigate to Google",
-      tool: "browser_navigate", 
+      tool: "browser_navigate",
       args: { url: "https://www.google.com", include_snapshot: false }
     },
     {
@@ -200,7 +198,7 @@ def demonstrate_google_search
     {
       step: "4️⃣ Click search box and type query",
       tool: "browser_type",
-      args: { 
+      args: {
         text: "vector_mcp gem ruby",
         selector: "input[name='q']"
       }
@@ -212,7 +210,7 @@ def demonstrate_google_search
     },
     {
       step: "6️⃣ Wait for results",
-      tool: "browser_wait", 
+      tool: "browser_wait",
       args: { duration: 3000 }
     },
     {
@@ -235,13 +233,13 @@ def demonstrate_google_search
   steps.each do |step_info|
     puts step_info[:step]
     result = client.call_tool(step_info[:tool], step_info[:args])
-    
+
     if result && result[:success]
       puts "   ✅ Success"
     else
       puts "   ⚠️  Tool call sent (extension needed for execution)"
     end
-    
+
     sleep(0.5) # Brief pause between steps
   end
 

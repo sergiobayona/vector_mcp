@@ -20,8 +20,8 @@ module VectorMCP
           }
         ) do |arguments, session_context|
           navigate_tool = VectorMCP::Browser::Tools::Navigate.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           navigate_tool.call(arguments, session_context)
@@ -35,20 +35,20 @@ module VectorMCP
             type: "object",
             properties: {
               selector: { type: "string", description: "ARIA selector for the element to click" },
-              coordinate: { 
-                type: "array", 
-                items: { type: "integer" }, 
-                minItems: 2, 
+              coordinate: {
+                type: "array",
+                items: { type: "integer" },
+                minItems: 2,
                 maxItems: 2,
-                description: "X,Y coordinates to click if selector is not provided" 
+                description: "X,Y coordinates to click if selector is not provided"
               },
               include_snapshot: { type: "boolean", description: "Whether to include ARIA snapshot in response", default: true }
             }
           }
         ) do |arguments, session_context|
           click_tool = VectorMCP::Browser::Tools::Click.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           click_tool.call(arguments, session_context)
@@ -63,12 +63,12 @@ module VectorMCP
             properties: {
               text: { type: "string", description: "Text to type" },
               selector: { type: "string", description: "ARIA selector for the input element" },
-              coordinate: { 
-                type: "array", 
-                items: { type: "integer" }, 
-                minItems: 2, 
+              coordinate: {
+                type: "array",
+                items: { type: "integer" },
+                minItems: 2,
                 maxItems: 2,
-                description: "X,Y coordinates to click before typing if selector is not provided" 
+                description: "X,Y coordinates to click before typing if selector is not provided"
               },
               include_snapshot: { type: "boolean", description: "Whether to include ARIA snapshot in response", default: true }
             },
@@ -76,8 +76,8 @@ module VectorMCP
           }
         ) do |arguments, session_context|
           type_tool = VectorMCP::Browser::Tools::Type.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           type_tool.call(arguments, session_context)
@@ -93,8 +93,8 @@ module VectorMCP
           }
         ) do |arguments, session_context|
           snapshot_tool = VectorMCP::Browser::Tools::Snapshot.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           snapshot_tool.call(arguments, session_context)
@@ -110,8 +110,8 @@ module VectorMCP
           }
         ) do |arguments, session_context|
           screenshot_tool = VectorMCP::Browser::Tools::Screenshot.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           screenshot_tool.call(arguments, session_context)
@@ -127,8 +127,8 @@ module VectorMCP
           }
         ) do |arguments, session_context|
           console_tool = VectorMCP::Browser::Tools::Console.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           console_tool.call(arguments, session_context)
@@ -141,19 +141,19 @@ module VectorMCP
           input_schema: {
             type: "object",
             properties: {
-              duration: { 
-                type: "integer", 
-                description: "Duration to wait in milliseconds", 
+              duration: {
+                type: "integer",
+                description: "Duration to wait in milliseconds",
                 default: 1000,
                 minimum: 100,
-                maximum: 30000
+                maximum: 30_000
               }
             }
           }
         ) do |arguments, session_context|
           wait_tool = VectorMCP::Browser::Tools::Wait.new(
-            server_host: server_host, 
-            server_port: server_port, 
+            server_host: server_host,
+            server_port: server_port,
             logger: @logger
           )
           wait_tool.call(arguments, session_context)
@@ -164,29 +164,29 @@ module VectorMCP
 
       # Configure browser-specific authorization policies
       # This provides common authorization patterns for browser automation
-      def enable_browser_authorization!(&block)
+      def enable_browser_authorization!(&)
         raise ArgumentError, "Authorization must be enabled first" unless authorization.enabled
 
         # Create browser authorization context
         browser_auth = BrowserAuthorizationBuilder.new(authorization)
-        
+
         # Execute the configuration block
-        browser_auth.instance_eval(&block) if block_given?
-        
+        browser_auth.instance_eval(&) if block_given?
+
         @logger.info("Browser authorization policies configured")
       end
 
       # Check if Chrome extension is connected (requires SSE transport)
       def browser_extension_connected?
         return false unless @transport.is_a?(VectorMCP::Transport::SSE)
-        
+
         @transport.extension_connected?
       end
 
       # Get browser automation statistics (requires SSE transport)
       def browser_stats
         return { error: "Browser automation requires SSE transport" } unless @transport.is_a?(VectorMCP::Transport::SSE)
-        
+
         @transport.browser_stats
       end
 
@@ -242,15 +242,13 @@ module VectorMCP
 
         # Restrict browser access to specific domains
         def restrict_to_domains(*domains, &condition_block)
-          domains = domains.flatten
+          domains.flatten
           @authorization.add_policy(:tool) do |user, action, tool|
             # Only apply to browser navigation
             next true unless tool.name == "browser_navigate"
-            
+
             # Check user condition if provided
-            if condition_block
-              next false unless condition_block.call(user, action, tool)
-            end
+            next false if condition_block && !condition_block.call(user, action, tool)
 
             # Check if any allowed domain matches (this is a simplified check)
             # In practice, you'd want to check the actual URL being navigated to
@@ -260,22 +258,22 @@ module VectorMCP
 
         # Common role-based policies
         def admin_full_access
-          allow_all_browser_tools { |user, action, tool| user[:role] == "admin" }
+          allow_all_browser_tools { |user, _action, _tool| user[:role] == "admin" }
         end
 
         def browser_user_full_access
-          allow_all_browser_tools { |user, action, tool| %w[admin browser_user].include?(user[:role]) }
+          allow_all_browser_tools { |user, _action, _tool| %w[admin browser_user].include?(user[:role]) }
         end
 
         def read_only_access
-          allow_navigation { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
-          allow_snapshots { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
-          allow_screenshots { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
+          allow_navigation { |user, _action, _tool| %w[admin browser_user demo].include?(user[:role]) }
+          allow_snapshots { |user, _action, _tool| %w[admin browser_user demo].include?(user[:role]) }
+          allow_screenshots { |user, _action, _tool| %w[admin browser_user demo].include?(user[:role]) }
         end
 
         def demo_user_limited_access
-          allow_navigation { |user, action, tool| user[:role] == "demo" }
-          allow_snapshots { |user, action, tool| user[:role] == "demo" }
+          allow_navigation { |user, _action, _tool| user[:role] == "demo" }
+          allow_snapshots { |user, _action, _tool| user[:role] == "demo" }
         end
 
         private
@@ -284,7 +282,7 @@ module VectorMCP
           @authorization.add_policy(:tool) do |user, action, tool|
             # Only apply to the specific browser tool
             next true unless tool.name == tool_name
-            
+
             # Apply the browser-specific policy
             policy_proc.call(user, action, tool)
           end

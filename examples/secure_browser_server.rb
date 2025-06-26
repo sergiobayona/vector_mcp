@@ -10,15 +10,15 @@ require_relative "../lib/vector_mcp"
 server = VectorMCP::Server.new("secure-browser-server", version: "1.0.0")
 
 # Enable API key authentication
-api_keys = ["browser-automation-key-123", "demo-key-456"]
+api_keys = %w[browser-automation-key-123 demo-key-456]
 server.enable_authentication!(strategy: :api_key, keys: api_keys)
 
 # Enable authorization with browser-specific policies
 server.enable_authorization! do
   # Only allow browser automation for authenticated users with 'browser' role
-  authorize_tools do |user, action, tool|
+  authorize_tools do |user, _action, tool|
     if tool.name.start_with?("browser_")
-      user[:role] == "browser_user" || user[:role] == "admin"
+      %w[browser_user admin].include?(user[:role])
     else
       true # Allow other tools
     end
@@ -32,10 +32,10 @@ server.register_browser_tools
 server.enable_browser_authorization! do
   # Full access for admin users
   admin_full_access
-  
+
   # Full browser access for browser_user role
   browser_user_full_access
-  
+
   # Limited access for demo users (navigation and snapshots only)
   demo_user_limited_access
 end
@@ -43,7 +43,7 @@ end
 # Add a custom authentication strategy that sets user roles
 server.auth_manager.add_custom_auth do |request|
   api_key = request[:headers]["X-API-Key"]
-  
+
   case api_key
   when "browser-automation-key-123"
     {
@@ -52,7 +52,7 @@ server.auth_manager.add_custom_auth do |request|
         id: "browser_user_1",
         name: "Browser Automation User",
         role: "browser_user",
-        permissions: ["browser_navigate", "browser_click", "browser_type", "browser_snapshot"]
+        permissions: %w[browser_navigate browser_click browser_type browser_snapshot]
       }
     }
   when "demo-key-456"
@@ -62,7 +62,7 @@ server.auth_manager.add_custom_auth do |request|
         id: "demo_user_1",
         name: "Demo User",
         role: "demo",
-        permissions: ["browser_navigate", "browser_snapshot"] # Limited permissions
+        permissions: %w[browser_navigate browser_snapshot] # Limited permissions
       }
     }
   else
@@ -78,15 +78,15 @@ transport = VectorMCP::Transport::SSE.new(server, port: 8000, host: "0.0.0.0")
 
 puts <<~BANNER
   🔒 Secure Browser Automation Server Starting
-  
+
   Server: #{server.name} v#{server.version}
   Transport: SSE on http://0.0.0.0:8000
-  
+
   🔐 Authentication: API Key Strategy
   📋 Valid API Keys:
     - browser-automation-key-123 (browser_user role - full access)
     - demo-key-456 (demo role - limited access)
-  
+
   🌐 Browser Endpoints:
     - http://localhost:8000/browser/ping (extension heartbeat)
     - http://localhost:8000/browser/poll (command polling)
@@ -98,7 +98,7 @@ puts <<~BANNER
     - http://localhost:8000/browser/screenshot (screenshots)
     - http://localhost:8000/browser/console (console logs)
     - http://localhost:8000/browser/wait (wait commands)
-  
+
   🔧 Chrome Extension Setup:
     1. Load extension from examples/chrome_extension/
     2. Configure authentication in extension storage:
@@ -109,13 +109,13 @@ puts <<~BANNER
            apiKey: 'browser-automation-key-123'
          }
        })
-  
+
   📊 Security Features:
     ✅ API Key Authentication
     ✅ Role-Based Authorization
     ✅ Browser-Specific Security Policies
     ✅ Structured Security Logging
-  
+
   Press Ctrl+C to stop the server
 BANNER
 
@@ -132,10 +132,10 @@ end
 
 # Log security configuration
 security_logger.info("Secure browser server starting", context: {
-  authentication: server.security_status[:authentication],
-  authorization: server.security_status[:authorization],
-  browser_tools: server.tools.keys.select { |name| name.start_with?("browser_") }
-})
+                       authentication: server.security_status[:authentication],
+                       authorization: server.security_status[:authorization],
+                       browser_tools: server.tools.keys.select { |name| name.start_with?("browser_") }
+                     })
 
 # Start the server
 begin

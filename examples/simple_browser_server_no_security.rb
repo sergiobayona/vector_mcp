@@ -24,16 +24,16 @@ puts
 
 puts <<~BANNER
   🌐 Simple Browser Server (No Security)
-  
+
   Server: #{server.name} v#{server.version}
   Transport: SSE on http://0.0.0.0:8003
-  
+
   🔓 Security: DISABLED
     - No authentication required
     - No authorization checks
     - No security logging
     - All browser endpoints are publicly accessible
-  
+
   🌐 Browser Endpoints (no auth required):
     - http://localhost:8003/browser/ping
     - http://localhost:8003/browser/poll
@@ -45,20 +45,20 @@ puts <<~BANNER
     - http://localhost:8003/browser/screenshot
     - http://localhost:8003/browser/console
     - http://localhost:8003/browser/wait
-  
+
   🔧 Chrome Extension Setup (No Auth):
     1. Load extension from examples/chrome_extension/
     2. No authentication configuration needed
     3. Extension will connect automatically
-  
+
   🧪 Test Without Authentication:
      curl -X POST http://localhost:8003/browser/navigate \\
           -H "Content-Type: application/json" \\
           -d '{"url": "https://example.com"}'
-  
+
   ✅ Use Case: Development, testing, internal networks
   ⚠️  Warning: Do not use in production without security!
-  
+
   Press Ctrl+C to stop the server
 BANNER
 

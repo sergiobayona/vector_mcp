@@ -5,20 +5,20 @@ require "vector_mcp/browser"
 require "net/http"
 require "json"
 
-RSpec.describe "Browser Security Integration", type: :integration, :skip => "Integration tests require SSE transport implementation" do
+RSpec.describe "Browser Security Integration", type: :integration, skip: "Integration tests require SSE transport implementation" do
   let(:server) { VectorMCP::Server.new("browser-security-test") }
 
   describe "Authentication Integration" do
     before do
-      server.enable_authentication!(strategy: :api_key, keys: ["test-key-123", "admin-key-456"])
+      server.enable_authentication!(strategy: :api_key, keys: %w[test-key-123 admin-key-456])
       server.register_browser_tools
     end
 
     context "without authentication" do
       it "denies browser commands when authentication is required" do
-        http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new), 
-                                                        security_middleware: server.security_middleware)
-        
+        http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
+                                                         security_middleware: server.security_middleware)
+
         env = {
           "REQUEST_METHOD" => "POST",
           "REMOTE_ADDR" => "127.0.0.1",
@@ -27,7 +27,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
         response = http_server.send(:handle_navigate_command, env)
         expect(response[0]).to eq(401)
-        
+
         body = JSON.parse(response[2][0])
         expect(body["error"]).to include("Authentication required")
       end
@@ -36,8 +36,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     context "with valid authentication" do
       it "allows browser commands with valid API key" do
         http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                        security_middleware: server.security_middleware)
-        
+                                                         security_middleware: server.security_middleware)
+
         env = {
           "REQUEST_METHOD" => "POST",
           "REMOTE_ADDR" => "127.0.0.1",
@@ -50,7 +50,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
         http_server.instance_variable_set(:@extension_last_ping, Time.now)
 
         response = http_server.send(:handle_navigate_command, env)
-        
+
         # Should not be authentication error (will be 408 timeout since no real extension)
         expect(response[0]).not_to eq(401)
         expect(response[0]).not_to eq(403)
@@ -60,8 +60,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     context "with invalid authentication" do
       it "denies browser commands with invalid API key" do
         http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                        security_middleware: server.security_middleware)
-        
+                                                         security_middleware: server.security_middleware)
+
         env = {
           "REQUEST_METHOD" => "POST",
           "REMOTE_ADDR" => "127.0.0.1",
@@ -77,14 +77,14 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
   describe "Authorization Integration" do
     before do
-      server.enable_authentication!(strategy: :api_key, keys: ["admin-key", "user-key", "demo-key"])
+      server.enable_authentication!(strategy: :api_key, keys: %w[admin-key user-key demo-key])
       server.enable_authorization!
       server.register_browser_tools
-      
+
       # Set up user roles based on API keys
       server.auth_manager.add_custom_auth do |request|
         api_key = request[:headers]["X-API-Key"]
-        
+
         case api_key
         when "admin-key"
           {
@@ -99,7 +99,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
         when "demo-key"
           {
             success: true,
-            user: { id: "demo", role: "demo", permissions: ["browser_navigate", "browser_snapshot"] }
+            user: { id: "demo", role: "demo", permissions: %w[browser_navigate browser_snapshot] }
           }
         else
           { success: false, error: "Invalid API key" }
@@ -116,8 +116,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
     it "allows admin users full access to all browser tools" do
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
-      
+                                                       security_middleware: server.security_middleware)
+
       # Mock extension connection
       http_server.instance_variable_set(:@extension_connected, true)
       http_server.instance_variable_set(:@extension_last_ping, Time.now)
@@ -140,8 +140,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
     it "allows browser users access to all browser tools" do
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
-      
+                                                       security_middleware: server.security_middleware)
+
       http_server.instance_variable_set(:@extension_connected, true)
       http_server.instance_variable_set(:@extension_last_ping, Time.now)
 
@@ -162,8 +162,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
     it "restricts demo users to limited browser tools" do
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
-      
+                                                       security_middleware: server.security_middleware)
+
       http_server.instance_variable_set(:@extension_connected, true)
       http_server.instance_variable_set(:@extension_last_ping, Time.now)
 
@@ -179,7 +179,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       expect(response[0]).not_to eq(403)
 
       # Demo user should be able to take snapshots
-      env = env_base.merge("rack.input" => StringIO.new('{}'))
+      env = env_base.merge("rack.input" => StringIO.new("{}"))
       response = http_server.send(:handle_snapshot_command, env)
       expect(response[0]).not_to eq(403)
 
@@ -205,9 +205,9 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     it "logs authentication attempts" do
       security_logger = Logger.new(StringIO.new)
       allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(security_logger)
-      
+
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
+                                                       security_middleware: server.security_middleware)
 
       env = {
         "REQUEST_METHOD" => "POST",
@@ -218,10 +218,10 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
         "rack.input" => StringIO.new('{"url": "https://example.com"}')
       }
 
-      expect(security_logger).to receive(:info).with("Browser automation security check", 
-        context: hash_including(:action, :ip_address, :user_agent))
+      expect(security_logger).to receive(:info).with("Browser automation security check",
+                                                     context: hash_including(:action, :ip_address, :user_agent))
       expect(security_logger).to receive(:info).with("Browser automation authorized",
-        context: hash_including(:action, :ip_address))
+                                                     context: hash_including(:action, :ip_address))
 
       http_server.send(:check_security, env, :navigate)
     end
@@ -229,9 +229,9 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     it "logs authorization failures" do
       security_logger = Logger.new(StringIO.new)
       allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(security_logger)
-      
+
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
+                                                       security_middleware: server.security_middleware)
 
       env = {
         "REQUEST_METHOD" => "POST",
@@ -243,7 +243,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
 
       expect(security_logger).to receive(:info).with("Browser automation security check", anything)
       expect(security_logger).to receive(:warn).with("Browser automation denied",
-        context: hash_including(:error, :error_code, :ip_address))
+                                                     context: hash_including(:error, :error_code, :ip_address))
 
       http_server.send(:check_security, env, :navigate)
     end
@@ -251,7 +251,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     it "logs command execution with user context" do
       security_logger = Logger.new(StringIO.new)
       allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(security_logger)
-      
+
       server.auth_manager.add_custom_auth do |request|
         api_key = request[:headers]["X-API-Key"]
         if api_key == "test-key"
@@ -265,8 +265,8 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       end
 
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server.security_middleware)
-      
+                                                       security_middleware: server.security_middleware)
+
       command_queue = instance_double("CommandQueue")
       allow(http_server).to receive(:command_queue).and_return(command_queue)
       allow(command_queue).to receive(:enqueue_command)
@@ -280,9 +280,9 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       }
 
       expect(security_logger).to receive(:info).with("Browser command executed",
-        context: hash_including(:user_id => "test_user", :user_role => "browser_user"))
+                                                     context: hash_including(user_id: "test_user", user_role: "browser_user"))
       expect(security_logger).to receive(:info).with("Browser command completed",
-        context: hash_including(:user_id => "test_user"))
+                                                     context: hash_including(user_id: "test_user"))
 
       http_server.send(:execute_browser_command, env, "navigate")
     end
@@ -294,7 +294,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       server_no_security.register_browser_tools
 
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new),
-                                                      security_middleware: server_no_security.security_middleware)
+                                                       security_middleware: server_no_security.security_middleware)
 
       # Mock extension connection
       http_server.instance_variable_set(:@extension_connected, true)
@@ -308,7 +308,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       }
 
       response = http_server.send(:handle_navigate_command, env)
-      
+
       # Should not be authentication/authorization error
       expect(response[0]).not_to eq(401)
       expect(response[0]).not_to eq(403)
@@ -326,7 +326,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       }
 
       sanitized = http_server.send(:sanitize_params_for_logging, params)
-      
+
       expect(sanitized["url"]).to eq("https://example.com")
       expect(sanitized["password"]).to eq("[REDACTED]")
       expect(sanitized["token"]).to eq("[REDACTED]")
@@ -339,7 +339,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       params = { "text" => long_text }
 
       sanitized = http_server.send(:sanitize_params_for_logging, params)
-      
+
       expect(sanitized["text"]).to include("[TRUNCATED]")
       expect(sanitized["text"].length).to be < long_text.length
     end
@@ -349,7 +349,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     it "logs extension connection events" do
       security_logger = Logger.new(StringIO.new)
       allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(security_logger)
-      
+
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new))
 
       env = {
@@ -359,10 +359,10 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       }
 
       expect(security_logger).to receive(:info).with("Chrome extension connected",
-        context: hash_including(
-          ip_address: "192.168.1.100",
-          user_agent: "Chrome Extension/1.0"
-        ))
+                                                     context: hash_including(
+                                                       ip_address: "192.168.1.100",
+                                                       user_agent: "Chrome Extension/1.0"
+                                                     ))
 
       http_server.send(:handle_extension_ping, env)
     end
@@ -370,7 +370,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
     it "logs extension disconnection events" do
       security_logger = Logger.new(StringIO.new)
       allow(VectorMCP).to receive(:logger_for).with("security.browser").and_return(security_logger)
-      
+
       http_server = VectorMCP::Browser::HttpServer.new(Logger.new(StringIO.new))
 
       # Set up extension as previously connected but timed out
@@ -378,7 +378,7 @@ RSpec.describe "Browser Security Integration", type: :integration, :skip => "Int
       http_server.instance_variable_set(:@extension_last_ping, Time.now - 35)
 
       expect(security_logger).to receive(:warn).with("Chrome extension disconnected",
-        context: hash_including(:last_ping, :timeout_seconds))
+                                                     context: hash_including(:last_ping, :timeout_seconds))
 
       http_server.extension_connected?
     end

@@ -27,17 +27,17 @@ module VectorMCP
 
         # Consider extension disconnected if no ping in last 30 seconds
         still_connected = Time.now - @extension_last_ping < 30
-        
+
         # Log disconnection event
         if @extension_connected && !still_connected
           @extension_connected = false
           @security_logger.warn("Chrome extension disconnected", context: {
-            last_ping: @extension_last_ping&.iso8601,
-            timeout_seconds: 30,
-            timestamp: Time.now.iso8601
-          })
+                                  last_ping: @extension_last_ping&.iso8601,
+                                  timeout_seconds: 30,
+                                  timestamp: Time.now.iso8601
+                                })
         end
-        
+
         still_connected
       end
 
@@ -75,37 +75,37 @@ module VectorMCP
 
         # Extract request from Rack environment
         request = @security_middleware.normalize_request(env)
-        
+
         # Log security attempt
         @security_logger.info("Browser automation security check", context: {
-          action: action,
-          ip_address: env["REMOTE_ADDR"],
-          user_agent: env["HTTP_USER_AGENT"],
-          endpoint: env["PATH_INFO"],
-          method: env["REQUEST_METHOD"]
-        })
-        
+                                action: action,
+                                ip_address: env["REMOTE_ADDR"],
+                                user_agent: env["HTTP_USER_AGENT"],
+                                endpoint: env["PATH_INFO"],
+                                method: env["REQUEST_METHOD"]
+                              })
+
         # Process security check
         result = @security_middleware.process_request(request, action: action, resource: nil)
-        
+
         # Log security result
         if result[:success]
           @security_logger.info("Browser automation authorized", context: {
-            action: action,
-            user_id: result[:session_context]&.user&.[](:id),
-            user_role: result[:session_context]&.user&.[](:role),
-            ip_address: env["REMOTE_ADDR"]
-          })
+                                  action: action,
+                                  user_id: result[:session_context]&.user&.[](:id),
+                                  user_role: result[:session_context]&.user&.[](:role),
+                                  ip_address: env["REMOTE_ADDR"]
+                                })
         else
           @security_logger.warn("Browser automation denied", context: {
-            action: action,
-            error: result[:error],
-            error_code: result[:error_code],
-            ip_address: env["REMOTE_ADDR"],
-            user_agent: env["HTTP_USER_AGENT"]
-          })
+                                  action: action,
+                                  error: result[:error],
+                                  error_code: result[:error_code],
+                                  ip_address: env["REMOTE_ADDR"],
+                                  user_agent: env["HTTP_USER_AGENT"]
+                                })
         end
-        
+
         result
       end
 
@@ -118,16 +118,16 @@ module VectorMCP
         was_connected = @extension_connected
         @extension_connected = true
         @extension_last_ping = Time.now
-        
+
         # Log extension connection events for security monitoring
-        if !was_connected
+        unless was_connected
           @security_logger.info("Chrome extension connected", context: {
-            ip_address: env["REMOTE_ADDR"],
-            user_agent: env["HTTP_USER_AGENT"],
-            timestamp: Time.now.iso8601
-          })
+                                  ip_address: env["REMOTE_ADDR"],
+                                  user_agent: env["HTTP_USER_AGENT"],
+                                  timestamp: Time.now.iso8601
+                                })
         end
-        
+
         logger.debug("Chrome extension ping received")
 
         [200, { "Content-Type" => "application/json" }, [{ status: "ok" }.to_json]]
@@ -149,14 +149,14 @@ module VectorMCP
 
         body = read_request_body(env)
         result_data = JSON.parse(body)
-        
+
         command_id = result_data["command_id"]
         success = result_data["success"]
         result = result_data["result"]
         error = result_data["error"]
 
         logger.debug("Received result for command #{command_id}: success=#{success}")
-        
+
         @command_queue.complete_command(command_id, success, result, error)
 
         [200, { "Content-Type" => "application/json" }, [{ status: "ok" }.to_json]]
@@ -237,7 +237,7 @@ module VectorMCP
 
         body = read_request_body(env)
         params = JSON.parse(body)
-        
+
         duration = params["duration"] || 1000
         sleep(duration / 1000.0) # Convert milliseconds to seconds
 
@@ -251,7 +251,7 @@ module VectorMCP
       def execute_browser_command(env, action)
         body = read_request_body(env)
         params = JSON.parse(body)
-        
+
         command_id = SecureRandom.uuid
         command = {
           id: command_id,
@@ -261,62 +261,62 @@ module VectorMCP
         }
 
         logger.debug("Executing browser command: #{action} with params: #{params}")
-        
+
         # Log browser automation command execution for security audit
         user_context = extract_user_context_from_env(env)
         @security_logger.info("Browser command executed", context: {
-          command_id: command_id,
-          action: action,
-          user_id: user_context[:user_id],
-          user_role: user_context[:user_role],
-          ip_address: env["REMOTE_ADDR"],
-          params: sanitize_params_for_logging(params),
-          timestamp: Time.now.iso8601
-        })
-        
+                                command_id: command_id,
+                                action: action,
+                                user_id: user_context[:user_id],
+                                user_role: user_context[:user_role],
+                                ip_address: env["REMOTE_ADDR"],
+                                params: sanitize_params_for_logging(params),
+                                timestamp: Time.now.iso8601
+                              })
+
         @command_queue.enqueue_command(command)
-        
+
         # Wait for result with timeout
         result = @command_queue.wait_for_result(command_id, timeout: 30)
-        
+
         # Log command completion
         if result[:success]
           @security_logger.info("Browser command completed", context: {
-            command_id: command_id,
-            action: action,
-            user_id: user_context[:user_id],
-            success: true,
-            execution_time_ms: ((Time.now.to_f - command[:timestamp]) * 1000).round(2)
-          })
+                                  command_id: command_id,
+                                  action: action,
+                                  user_id: user_context[:user_id],
+                                  success: true,
+                                  execution_time_ms: ((Time.now.to_f - command[:timestamp]) * 1000).round(2)
+                                })
           [200, { "Content-Type" => "application/json" }, [result.to_json]]
         else
           @security_logger.warn("Browser command failed", context: {
-            command_id: command_id,
-            action: action,
-            user_id: user_context[:user_id],
-            success: false,
-            error: result[:error],
-            execution_time_ms: ((Time.now.to_f - command[:timestamp]) * 1000).round(2)
-          })
+                                  command_id: command_id,
+                                  action: action,
+                                  user_id: user_context[:user_id],
+                                  success: false,
+                                  error: result[:error],
+                                  execution_time_ms: ((Time.now.to_f - command[:timestamp]) * 1000).round(2)
+                                })
           [500, { "Content-Type" => "application/json" }, [result.to_json]]
         end
       rescue JSON::ParserError => e
         logger.error("Invalid JSON in browser command: #{e.message}")
         @security_logger.error("Browser command JSON parsing failed", context: {
-          action: action,
-          error: e.message,
-          ip_address: env["REMOTE_ADDR"],
-          user_agent: env["HTTP_USER_AGENT"]
-        })
+                                 action: action,
+                                 error: e.message,
+                                 ip_address: env["REMOTE_ADDR"],
+                                 user_agent: env["HTTP_USER_AGENT"]
+                               })
         [400, { "Content-Type" => "application/json" }, [{ error: "Invalid JSON" }.to_json]]
       rescue CommandQueue::TimeoutError
         logger.error("Browser command timed out: #{action}")
         @security_logger.error("Browser command timeout", context: {
-          command_id: command_id,
-          action: action,
-          user_id: user_context[:user_id],
-          timeout_seconds: 30
-        })
+                                 command_id: command_id,
+                                 action: action,
+                                 user_id: user_context[:user_id],
+                                 timeout_seconds: 30
+                               })
         [408, { "Content-Type" => "application/json" }, [{ error: "Command timed out" }.to_json]]
       end
 
@@ -354,7 +354,7 @@ module VectorMCP
 
         request = @security_middleware.normalize_request(env)
         result = @security_middleware.process_request(request)
-        
+
         if result[:success] && result[:session_context]
           user = result[:session_context].user
           {
@@ -373,20 +373,16 @@ module VectorMCP
         return params unless params.is_a?(Hash)
 
         sanitized = params.dup
-        
+
         # Remove or mask sensitive fields
         sensitive_fields = %w[password token secret key authorization auth]
         sensitive_fields.each do |field|
-          if sanitized.key?(field)
-            sanitized[field] = "[REDACTED]"
-          end
+          sanitized[field] = "[REDACTED]" if sanitized.key?(field)
         end
 
         # Truncate very long text values to prevent log bloat
         sanitized.each do |key, value|
-          if value.is_a?(String) && value.length > 1000
-            sanitized[key] = "#{value[0...1000]}...[TRUNCATED]"
-          end
+          sanitized[key] = "#{value[0...1000]}...[TRUNCATED]" if value.is_a?(String) && value.length > 1000
         end
 
         sanitized
