@@ -6,7 +6,6 @@ source "https://rubygems.org"
 gemspec
 
 group :development, :test do
-  gem "async-rspec"
   gem "bundler", "~> 2.0"
   gem "irb"
   gem "pry-byebug"

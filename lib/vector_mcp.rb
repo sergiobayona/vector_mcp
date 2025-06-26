@@ -11,7 +11,7 @@ require_relative "vector_mcp/util"
 require_relative "vector_mcp/image_util"
 require_relative "vector_mcp/handlers/core"
 require_relative "vector_mcp/transport/stdio"
-# require_relative "vector_mcp/transport/sse" # Load on demand to avoid async dependencies
+# require_relative "vector_mcp/transport/sse" # Load on demand
 require_relative "vector_mcp/logging"
 require_relative "vector_mcp/server"
 require_relative "vector_mcp/browser"
@@ -20,7 +20,7 @@ require_relative "vector_mcp/browser"
 # of the **Model Context Protocol (MCP)**.  It gives developers everything needed
 # to spin up an MCP-compatible server—including:
 #
-# * **Transport adapters** (synchronous `stdio` or asynchronous HTTP + SSE)
+# * **Transport adapters** (synchronous `stdio` or HTTP + SSE)
 # * **High-level abstractions** for *tools*, *resources*, and *prompts*
 # * **JSON-RPC 2.0** message handling with sensible defaults and detailed
 #   error reporting helpers

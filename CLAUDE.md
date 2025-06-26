@@ -115,7 +115,7 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 - Use `lib/vector_mcp/` for core functionality
 - Place examples in `examples/` directory
 - Tests go in `spec/` with matching directory structure
-- Follow existing async patterns using the `async` gem
+- Follow existing concurrency patterns using Ruby threading and concurrent-ruby
 - Structured logging available via `VectorMCP.logger_for(component)`
 
 ### Error Handling
@@ -142,7 +142,7 @@ Use VectorMCP-specific error classes:
 
 ### Dependencies
 
-**Runtime**: async, async-container, async-http, async-io, base64, falcon
+**Runtime**: base64, concurrent-ruby, json-schema, jwt, puma, rack
 **Development**: rspec, rubocop, simplecov, yard, pry-byebug
 **Optional**: jwt (for JWT authentication strategy)
 
