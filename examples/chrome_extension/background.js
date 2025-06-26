@@ -7,6 +7,48 @@ class VectorMCPClient {
     this.connected = false;
     this.pollInterval = null;
     this.currentTab = null;
+    // Security configuration - can be set via chrome.storage
+    this.authConfig = {
+      enabled: false,
+      strategy: 'api_key', // 'api_key' or 'jwt'
+      apiKey: null,
+      jwtToken: null
+    };
+    this.loadAuthConfig();
+  }
+
+  async loadAuthConfig() {
+    try {
+      const result = await chrome.storage.local.get(['vectormcp_auth']);
+      if (result.vectormcp_auth) {
+        this.authConfig = { ...this.authConfig, ...result.vectormcp_auth };
+      }
+    } catch (error) {
+      console.log('VectorMCP: No auth config found, using defaults');
+    }
+  }
+
+  getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (!this.authConfig.enabled) {
+      return headers;
+    }
+    
+    switch (this.authConfig.strategy) {
+      case 'api_key':
+        if (this.authConfig.apiKey) {
+          headers['X-API-Key'] = this.authConfig.apiKey;
+        }
+        break;
+      case 'jwt':
+        if (this.authConfig.jwtToken) {
+          headers['Authorization'] = `Bearer ${this.authConfig.jwtToken}`;
+        }
+        break;
+    }
+    
+    return headers;
   }
 
   async start() {
@@ -27,7 +69,7 @@ class VectorMCPClient {
     try {
       const response = await fetch(`${this.serverUrl}/browser/ping`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({ timestamp: Date.now() })
       });
       
@@ -55,7 +97,9 @@ class VectorMCPClient {
     }
 
     try {
-      const response = await fetch(`${this.serverUrl}/browser/poll`);
+      const response = await fetch(`${this.serverUrl}/browser/poll`, {
+        headers: this.getAuthHeaders()
+      });
       const data = await response.json();
       
       if (data.commands && data.commands.length > 0) {
@@ -294,7 +338,7 @@ class VectorMCPClient {
     try {
       await fetch(`${this.serverUrl}/browser/result`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({
           command_id: commandId,
           success,

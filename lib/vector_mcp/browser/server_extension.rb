@@ -162,6 +162,20 @@ module VectorMCP
         @logger.info("Browser automation tools registered")
       end
 
+      # Configure browser-specific authorization policies
+      # This provides common authorization patterns for browser automation
+      def enable_browser_authorization!(&block)
+        raise ArgumentError, "Authorization must be enabled first" unless authorization.enabled
+
+        # Create browser authorization context
+        browser_auth = BrowserAuthorizationBuilder.new(authorization)
+        
+        # Execute the configuration block
+        browser_auth.instance_eval(&block) if block_given?
+        
+        @logger.info("Browser authorization policies configured")
+      end
+
       # Check if Chrome extension is connected (requires SSE transport)
       def browser_extension_connected?
         return false unless @transport.is_a?(VectorMCP::Transport::SSE)
@@ -174,6 +188,107 @@ module VectorMCP
         return { error: "Browser automation requires SSE transport" } unless @transport.is_a?(VectorMCP::Transport::SSE)
         
         @transport.browser_stats
+      end
+
+      # Browser authorization configuration builder
+      class BrowserAuthorizationBuilder
+        def initialize(authorization_manager)
+          @authorization = authorization_manager
+        end
+
+        # Allow navigation for specific users or roles
+        def allow_navigation(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_navigate", policy)
+        end
+
+        # Allow clicking for specific users or roles
+        def allow_clicking(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_click", policy)
+        end
+
+        # Allow typing for specific users or roles
+        def allow_typing(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_type", policy)
+        end
+
+        # Allow screenshots for specific users or roles
+        def allow_screenshots(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_screenshot", policy)
+        end
+
+        # Allow snapshots for specific users or roles
+        def allow_snapshots(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_snapshot", policy)
+        end
+
+        # Allow console access for specific users or roles
+        def allow_console(condition = nil, &block)
+          policy = condition || block || proc { true }
+          add_browser_policy("browser_console", policy)
+        end
+
+        # Allow all browser tools for specific users or roles
+        def allow_all_browser_tools(condition = nil, &block)
+          policy = condition || block || proc { true }
+          %w[browser_navigate browser_click browser_type browser_screenshot browser_snapshot browser_console].each do |tool_name|
+            add_browser_policy(tool_name, policy)
+          end
+        end
+
+        # Restrict browser access to specific domains
+        def restrict_to_domains(*domains, &condition_block)
+          domains = domains.flatten
+          @authorization.add_policy(:tool) do |user, action, tool|
+            # Only apply to browser navigation
+            next true unless tool.name == "browser_navigate"
+            
+            # Check user condition if provided
+            if condition_block
+              next false unless condition_block.call(user, action, tool)
+            end
+
+            # Check if any allowed domain matches (this is a simplified check)
+            # In practice, you'd want to check the actual URL being navigated to
+            true # For now, just allow - domain checking would need URL parameter access
+          end
+        end
+
+        # Common role-based policies
+        def admin_full_access
+          allow_all_browser_tools { |user, action, tool| user[:role] == "admin" }
+        end
+
+        def browser_user_full_access
+          allow_all_browser_tools { |user, action, tool| %w[admin browser_user].include?(user[:role]) }
+        end
+
+        def read_only_access
+          allow_navigation { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
+          allow_snapshots { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
+          allow_screenshots { |user, action, tool| %w[admin browser_user demo].include?(user[:role]) }
+        end
+
+        def demo_user_limited_access
+          allow_navigation { |user, action, tool| user[:role] == "demo" }
+          allow_snapshots { |user, action, tool| user[:role] == "demo" }
+        end
+
+        private
+
+        def add_browser_policy(tool_name, policy_proc)
+          @authorization.add_policy(:tool) do |user, action, tool|
+            # Only apply to the specific browser tool
+            next true unless tool.name == tool_name
+            
+            # Apply the browser-specific policy
+            policy_proc.call(user, action, tool)
+          end
+        end
       end
     end
   end

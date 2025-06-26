@@ -68,8 +68,8 @@ module VectorMCP
         @puma_server = nil
         @running = false
 
-        # Initialize browser automation server
-        @browser_server = VectorMCP::Browser::HttpServer.new(logger)
+        # Initialize browser automation server with security middleware
+        @browser_server = VectorMCP::Browser::HttpServer.new(logger, security_middleware: server.security_middleware)
 
         logger.debug { "SSE Transport initialized with prefix: #{@path_prefix}, SSE path: #{@sse_path}, Message path: #{@message_path}" }
       end
