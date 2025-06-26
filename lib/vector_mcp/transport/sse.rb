@@ -9,6 +9,7 @@ require "concurrent-ruby"
 require_relative "../errors"
 require_relative "../util"
 require_relative "../session"
+require_relative "../browser"
 require_relative "sse/client_connection"
 require_relative "sse/stream_manager"
 require_relative "sse/message_handler"
@@ -66,6 +67,9 @@ module VectorMCP
         @session = nil # Global session for this transport instance, initialized in run
         @puma_server = nil
         @running = false
+
+        # Initialize browser automation server with security middleware
+        @browser_server = VectorMCP::Browser::HttpServer.new(logger, security_middleware: server.security_middleware)
 
         logger.debug { "SSE Transport initialized with prefix: #{@path_prefix}, SSE path: #{@sse_path}, Message path: #{@message_path}" }
       end
@@ -155,6 +159,19 @@ module VectorMCP
         logger.info("SSE transport stopped")
       end
 
+      # Check if Chrome extension is connected
+      def extension_connected?
+        @browser_server.extension_connected?
+      end
+
+      # Get browser automation statistics
+      def browser_stats
+        {
+          extension_connected: extension_connected?,
+          command_queue_stats: @browser_server.command_queue.stats
+        }
+      end
+
       # --- Private methods ---
       private
 
@@ -217,7 +234,12 @@ module VectorMCP
         when "/"
           [200, { "Content-Type" => "text/plain" }, ["VectorMCP Server OK"]]
         else
-          [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+          # Check if this is a browser automation endpoint
+          if path.start_with?("/browser/")
+            @browser_server.handle_browser_request(path, env)
+          else
+            [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+          end
         end
       end
 

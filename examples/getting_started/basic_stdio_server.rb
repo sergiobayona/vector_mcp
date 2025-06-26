@@ -4,7 +4,7 @@
 # Simple example of a stdio-based MCP server
 # It registers a couple of example tools, resources, and prompts.
 
-require_relative "../lib/vector_mcp"
+require_relative "../../lib/vector_mcp"
 
 # Set debug logging level for development
 VectorMCP.logger.level = Logger::DEBUG

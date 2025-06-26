@@ -6,42 +6,41 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
   let(:secret) { "test-secret-key" }
   let(:strategy) { described_class.new(secret: secret) }
 
-  # Mock JWT module when not available
+  # Mock JWT module for tests
   before do
-    unless defined?(JWT)
-      stub_const("JWT", Module.new)
-      JWT.singleton_class.class_eval do
-        def decode(token, _secret, _verify, _options = {})
-          case token
-          when "valid.jwt.token"
-            [{ "user_id" => 123, "email" => "test@example.com" }, { "alg" => "HS256" }]
-          when "expired.jwt.token"
-            raise JWT::ExpiredSignature, "Token has expired"
-          when "invalid.signature.token"
-            raise JWT::VerificationError, "Invalid signature"
-          when "invalid.issuer.token"
-            raise JWT::InvalidIssuerError, "Invalid issuer"
-          when "invalid.audience.token"
-            raise JWT::InvalidAudienceError, "Invalid audience"
-          when "malformed.token"
-            raise JWT::DecodeError, "Invalid token format"
-          else
-            raise StandardError, "Unexpected error"
-          end
-        end
-
-        def encode(_payload, _secret, _algorithm = "HS256")
-          "encoded.jwt.token"
+    # Always stub JWT for consistent testing behavior
+    stub_const("JWT", Module.new)
+    JWT.singleton_class.class_eval do
+      def decode(token, _secret, _verify, _options = {})
+        case token
+        when "valid.jwt.token"
+          [{ "user_id" => 123, "email" => "test@example.com" }, { "alg" => "HS256" }]
+        when "expired.jwt.token"
+          raise JWT::ExpiredSignature, "Token has expired"
+        when "invalid.signature.token"
+          raise JWT::VerificationError, "Invalid signature"
+        when "invalid.issuer.token"
+          raise JWT::InvalidIssuerError, "Invalid issuer"
+        when "invalid.audience.token"
+          raise JWT::InvalidAudienceError, "Invalid audience"
+        when "malformed.token"
+          raise JWT::DecodeError, "Invalid token format"
+        else
+          raise StandardError, "Unexpected error"
         end
       end
 
-      # Define JWT exception classes
-      JWT.const_set("ExpiredSignature", Class.new(StandardError))
-      JWT.const_set("VerificationError", Class.new(StandardError))
-      JWT.const_set("InvalidIssuerError", Class.new(StandardError))
-      JWT.const_set("InvalidAudienceError", Class.new(StandardError))
-      JWT.const_set("DecodeError", Class.new(StandardError))
+      def encode(_payload, _secret, _algorithm = "HS256")
+        "encoded.jwt.token"
+      end
     end
+
+    # Define JWT exception classes
+    JWT.const_set("ExpiredSignature", Class.new(StandardError))
+    JWT.const_set("VerificationError", Class.new(StandardError))
+    JWT.const_set("InvalidIssuerError", Class.new(StandardError))
+    JWT.const_set("InvalidAudienceError", Class.new(StandardError))
+    JWT.const_set("DecodeError", Class.new(StandardError))
   end
 
   describe "#initialize" do

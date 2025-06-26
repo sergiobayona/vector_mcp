@@ -8,7 +8,7 @@ require "timeout"
 RSpec.describe "VectorMCP Server (Stdio Integration)" do
   # Path to the example server script to run
   # Adjust if your example script is located elsewhere or named differently
-  let(:server_script) { File.expand_path("../../examples/stdio_server.rb", __dir__) }
+  let(:server_script) { File.expand_path("../../examples/getting_started/basic_stdio_server.rb", __dir__) }
 
   # Variables to hold process pipes and thread
   let(:stdin) { @server_stdin }

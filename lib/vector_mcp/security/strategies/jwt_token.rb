@@ -51,8 +51,8 @@ module VectorMCP
               authenticated_at: Time.now,
               jwt_headers: headers
             }
-          rescue JWT::ExpiredSignature, JWT::InvalidIssuerError,
-                 JWT::DecodeError, StandardError
+          rescue JWT::ExpiredSignature, JWT::InvalidIssuerError, JWT::InvalidAudienceError,
+                 JWT::VerificationError, JWT::DecodeError, StandardError
             false # Token validation failed
           end
         end
@@ -96,7 +96,10 @@ module VectorMCP
           auth_header = headers["Authorization"] || headers["authorization"]
           return nil unless auth_header&.start_with?("Bearer ")
 
-          auth_header[7..] # Remove 'Bearer ' prefix
+          token = auth_header[7..] # Remove 'Bearer ' prefix
+          return nil if token.nil? || token.strip.empty?
+
+          token.strip
         end
 
         # Extract token from custom JWT header
