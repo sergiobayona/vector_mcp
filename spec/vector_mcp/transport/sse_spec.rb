@@ -22,7 +22,8 @@ RSpec.describe VectorMCP::Transport::SSE do
       server_info: mock_server_info,
       server_capabilities: mock_server_capabilities,
       protocol_version: "2024-11-05",
-      handle_message: nil
+      handle_message: nil,
+      security_middleware: nil
     )
   end
 

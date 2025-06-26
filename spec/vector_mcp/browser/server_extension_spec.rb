@@ -5,6 +5,22 @@ require "vector_mcp/browser"
 
 RSpec.describe VectorMCP::Browser::ServerExtension do
   let(:server) { VectorMCP::Server.new("test-server") }
+  
+  # Stub SSE transport constant for testing
+  before(:all) do
+    unless VectorMCP::Transport.const_defined?(:SSE)
+      sse_class = Class.new do
+        def extension_connected?
+          true
+        end
+        
+        def browser_stats
+          {}
+        end
+      end
+      VectorMCP::Transport.const_set(:SSE, sse_class)
+    end
+  end
 
   describe "#register_browser_tools" do
     before do
@@ -29,9 +45,9 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
       navigate_tool = server.tools["browser_navigate"]
       expect(navigate_tool.name).to eq("browser_navigate")
       expect(navigate_tool.description).to include("Navigate to a URL")
-      expect(navigate_tool.input_schema).to include("type" => "object")
-      expect(navigate_tool.input_schema["properties"]).to have_key("url")
-      expect(navigate_tool.input_schema["required"]).to include("url")
+      expect(navigate_tool.input_schema).to include(:type => "object")
+      expect(navigate_tool.input_schema[:properties]).to have_key(:url)
+      expect(navigate_tool.input_schema[:required]).to include("url")
     end
 
     it "creates tools with custom server configuration" do
@@ -73,9 +89,13 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
         allow(response_mock).to receive(:length).and_return(50)
         
         # Mock logging
-        operation_logger = instance_double("Logger")
+        operation_logger = double("VectorMCP Operation Logger").tap do |mock|
+          allow(mock).to receive(:info)
+          allow(mock).to receive(:warn)
+          allow(mock).to receive(:error)
+          allow(mock).to receive(:debug)
+        end
         allow(VectorMCP).to receive(:logger_for).with("browser.operations").and_return(operation_logger)
-        allow(operation_logger).to receive(:info)
         
         result = navigate_tool.handler.call(arguments, session_context)
         expect(result[:url]).to eq("https://example.com")
@@ -122,7 +142,11 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
     end
 
     context "with SSE transport" do
-      let(:sse_transport) { instance_double("VectorMCP::Transport::SSE") }
+      let(:sse_transport) do
+        instance_double(VectorMCP::Transport::SSE).tap do |transport|
+          allow(transport).to receive(:is_a?).with(VectorMCP::Transport::SSE).and_return(true)
+        end
+      end
 
       before do
         server.instance_variable_set(:@transport, sse_transport)
@@ -149,7 +173,11 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
     end
 
     context "with SSE transport" do
-      let(:sse_transport) { instance_double("VectorMCP::Transport::SSE") }
+      let(:sse_transport) do
+        instance_double(VectorMCP::Transport::SSE).tap do |transport|
+          allow(transport).to receive(:is_a?).with(VectorMCP::Transport::SSE).and_return(true)
+        end
+      end
 
       before do
         server.instance_variable_set(:@transport, sse_transport)
@@ -252,25 +280,35 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
 
     describe "#browser_user_full_access" do
       it "allows all browser tools for browser_user and admin roles" do
+        policy_blocks = []
         expect(authorization_manager).to receive(:add_policy).with(:tool).exactly(6).times do |&block|
-          # Test with browser_user
-          browser_user = { role: "browser_user" }
-          tool = double("Tool", name: "browser_click")
-          result = block.call(browser_user, "action", tool)
-          expect(result).to be(true)
-          
-          # Test with admin
-          admin_user = { role: "admin" }
-          result = block.call(admin_user, "action", tool)
-          expect(result).to be(true)
-          
-          # Test with other role
-          other_user = { role: "demo" }
-          result = block.call(other_user, "action", tool)
-          expect(result).to be(false)
+          policy_blocks << block
         end
         
         builder.browser_user_full_access
+        
+        # Test the policies after they're created - each policy block handles one specific browser tool
+        browser_tools = %w[browser_navigate browser_click browser_type browser_screenshot browser_snapshot browser_console]
+        policy_blocks.each_with_index do |policy_block, index|
+          tool_name = browser_tools[index]
+          
+          # Test with browser_user
+          browser_user = { role: "browser_user" }
+          tool = double("Tool", name: tool_name)
+          expect(policy_block.call(browser_user, "action", tool)).to be(true)
+          
+          # Test with admin
+          admin_user = { role: "admin" }
+          expect(policy_block.call(admin_user, "action", tool)).to be(true)
+          
+          # Test with other role (should be denied for the specific browser tool)
+          other_user = { role: "demo" }
+          expect(policy_block.call(other_user, "action", tool)).to be(false)
+          
+          # Test with non-browser tool (should be allowed by policy - passes through)
+          non_browser_tool = double("Tool", name: "some_other_tool")
+          expect(policy_block.call(other_user, "action", non_browser_tool)).to be(true)
+        end
       end
     end
 
