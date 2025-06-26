@@ -369,8 +369,8 @@ RSpec.describe "Browser Automation Integration", type: :integration, skip: "Inte
   rescue Net::OpenTimeout, Net::ReadTimeout
     # Return a mock response for timeout
     response = Object.new
-    def code = "408"
-    def body = '{"error": "Request timed out"}'
+    response.define_singleton_method(:code) { "408" }
+    response.define_singleton_method(:body) { '{"error": "Request timed out"}' }
     response
   end
 end

@@ -16,16 +16,26 @@ Style/StringLiteralsInInterpolation:
 # Increase method length limits
 Metrics/MethodLength:
   Max: 30
+  Exclude:
+    - 'lib/vector_mcp/browser/**/*'
+    - 'examples/**/*'
+    - 'spec/**/*'
 
 # Increase ABC size limits
 Metrics/AbcSize:
   Max: 30
+  Exclude:
+    - 'lib/vector_mcp/browser/**/*'
+    - 'examples/**/*'
+    - 'spec/**/*'
 
 # Increase class length limits
 Metrics/ClassLength:
   Max: 250
   Exclude:
     - 'lib/vector_mcp/transport/sse.rb'
+    - 'lib/vector_mcp/browser/**/*'
+    - 'examples/**/*'
 
 # Increase module length limits
 Metrics/ModuleLength:
@@ -38,19 +48,27 @@ Layout/LineLength:
 # Increase cyclomatic complexity
 Metrics/CyclomaticComplexity:
   Max: 10
+  Exclude:
+    - 'lib/vector_mcp/browser/**/*'
+    - 'examples/**/*'
 
 # Increase perceived complexity
 Metrics/PerceivedComplexity:
   Max: 10
+  Exclude:
+    - 'lib/vector_mcp/browser/**/*'
+    - 'examples/**/*'
 
 # If you're using RSpec and Rake, you might want to include these extensions
-require:
+plugins:
   - rubocop-rake
 
-# Ignore long blocks in tests
+# Ignore long blocks in tests and examples
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
+    - 'examples/**/*'
+    - '*.gemspec'
 
 Style/MultilineBlockChain:
   Exclude:

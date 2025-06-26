@@ -121,7 +121,7 @@ class BrowserTestRunner
     end
   end
 
-  def check_prerequisites
+  def prerequisites_met?
     puts "🔍 Checking Prerequisites".colorize(:blue)
 
     # Check if RSpec is available
@@ -167,7 +167,7 @@ if __FILE__ == $PROGRAM_NAME
   runner = BrowserTestRunner.new
 
   # Check prerequisites first
-  unless runner.check_prerequisites
+  unless runner.prerequisites_met?
     puts
     puts "❌ Prerequisites not met. Please install missing dependencies.".colorize(:red)
     exit(1)

@@ -137,7 +137,7 @@ module VectorMCP
       def handle_extension_poll(env)
         return method_not_allowed("GET") unless env["REQUEST_METHOD"] == "GET"
 
-        commands = @command_queue.get_pending_commands
+        commands = @command_queue.pending_commands
         logger.debug("Extension poll: returning #{commands.size} commands")
 
         [200, { "Content-Type" => "application/json" }, [{ commands: commands }.to_json]]
@@ -337,8 +337,6 @@ module VectorMCP
 
       def security_error_response(security_result)
         status_code = case security_result[:error_code]
-                      when "AUTHENTICATION_REQUIRED"
-                        401
                       when "AUTHORIZATION_FAILED"
                         403
                       else

@@ -176,7 +176,7 @@ class LogAnalyzer
     puts "📋 Summary"
     puts "=" * 50
 
-    time_range = get_time_range
+    time_range = self.time_range
     puts "Time range: #{time_range}" if time_range
 
     components = @events.map { |e| e["component"] }.compact.uniq.length
@@ -205,7 +205,7 @@ class LogAnalyzer
     puts "  jq 'select(.component | startswith(\"security\"))' #{@log_file}"
   end
 
-  def get_time_range
+  def time_range
     timestamps = @events.map { |e| e["timestamp"] }.compact
     return nil if timestamps.empty?
 

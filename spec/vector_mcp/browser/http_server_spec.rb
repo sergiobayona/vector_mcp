@@ -442,7 +442,7 @@ RSpec.describe VectorMCP::Browser::HttpServer do
 
       it "returns pending commands" do
         commands = [{ id: "123", action: "navigate" }]
-        allow(command_queue).to receive(:get_pending_commands).and_return(commands)
+        allow(command_queue).to receive(:pending_commands).and_return(commands)
 
         response = server.send(:handle_extension_poll, env)
         expect(response[0]).to eq(200)

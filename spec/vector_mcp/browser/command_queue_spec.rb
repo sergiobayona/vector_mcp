@@ -76,7 +76,7 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     end
   end
 
-  describe "#get_pending_commands" do
+  describe "#pending_commands" do
     let(:commands) do
       [
         { id: "cmd-1", action: "navigate", params: {} },
@@ -90,12 +90,12 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
     end
 
     it "returns all pending commands" do
-      pending_commands = queue.get_pending_commands
+      pending_commands = queue.pending_commands
       expect(pending_commands).to match_array(commands)
     end
 
     it "clears pending commands after retrieval" do
-      queue.get_pending_commands
+      queue.pending_commands
 
       pending_commands = queue.instance_variable_get(:@pending_commands)
       expect(pending_commands).to be_empty
@@ -109,21 +109,21 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
                                                          actions: %w[navigate click]
                                                        ))
 
-      queue.get_pending_commands
+      queue.pending_commands
     end
 
     it "does not log when no commands are pending" do
-      queue.get_pending_commands # Clear existing commands
+      queue.pending_commands # Clear existing commands
 
       expect(logger).not_to receive(:info).with(/Commands dispatched/)
 
-      queue.get_pending_commands
+      queue.pending_commands
     end
 
     it "returns empty array when no commands pending" do
-      queue.get_pending_commands # Clear existing
+      queue.pending_commands # Clear existing
 
-      result = queue.get_pending_commands
+      result = queue.pending_commands
       expect(result).to eq([])
     end
   end
@@ -315,7 +315,7 @@ RSpec.describe VectorMCP::Browser::CommandQueue do
       threads.each(&:join)
 
       # All commands should be enqueued
-      pending_commands = queue.get_pending_commands
+      pending_commands = queue.pending_commands
       expect(pending_commands.size).to eq(10)
     end
 

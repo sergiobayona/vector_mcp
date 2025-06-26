@@ -203,7 +203,8 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
       server_without_auth = VectorMCP::Server.new("test-server-2")
 
       expect do
-        server_without_auth.enable_browser_authorization! {}
+        server_without_auth.enable_browser_authorization! do # empty block for test
+        end
       end.to raise_error(ArgumentError, "Authorization must be enabled first")
     end
 
@@ -213,14 +214,16 @@ RSpec.describe VectorMCP::Browser::ServerExtension do
         .to receive(:new).with(server.authorization).and_return(builder_mock)
       expect(builder_mock).to receive(:instance_eval)
 
-      server.enable_browser_authorization! {}
+      server.enable_browser_authorization! do # empty block for test
+      end
     end
 
     it "logs configuration completion" do
       expect(server.instance_variable_get(:@logger)).to receive(:info)
         .with("Browser authorization policies configured")
 
-      server.enable_browser_authorization! {}
+      server.enable_browser_authorization! do # empty block for test
+      end
     end
 
     it "executes configuration block" do

@@ -31,7 +31,7 @@ module VectorMCP
       end
 
       # Get all pending commands (called by extension)
-      def get_pending_commands
+      def pending_commands
         commands = @pending_commands.to_a
         @pending_commands.clear
 
