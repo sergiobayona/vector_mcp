@@ -6,10 +6,6 @@
 require_relative "../lib/vector_mcp"
 
 # Configure logging using the new structured logging system
-VectorMCP.configure_logging do
-  level "DEBUG"
-  console colorize: true, include_timestamp: true
-end
 
 # Create a server instance
 server = VectorMCP.new(

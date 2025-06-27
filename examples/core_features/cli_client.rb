@@ -6,10 +6,6 @@ require "vector_mcp"
 require "json"
 
 # Configure logging using the new structured logging system
-VectorMCP.configure_logging do
-  level "DEBUG"
-  console colorize: true, include_timestamp: true
-end
 
 # Create a client instance and connect to the server
 client = VectorMCP.new_client(endpoint: ARGV[0] || "http://localhost:7465/sse")

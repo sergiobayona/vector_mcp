@@ -6,11 +6,8 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "vector_mcp"
 
-# Configure logging using the new structured logging system
-VectorMCP.configure_logging do
-  level "DEBUG"
-  console colorize: true, include_timestamp: true
-end
+# Logging can be configured via environment variables:
+# VECTORMCP_LOG_LEVEL=DEBUG VECTORMCP_LOG_FORMAT=json ruby examples/getting_started/minimal_server.rb
 
 # Create an instance of the server
 server = VectorMCP.new(name: "VectorMCP::ExampleSSE_Server", version: "0.0.1")

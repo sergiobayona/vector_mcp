@@ -28,25 +28,25 @@ module VectorMCP
       new(component)
     end
 
-    # Log methods with context support
-    def debug(message, **context)
-      log(:debug, message, context)
+    # Log methods with context support and block evaluation
+    def debug(message = nil, **context, &block)
+      log(:debug, message || block&.call, context)
     end
 
-    def info(message, **context)
-      log(:info, message, context)
+    def info(message = nil, **context, &block)
+      log(:info, message || block&.call, context)
     end
 
-    def warn(message, **context)
-      log(:warn, message, context)
+    def warn(message = nil, **context, &block)
+      log(:warn, message || block&.call, context)
     end
 
-    def error(message, **context)
-      log(:error, message, context)
+    def error(message = nil, **context, &block)
+      log(:error, message || block&.call, context)
     end
 
-    def fatal(message, **context)
-      log(:fatal, message, context)
+    def fatal(message = nil, **context, &block)
+      log(:fatal, message || block&.call, context)
     end
 
     # Security-specific logging

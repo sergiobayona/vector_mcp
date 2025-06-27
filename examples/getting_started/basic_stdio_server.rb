@@ -6,11 +6,8 @@
 
 require_relative "../../lib/vector_mcp"
 
-# Configure logging using the new structured logging system
-VectorMCP.configure_logging do
-  level "DEBUG"
-  console colorize: true, include_timestamp: true
-end
+# Logging can be configured via environment variables:
+# VECTORMCP_LOG_LEVEL=DEBUG VECTORMCP_LOG_FORMAT=json ruby examples/getting_started/basic_stdio_server.rb
 
 # Create a server instance with a name/version
 server = VectorMCP.new(name: "VectorMCP::ExampleServer", version: "0.0.1")

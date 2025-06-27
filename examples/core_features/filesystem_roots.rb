@@ -8,10 +8,6 @@
 require_relative "../lib/vector_mcp"
 
 # Configure logging using the new structured logging system
-VectorMCP.configure_logging do
-  level "INFO"
-  console colorize: true, include_timestamp: true
-end
 
 # Create a server instance
 server = VectorMCP.new(name: "VectorMCP::RootsDemo", version: "0.0.1")
