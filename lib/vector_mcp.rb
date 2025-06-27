@@ -12,7 +12,7 @@ require_relative "vector_mcp/image_util"
 require_relative "vector_mcp/handlers/core"
 require_relative "vector_mcp/transport/stdio"
 # require_relative "vector_mcp/transport/sse" # Load on demand
-require_relative "vector_mcp/logging"
+require_relative "vector_mcp/logger"
 require_relative "vector_mcp/server"
 require_relative "vector_mcp/browser"
 
@@ -46,44 +46,18 @@ require_relative "vector_mcp/browser"
 # order to serve multiple concurrent clients over HTTP.
 #
 module VectorMCP
-  # @return [Logger] the shared logger instance for the library.
-  @logger = Logger.new($stderr, level: Logger::INFO, progname: "VectorMCP")
-
-  # @return [VectorMCP::Logging::Core] the new structured logging system
-  @logging_core = nil
-
   class << self
-    # @!attribute [r] logger
-    #   @return [Logger] the shared logger instance for the library (legacy compatibility).
-    def logger
-      if @logging_core
-        @logging_core.legacy_logger
-      else
-        @logger
-      end
-    end
-
-    # Initialize the new structured logging system
-    # @param config [Hash, VectorMCP::Logging::Configuration] logging configuration
-    # @return [VectorMCP::Logging::Core] the logging core instance
-    def setup_logging(config = {})
-      configuration = config.is_a?(Logging::Configuration) ? config : Logging::Configuration.new(config)
-      @logging_core = Logging::Core.new(configuration)
-    end
-
     # Get a component-specific logger
     # @param component [String, Symbol] the component name
-    # @return [VectorMCP::Logging::Component] component logger
+    # @return [VectorMCP::Logger] component logger
     def logger_for(component)
-      setup_logging unless @logging_core
-      @logging_core.logger_for(component)
+      Logger.for(component)
     end
 
-    # Configure the logging system
-    # @yield [VectorMCP::Logging::Configuration] configuration block
-    def configure_logging(&)
-      setup_logging unless @logging_core
-      @logging_core.configure(&)
+    # Get the default logger
+    # @return [VectorMCP::Logger] default logger
+    def logger
+      @default_logger ||= Logger.for("vectormcp")
     end
 
     # Creates a new {VectorMCP::Server} instance. This is a **thin wrapper** around

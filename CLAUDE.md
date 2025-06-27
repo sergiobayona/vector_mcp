@@ -150,72 +150,47 @@ Use VectorMCP-specific error classes:
 
 Version defined in `lib/vector_mcp/version.rb` (currently 0.3.0)
 
-## Logging Architecture
+## Logging
 
-VectorMCP includes a production-ready structured logging system with component-based organization and multiple output formats.
+VectorMCP provides simple, environment-driven logging with support for structured JSON output and component identification.
 
-### Logging Features
+### Basic Usage
 
-**✅ Component-Based Logging**
-- **Component Loggers**: `VectorMCP.logger_for("server")`, `VectorMCP.logger_for("transport.stdio")`
-- **Hierarchical Configuration**: Different log levels per component
-- **Context Management**: Structured context with `with_context` blocks
-- **Performance Measurement**: Built-in `measure` method for operation timing
-
-**✅ Multiple Output Formats**
-- **Text Format**: Human-readable with colors and structured layout
-- **JSON Format**: Machine-readable for log aggregation systems
-- **Console Output**: Interactive development with colored output
-- **File Output**: Production logging with rotation support
-
-**✅ Flexible Configuration**
-- **Environment Variables**: `VECTORMCP_LOG_LEVEL`, `VECTORMCP_LOG_FORMAT`, `VECTORMCP_LOG_OUTPUT`
-- **YAML Configuration**: File-based configuration for complex deployments
-- **Programmatic Configuration**: Runtime configuration changes
-- **Legacy Compatibility**: Existing `VectorMCP.logger` continues to work
-
-### Logging Usage Examples
-
-**Basic Component Logging:**
+**Component Loggers:**
 ```ruby
 server_logger = VectorMCP.logger_for("server")
-server_logger.info("Server started", context: { port: 8080, transport: "stdio" })
-```
-
-**Context Management:**
-```ruby
-server_logger.with_context(session_id: "sess_123") do
-  server_logger.info("Processing request")
-  server_logger.warn("Request validation failed")
-end
+server_logger.info("Server started", port: 8080, transport: "stdio")
 ```
 
 **Performance Measurement:**
 ```ruby
 result = server_logger.measure("Database query") do
-  # Your operation here
   perform_database_query
 end
 ```
 
-**Configuration Setup:**
+**Security Logging:**
 ```ruby
-VectorMCP.setup_logging(level: "DEBUG", format: "json")
-VectorMCP.configure_logging do
-  level "INFO"
-  component "security.auth", level: "DEBUG"
-  console colorize: true, include_timestamp: true
-end
+security_logger = VectorMCP.logger_for("security")
+security_logger.security("Authentication failed", user_id: "user_123", reason: "invalid_key")
 ```
 
-**Security Event Logging:**
-```ruby
-security_logger = VectorMCP.logger_for("security.auth")
-security_logger.security("Authentication successful", context: { 
-  user_id: "user_123", 
-  strategy: "jwt", 
-  ip_address: request_ip 
-})
+### Configuration
+
+All configuration is done via environment variables:
+
+- `VECTORMCP_LOG_LEVEL`: DEBUG, INFO, WARN, ERROR, FATAL (default: INFO)
+- `VECTORMCP_LOG_FORMAT`: text, json (default: text)
+- `VECTORMCP_LOG_OUTPUT`: stderr, stdout, file (default: stderr)
+- `VECTORMCP_LOG_FILE`: File path when using file output (default: ./vectormcp.log)
+
+**Examples:**
+```bash
+# JSON logging to file
+VECTORMCP_LOG_FORMAT=json VECTORMCP_LOG_OUTPUT=file ruby server.rb
+
+# Debug level with text format
+VECTORMCP_LOG_LEVEL=DEBUG ruby server.rb
 ```
 
 ## Image Processing
@@ -430,6 +405,6 @@ end
 1. **Setup**: Run `bin/setup` for development environment
 2. **Testing**: Use `rake` for full test suite including linting
 3. **Quality**: Ensure `bundle exec rubocop` passes
-4. **Logging**: Use component loggers for observability during development
+4. **Logging**: Use `VectorMCP.logger_for(component)` for component-specific logging
 5. **Security**: Test with `examples/auth_server.rb` for security scenarios
 6. **Documentation**: Update YARD docs and run `rake yard`
