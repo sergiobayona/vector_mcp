@@ -15,7 +15,7 @@ puts
 # Test 2: Component-specific loggers
 puts "2. Testing component-specific loggers:"
 server_logger = VectorMCP.logger_for("server")
-transport_logger = VectorMCP.logger_for("transport.stdio") 
+transport_logger = VectorMCP.logger_for("transport.stdio")
 security_logger = VectorMCP.logger_for("security.auth")
 
 server_logger.info("Server initialized", port: 8080, transport: "stdio")

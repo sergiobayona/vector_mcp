@@ -9,7 +9,7 @@ module VectorMCP
   class Logger
     LEVELS = {
       "TRACE" => ::Logger::DEBUG,
-      "DEBUG" => ::Logger::DEBUG, 
+      "DEBUG" => ::Logger::DEBUG,
       "INFO" => ::Logger::INFO,
       "WARN" => ::Logger::WARN,
       "ERROR" => ::Logger::ERROR,
@@ -59,21 +59,17 @@ module VectorMCP
       start_time = Time.now
       result = yield
       duration = Time.now - start_time
-      
-      info("#{description} completed", **context.merge(
-        duration_ms: (duration * 1000).round(2),
-        success: true
-      ))
-      
+
+      info("#{description} completed", **context, duration_ms: (duration * 1000).round(2),
+                                                  success: true)
+
       result
     rescue StandardError => e
       duration = Time.now - start_time
-      error("#{description} failed", **context.merge(
-        duration_ms: (duration * 1000).round(2),
-        success: false,
-        error: e.class.name,
-        error_message: e.message
-      ))
+      error("#{description} failed", **context, duration_ms: (duration * 1000).round(2),
+                                                success: false,
+                                                error: e.class.name,
+                                                error_message: e.message)
       raise
     end
 
@@ -104,11 +100,11 @@ module VectorMCP
 
     def log_text(level, message, context)
       formatted_message = if context.empty?
-                           "[#{@component}] #{message}"
-                         else
-                           context_str = context.map { |k, v| "#{k}=#{v}" }.join(" ")
-                           "[#{@component}] #{message} (#{context_str})"
-                         end
+                            "[#{@component}] #{message}"
+                          else
+                            context_str = context.map { |k, v| "#{k}=#{v}" }.join(" ")
+                            "[#{@component}] #{message} (#{context_str})"
+                          end
 
       @ruby_logger.send(level, formatted_message)
     end
@@ -138,7 +134,7 @@ module VectorMCP
       LEVELS.fetch(level_name, ::Logger::INFO)
     end
 
-    def format_log_entry(severity, datetime, progname, msg)
+    def format_log_entry(severity, datetime, _progname, msg)
       if @format == "json"
         # JSON messages are already formatted
         "#{msg}\n"

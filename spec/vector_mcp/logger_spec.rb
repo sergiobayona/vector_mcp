@@ -8,28 +8,28 @@ RSpec.describe VectorMCP::Logger do
   let(:original_env) { ENV.to_h }
 
   # Helper to capture log output
-  def capture_log_output(&block)
+  def capture_log_output
     output = StringIO.new
-    
+
     # Create a logger that writes to our StringIO
     original_create_ruby_logger = VectorMCP::Logger.instance_method(:create_ruby_logger)
-    
+
     VectorMCP::Logger.class_eval do
       define_method(:create_ruby_logger) do
-        logger = ::Logger.new(output)
+        logger = Logger.new(output)
         logger.level = determine_level
         logger.formatter = method(:format_log_entry)
         logger
       end
     end
-    
+
     yield if block_given?
-    
+
     # Restore original method
     VectorMCP::Logger.class_eval do
       define_method(:create_ruby_logger, original_create_ruby_logger)
     end
-    
+
     output
   end
 
@@ -64,7 +64,7 @@ RSpec.describe VectorMCP::Logger do
 
     it "creates ruby logger instance" do
       logger = described_class.new("test")
-      expect(logger.ruby_logger).to be_a(::Logger)
+      expect(logger.ruby_logger).to be_a(Logger)
     end
 
     it "sets format from environment variable" do
@@ -208,7 +208,7 @@ RSpec.describe VectorMCP::Logger do
         result = logger.measure("test operation") { "operation result" }
         expect(result).to eq("operation result")
       end
-      
+
       expect(output.string).to include("test operation completed")
       expect(output.string).to include("duration_ms=")
       expect(output.string).to include("success=true")
@@ -258,42 +258,42 @@ RSpec.describe VectorMCP::Logger do
       it "respects VECTORMCP_LOG_LEVEL=DEBUG" do
         ENV["VECTORMCP_LOG_LEVEL"] = "DEBUG"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::DEBUG)
+        expect(logger.ruby_logger.level).to eq(Logger::DEBUG)
       end
 
       it "respects VECTORMCP_LOG_LEVEL=INFO" do
         ENV["VECTORMCP_LOG_LEVEL"] = "INFO"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::INFO)
+        expect(logger.ruby_logger.level).to eq(Logger::INFO)
       end
 
       it "respects VECTORMCP_LOG_LEVEL=ERROR" do
         ENV["VECTORMCP_LOG_LEVEL"] = "ERROR"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::ERROR)
+        expect(logger.ruby_logger.level).to eq(Logger::ERROR)
       end
 
       it "handles case insensitive levels" do
         ENV["VECTORMCP_LOG_LEVEL"] = "debug"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::DEBUG)
+        expect(logger.ruby_logger.level).to eq(Logger::DEBUG)
       end
 
       it "defaults to INFO for unknown levels" do
         ENV["VECTORMCP_LOG_LEVEL"] = "UNKNOWN"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::INFO)
+        expect(logger.ruby_logger.level).to eq(Logger::INFO)
       end
 
       it "defaults to INFO when not set" do
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::INFO)
+        expect(logger.ruby_logger.level).to eq(Logger::INFO)
       end
 
       it "supports TRACE level as DEBUG" do
         ENV["VECTORMCP_LOG_LEVEL"] = "TRACE"
         logger = described_class.new("test")
-        expect(logger.ruby_logger.level).to eq(::Logger::DEBUG)
+        expect(logger.ruby_logger.level).to eq(Logger::DEBUG)
       end
     end
 
@@ -319,7 +319,7 @@ RSpec.describe VectorMCP::Logger do
     describe "file output" do
       it "writes to file when configured" do
         temp_file = Tempfile.new("test_log")
-        
+
         begin
           ENV["VECTORMCP_LOG_OUTPUT"] = "file"
           ENV["VECTORMCP_LOG_FILE"] = temp_file.path
@@ -329,7 +329,7 @@ RSpec.describe VectorMCP::Logger do
 
           # Close the logger to flush the file
           logger.ruby_logger.close
-          
+
           content = File.read(temp_file.path)
           expect(content).to include("[test] test message")
         ensure
@@ -340,12 +340,12 @@ RSpec.describe VectorMCP::Logger do
 
       it "defaults to vectormcp.log when file path not specified" do
         ENV["VECTORMCP_LOG_OUTPUT"] = "file"
-        
+
         # Mock File.open to avoid creating actual file
         allow(File).to receive(:open).with("./vectormcp.log", "a").and_return(StringIO.new)
-        
+
         described_class.new("test")
-        
+
         expect(File).to have_received(:open).with("./vectormcp.log", "a")
       end
     end
@@ -393,10 +393,10 @@ RSpec.describe VectorMCP::Logger do
           logger = described_class.new("test")
           logger.info("test message", key: "value")
         end
-        
+
         lines = output.string.strip.split("\n")
         json_line = lines.last
-        
+
         parsed = JSON.parse(json_line)
         expect(parsed["level"]).to eq("INFO")
         expect(parsed["component"]).to eq("test")
@@ -411,10 +411,10 @@ RSpec.describe VectorMCP::Logger do
           logger = described_class.new("test")
           logger.info("message", user_id: 123, action: "login")
         end
-        
+
         lines = output.string.strip.split("\n")
         parsed = JSON.parse(lines.last)
-        
+
         expect(parsed["user_id"]).to eq(123)
         expect(parsed["action"]).to eq("login")
       end
@@ -424,10 +424,10 @@ RSpec.describe VectorMCP::Logger do
           logger = described_class.new("test")
           logger.info("simple message")
         end
-        
+
         lines = output.string.strip.split("\n")
         parsed = JSON.parse(lines.last)
-        
+
         expect(parsed.keys).to contain_exactly("timestamp", "level", "component", "message", "thread_id")
       end
     end
@@ -509,16 +509,16 @@ RSpec.describe VectorMCP::Logger do
     it "handles thread safety" do
       output = capture_log_output do
         logger = described_class.new("test")
-        
+
         threads = 10.times.map do |i|
           Thread.new do
             logger.info("message #{i}", thread_num: i)
           end
         end
-        
+
         threads.each(&:join)
       end
-      
+
       # All messages should be logged
       (0...10).each do |i|
         expect(output.string).to include("message #{i}")
@@ -529,12 +529,12 @@ RSpec.describe VectorMCP::Logger do
   describe "LEVELS constant" do
     it "maps all expected level names" do
       expect(described_class::LEVELS).to include(
-        "TRACE" => ::Logger::DEBUG,
-        "DEBUG" => ::Logger::DEBUG,
-        "INFO" => ::Logger::INFO,
-        "WARN" => ::Logger::WARN,
-        "ERROR" => ::Logger::ERROR,
-        "FATAL" => ::Logger::FATAL
+        "TRACE" => Logger::DEBUG,
+        "DEBUG" => Logger::DEBUG,
+        "INFO" => Logger::INFO,
+        "WARN" => Logger::WARN,
+        "ERROR" => Logger::ERROR,
+        "FATAL" => Logger::FATAL
       )
     end
 

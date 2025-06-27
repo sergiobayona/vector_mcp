@@ -57,7 +57,7 @@ module VectorMCP
     # Get the default logger
     # @return [VectorMCP::Logger] default logger
     def logger
-      @default_logger ||= Logger.for("vectormcp")
+      @logger ||= Logger.for("vectormcp")
     end
 
     # Creates a new {VectorMCP::Server} instance. This is a **thin wrapper** around

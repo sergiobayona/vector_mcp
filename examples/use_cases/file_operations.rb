@@ -53,7 +53,7 @@ class FileOperationsServer
 
     # Create and register a safe operations directory
     @operations_dir = File.join(__dir__, "file_workspace")
-    Dir.mkdir(@operations_dir) unless Dir.exist?(@operations_dir)
+    FileUtils.mkdir_p(@operations_dir)
     @server.register_root_from_path(@operations_dir, name: "Operations")
 
     @logger.info("Filesystem roots configured", roots: @server.roots.keys)
@@ -72,7 +72,7 @@ class FileOperationsServer
         },
         required: ["file_path"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       file_path = args["file_path"]
       encoding = args.fetch("encoding", "UTF-8")
 
@@ -81,21 +81,15 @@ class FileOperationsServer
       begin
         # Security check: ensure file is within a registered root
         absolute_path = File.expand_path(file_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "File path is outside registered roots" }
-        end
+        return { status: "error", error: "File path is outside registered roots" } unless within_root
 
-        unless File.exist?(absolute_path)
-          return { status: "error", error: "File not found" }
-        end
+        return { status: "error", error: "File not found" } unless File.exist?(absolute_path)
 
-        unless File.readable?(absolute_path)
-          return { status: "error", error: "File not readable" }
-        end
+        return { status: "error", error: "File not readable" } unless File.readable?(absolute_path)
 
         content = File.read(absolute_path, encoding: encoding)
         file_info = File.stat(absolute_path)
@@ -108,7 +102,7 @@ class FileOperationsServer
           modified_at: file_info.mtime,
           encoding: encoding
         }
-      rescue => e
+      rescue StandardError => e
         @logger.error("Failed to read file", path: file_path, error: e.message)
         { status: "error", error: e.message }
       end
@@ -126,9 +120,9 @@ class FileOperationsServer
           encoding: { type: "string", description: "File encoding (default: UTF-8)", default: "UTF-8" },
           append: { type: "boolean", description: "Append to file instead of overwriting", default: false }
         },
-        required: ["file_path", "content"]
+        required: %w[file_path content]
       }
-    ) do |args, session|
+    ) do |args, _session|
       file_path = args["file_path"]
       content = args["content"]
       encoding = args.fetch("encoding", "UTF-8")
@@ -138,17 +132,15 @@ class FileOperationsServer
 
       begin
         absolute_path = File.expand_path(file_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "File path is outside registered roots" }
-        end
+        return { status: "error", error: "File path is outside registered roots" } unless within_root
 
         # Ensure directory exists
         dir = File.dirname(absolute_path)
-        Dir.mkdir(dir) unless Dir.exist?(dir)
+        FileUtils.mkdir_p(dir)
 
         mode = append ? "a" : "w"
         File.write(absolute_path, content, mode: mode, encoding: encoding)
@@ -163,7 +155,7 @@ class FileOperationsServer
           modified_at: file_info.mtime,
           append_mode: append
         }
-      rescue => e
+      rescue StandardError => e
         @logger.error("Failed to write file", path: file_path, error: e.message)
         { status: "error", error: e.message }
       end
@@ -182,24 +174,20 @@ class FileOperationsServer
         },
         required: ["directory_path"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       directory_path = args["directory_path"]
       include_hidden = args.fetch("include_hidden", false)
       file_details = args.fetch("file_details", false)
 
       begin
         absolute_path = File.expand_path(directory_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "Directory path is outside registered roots" }
-        end
+        return { status: "error", error: "Directory path is outside registered roots" } unless within_root
 
-        unless Dir.exist?(absolute_path)
-          return { status: "error", error: "Directory not found" }
-        end
+        return { status: "error", error: "Directory not found" } unless Dir.exist?(absolute_path)
 
         entries = Dir.entries(absolute_path)
         entries = entries.reject { |e| e.start_with?(".") } unless include_hidden
@@ -236,7 +224,7 @@ class FileOperationsServer
             total_count: entries.size
           }
         end
-      rescue => e
+      rescue StandardError => e
         { status: "error", error: e.message }
       end
     end
@@ -258,7 +246,7 @@ class FileOperationsServer
         },
         required: ["pattern"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       pattern = args["pattern"]
       directory = args["directory"]
       file_extension = args["file_extension"]
@@ -296,7 +284,7 @@ class FileOperationsServer
                 break if results.size >= max_results
               end
             end
-          rescue => e
+          rescue StandardError
             # Skip files that can't be read
             next
           end
@@ -325,9 +313,9 @@ class FileOperationsServer
           case_sensitive: { type: "boolean", description: "Case sensitive search", default: false },
           backup: { type: "boolean", description: "Create backup file", default: true }
         },
-        required: ["file_path", "search_pattern", "replacement"]
+        required: %w[file_path search_pattern replacement]
       }
-    ) do |args, session|
+    ) do |args, _session|
       file_path = args["file_path"]
       search_pattern = args["search_pattern"]
       replacement = args["replacement"]
@@ -336,20 +324,16 @@ class FileOperationsServer
 
       begin
         absolute_path = File.expand_path(file_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "File path is outside registered roots" }
-        end
+        return { status: "error", error: "File path is outside registered roots" } unless within_root
 
-        unless File.exist?(absolute_path)
-          return { status: "error", error: "File not found" }
-        end
+        return { status: "error", error: "File not found" } unless File.exist?(absolute_path)
 
         content = File.read(absolute_path)
-        
+
         # Create backup if requested
         if backup
           backup_path = "#{absolute_path}.backup"
@@ -358,7 +342,7 @@ class FileOperationsServer
 
         regex_flags = case_sensitive ? 0 : Regexp::IGNORECASE
         search_regex = Regexp.new(Regexp.escape(search_pattern), regex_flags)
-        
+
         new_content = content.gsub(search_regex, replacement)
         replacements_made = content.scan(search_regex).size
 
@@ -370,7 +354,7 @@ class FileOperationsServer
           replacements_made: replacements_made,
           backup_created: backup ? "#{file_path}.backup" : nil
         }
-      rescue => e
+      rescue StandardError => e
         { status: "error", error: e.message }
       end
     end
@@ -388,22 +372,18 @@ class FileOperationsServer
         },
         required: ["file_path"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       file_path = args["file_path"]
 
       begin
         absolute_path = File.expand_path(file_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "File path is outside registered roots" }
-        end
+        return { status: "error", error: "File path is outside registered roots" } unless within_root
 
-        unless File.exist?(absolute_path)
-          return { status: "error", error: "File not found" }
-        end
+        return { status: "error", error: "File not found" } unless File.exist?(absolute_path)
 
         file_stat = File.stat(absolute_path)
         content = File.read(absolute_path)
@@ -415,16 +395,16 @@ class FileOperationsServer
 
         # File type detection
         file_type = case File.extname(file_path).downcase
-                   when '.rb' then 'Ruby'
-                   when '.py' then 'Python'
-                   when '.js' then 'JavaScript'
-                   when '.txt' then 'Text'
-                   when '.md' then 'Markdown'
-                   when '.json' then 'JSON'
-                   when '.yaml', '.yml' then 'YAML'
-                   when '.csv' then 'CSV'
-                   else 'Unknown'
-                   end
+                    when ".rb" then "Ruby"
+                    when ".py" then "Python"
+                    when ".js" then "JavaScript"
+                    when ".txt" then "Text"
+                    when ".md" then "Markdown"
+                    when ".json" then "JSON"
+                    when ".yaml", ".yml" then "YAML"
+                    when ".csv" then "CSV"
+                    else "Unknown"
+                    end
 
         {
           status: "success",
@@ -443,7 +423,7 @@ class FileOperationsServer
             average_line_length: lines.empty? ? 0 : (characters.to_f / lines.size).round(2)
           }
         }
-      rescue => e
+      rescue StandardError => e
         { status: "error", error: e.message }
       end
     end
@@ -460,23 +440,19 @@ class FileOperationsServer
         },
         required: ["directory_path"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       directory_path = args["directory_path"]
       recursive = args.fetch("recursive", true)
 
       begin
         absolute_path = File.expand_path(directory_path)
-        within_root = @server.roots.any? do |uri, root|
+        within_root = @server.roots.any? do |_uri, root|
           absolute_path.start_with?(File.expand_path(root.path))
         end
 
-        unless within_root
-          return { status: "error", error: "Directory path is outside registered roots" }
-        end
+        return { status: "error", error: "Directory path is outside registered roots" } unless within_root
 
-        unless Dir.exist?(absolute_path)
-          return { status: "error", error: "Directory not found" }
-        end
+        return { status: "error", error: "Directory not found" } unless Dir.exist?(absolute_path)
 
         pattern = recursive ? "#{absolute_path}/**/*" : "#{absolute_path}/*"
         all_paths = Dir.glob(pattern)
@@ -506,7 +482,7 @@ class FileOperationsServer
             largest_files: largest_files.map { |path, size| { path: path, size_bytes: size } }
           }
         }
-      rescue => e
+      rescue StandardError => e
         { status: "error", error: e.message }
       end
     end

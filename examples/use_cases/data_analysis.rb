@@ -48,7 +48,7 @@ class DataAnalysisServer
 
   def setup_workspace
     @workspace_dir = File.join(__dir__, "data_workspace")
-    Dir.mkdir(@workspace_dir) unless Dir.exist?(@workspace_dir)
+    FileUtils.mkdir_p(@workspace_dir)
     @server.register_root_from_path(@workspace_dir, name: "Data Workspace")
   end
 
@@ -62,11 +62,11 @@ class DataAnalysisServer
         properties: {
           file_path: { type: "string", description: "Path to the data file" },
           dataset_name: { type: "string", description: "Name to identify this dataset" },
-          format: { type: "string", enum: ["csv", "json", "yaml"], description: "File format" }
+          format: { type: "string", enum: %w[csv json yaml], description: "File format" }
         },
-        required: ["file_path", "dataset_name", "format"]
+        required: %w[file_path dataset_name format]
       }
-    ) do |args, session|
+    ) do |args, _session|
       file_path = args["file_path"]
       dataset_name = args["dataset_name"]
       format = args["format"]
@@ -97,7 +97,7 @@ class DataAnalysisServer
           rows_loaded: @datasets[dataset_name][:rows],
           sample: data.is_a?(Array) ? data.first(3) : data
         }
-      rescue => e
+      rescue StandardError => e
         @logger.error("Failed to load dataset", error: e.message, dataset: dataset_name)
         { status: "error", error: e.message }
       end
@@ -108,7 +108,7 @@ class DataAnalysisServer
       name: "list_datasets",
       description: "List all loaded datasets",
       input_schema: { type: "object", properties: {} }
-    ) do |args, session|
+    ) do |_args, _session|
       {
         datasets: @datasets.keys,
         details: @datasets.transform_values do |info|
@@ -128,11 +128,11 @@ class DataAnalysisServer
         properties: {
           dataset_name: { type: "string", description: "Name of the dataset to analyze" },
           columns: { type: "array", items: { type: "string" }, description: "Columns to analyze (optional)" },
-          analysis_type: { type: "string", enum: ["summary", "correlation", "distribution"], description: "Type of analysis" }
+          analysis_type: { type: "string", enum: %w[summary correlation distribution], description: "Type of analysis" }
         },
-        required: ["dataset_name", "analysis_type"]
+        required: %w[dataset_name analysis_type]
       }
-    ) do |args, session|
+    ) do |args, _session|
       dataset_name = args["dataset_name"]
       analysis_type = args["analysis_type"]
       columns = args["columns"]
@@ -164,9 +164,9 @@ class DataAnalysisServer
           conditions: { type: "object", description: "Filter conditions as key-value pairs" },
           save_as: { type: "string", description: "Name for the filtered dataset" }
         },
-        required: ["dataset_name", "conditions"]
+        required: %w[dataset_name conditions]
       }
-    ) do |args, session|
+    ) do |args, _session|
       dataset_name = args["dataset_name"]
       conditions = args["conditions"]
       save_as = args["save_as"] || "#{dataset_name}_filtered"
@@ -206,12 +206,12 @@ class DataAnalysisServer
         type: "object",
         properties: {
           dataset_name: { type: "string", description: "Name of the dataset to export" },
-          format: { type: "string", enum: ["csv", "json", "yaml"], description: "Export format" },
+          format: { type: "string", enum: %w[csv json yaml], description: "Export format" },
           filename: { type: "string", description: "Output filename" }
         },
-        required: ["dataset_name", "format", "filename"]
+        required: %w[dataset_name format filename]
       }
-    ) do |args, session|
+    ) do |args, _session|
       dataset_name = args["dataset_name"]
       format = args["format"]
       filename = args["filename"]
@@ -240,7 +240,7 @@ class DataAnalysisServer
           rows_exported: data.size,
           format: format
         }
-      rescue => e
+      rescue StandardError => e
         { status: "error", error: e.message }
       end
     end
@@ -259,7 +259,7 @@ class DataAnalysisServer
         },
         required: ["dataset_name"]
       }
-    ) do |args, session|
+    ) do |args, _session|
       dataset_name = args["dataset_name"]
       include_sample = args.fetch("include_sample", true)
 
@@ -276,9 +276,7 @@ class DataAnalysisServer
         column_count: data.first&.keys&.size || 0
       }
 
-      if include_sample
-        report[:sample_data] = data.first(5)
-      end
+      report[:sample_data] = data.first(5) if include_sample
 
       report
     end
@@ -293,7 +291,7 @@ class DataAnalysisServer
     end
 
     summary = {}
-    
+
     cols.each do |col|
       values = data.map { |row| row[col] }
       unique_values = values.uniq
@@ -335,17 +333,17 @@ class DataAnalysisServer
     numeric_cols.combination(2) do |col1, col2|
       values1 = data.map { |row| row[col1].to_f }
       values2 = data.map { |row| row[col2].to_f }
-      
+
       # Simple Pearson correlation coefficient
       mean1 = values1.sum / values1.size
       mean2 = values2.sum / values2.size
-      
+
       numerator = values1.zip(values2).sum { |v1, v2| (v1 - mean1) * (v2 - mean2) }
       denominator = Math.sqrt(
-        values1.sum { |v1| (v1 - mean1) ** 2 } *
-        values2.sum { |v2| (v2 - mean2) ** 2 }
+        values1.sum { |v1| (v1 - mean1)**2 } *
+        values2.sum { |v2| (v2 - mean2)**2 }
       )
-      
+
       correlation = denominator.zero? ? 0 : numerator / denominator
       correlations["#{col1}_vs_#{col2}"] = correlation.round(4)
     end
@@ -360,9 +358,9 @@ class DataAnalysisServer
     cols.each do |col|
       values = data.map { |row| row[col] }
       frequency = values.each_with_object(Hash.new(0)) { |value, hash| hash[value] += 1 }
-      
+
       distributions[col] = {
-        frequency: frequency.sort_by { |k, v| -v }.first(10).to_h,
+        frequency: frequency.sort_by { |_k, v| -v }.first(10).to_h,
         total_unique: frequency.size
       }
     end
