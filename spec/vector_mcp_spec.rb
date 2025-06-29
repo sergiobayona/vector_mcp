@@ -9,21 +9,13 @@ RSpec.describe VectorMCP do
 
   describe "logger configuration" do
     it "has a logger instance" do
-      expect(VectorMCP.logger).to be_a(Logger)
+      expect(VectorMCP.logger).to be_a(VectorMCP::Logger)
     end
 
-    it "logger is configured with stderr output" do
-      expect(VectorMCP.logger.instance_variable_get(:@logdev).dev).to eq($stderr)
-    end
-
-    it "logger has INFO level by default" do
-      # Reset to ensure clean state since other tests might modify the global logger
-      VectorMCP.logger.level = Logger::INFO
-      expect(VectorMCP.logger.level).to eq(Logger::INFO)
-    end
-
-    it "logger has correct progname" do
-      expect(VectorMCP.logger.progname).to eq("VectorMCP")
+    it "logger_for creates component loggers" do
+      logger = VectorMCP.logger_for("test")
+      expect(logger).to be_a(VectorMCP::Logger)
+      expect(logger.component).to eq("test")
     end
   end
 
@@ -36,10 +28,11 @@ RSpec.describe VectorMCP do
     end
 
     it "accepts options" do
-      server = VectorMCP.new(name: "test_server", version: "1.0.0", log_level: Logger::DEBUG)
+      server = VectorMCP.new(name: "test_server", version: "1.0.0")
       expect(server).to be_a(VectorMCP::Server)
       expect(server.version).to eq("1.0.0")
-      expect(server.logger.level).to eq(Logger::DEBUG)
+      # NOTE: log level is now configured via environment variables
+      expect(server.logger).to respond_to(:info)
     end
   end
 

@@ -7,8 +7,7 @@
 
 require_relative "../lib/vector_mcp"
 
-# Set debug logging level for development
-VectorMCP.logger.level = Logger::INFO
+# Configure logging using the new structured logging system
 
 # Create a server instance
 server = VectorMCP.new(name: "VectorMCP::RootsDemo", version: "0.0.1")

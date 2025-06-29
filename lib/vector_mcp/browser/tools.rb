@@ -17,7 +17,7 @@ module VectorMCP
         def initialize(server_host: "localhost", server_port: 8000, logger: nil)
           @server_host = server_host
           @server_port = server_port
-          @logger = logger || VectorMCP.logger
+          @logger = logger || VectorMCP.logger_for("browser.tools")
           @operation_logger = VectorMCP.logger_for("browser.operations")
         end
 

@@ -26,7 +26,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
   # Helper to send JSON-RPC message (as hash) to server's stdin
   def send_jsonrpc(message_hash)
     json_message = message_hash.to_json
-    VectorMCP.logger.debug "[TEST->] #{json_message}"
+    VectorMCP.logger_for("integration.test").debug "[TEST->] #{json_message}"
     begin
       stdin.puts(json_message)
       stdin.flush
@@ -49,7 +49,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
           raise EOFError, "Server stdout closed unexpectedly." if raw_line.nil?
         end
       end
-      VectorMCP.logger.debug "[<-TEST] #{raw_line.strip}"
+      VectorMCP.logger_for("integration.test").debug "[<-TEST] #{raw_line.strip}"
       JSON.parse(raw_line)
     rescue Timeout::Error
       raise Timeout::Error, "Timeout waiting for response from server after #{timeout_seconds}s. Last read line: #{raw_line.inspect}"
@@ -59,7 +59,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       # Log stderr from server process to help diagnose crashes
       begin
         server_stderr = stderr.read unless stderr.closed?
-        VectorMCP.logger.error "Server stderr dump on EOFError:\n#{server_stderr}" if server_stderr && !server_stderr.empty?
+        VectorMCP.logger_for("integration.test").error "Server stderr dump on EOFError:\n#{server_stderr}" if server_stderr && !server_stderr.empty?
       rescue IOError
         # Ignore IOError when trying to read from closed stderr
       end
@@ -74,14 +74,14 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
     @server_stdin, @server_stdout, @server_stderr, @server_wait_thr = Open3.popen3("ruby", server_script)
     @server_pid = @server_wait_thr.pid
     @request_id = 0 # Reset request ID counter for each test
-    VectorMCP.logger.info "Started server process (PID: #{@server_pid}) for test."
+    VectorMCP.logger_for("integration.test").info "Started server process (PID: #{@server_pid}) for test."
 
     # Optional: Small sleep to allow server to fully initialize (usually not needed for stdio)
     # sleep 0.1
   end
 
   after(:each) do
-    VectorMCP.logger.info "Stopping server process (PID: #{server_pid})."
+    VectorMCP.logger_for("integration.test").info "Stopping server process (PID: #{server_pid})."
     begin
       # Close stdin first to signal EOF to server
       stdin.close if stdin && !stdin.closed?
@@ -94,17 +94,17 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
         Timeout.timeout(3) do
           wait_thr.join
         end
-        VectorMCP.logger.info "Server process (PID: #{server_pid}) terminated cleanly."
+        VectorMCP.logger_for("integration.test").info "Server process (PID: #{server_pid}) terminated cleanly."
       rescue Timeout::Error
-        VectorMCP.logger.warn "Server process (PID: #{server_pid}) did not exit after TERM, sending KILL."
+        VectorMCP.logger_for("integration.test").warn "Server process (PID: #{server_pid}) did not exit after TERM, sending KILL."
         Process.kill("KILL", server_pid)
         wait_thr.join # Wait again after KILL
       end
     rescue Errno::ESRCH
       # Process already exited, which is fine
-      VectorMCP.logger.info "Server process (PID: #{server_pid}) already exited."
+      VectorMCP.logger_for("integration.test").info "Server process (PID: #{server_pid}) already exited."
     rescue StandardError => e
-      VectorMCP.logger.error "Error during server process cleanup: #{e.class}: #{e.message}"
+      VectorMCP.logger_for("integration.test").error "Error during server process cleanup: #{e.class}: #{e.message}"
     ensure
       # Ensure pipes are closed even if errors occurred
       stdout.close if stdout && !stdout.closed?
@@ -115,7 +115,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
     begin
       server_stderr_output = stderr.read unless stderr.closed?
       unless server_stderr_output.nil? || server_stderr_output.empty?
-        VectorMCP.logger.warn "Server stderr output during test:\n---\n#{server_stderr_output}\n---"
+        VectorMCP.logger_for("integration.test").warn "Server stderr output during test:\n---\n#{server_stderr_output}\n---"
       end
     rescue IOError
       # Ignore IOError when trying to read from closed stderr
@@ -243,7 +243,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
       }
       send_jsonrpc(call_req)
       response = read_jsonrpc
-      VectorMCP.logger.debug "Error response: #{response.inspect}"
+      VectorMCP.logger_for("integration.test").debug "Error response: #{response.inspect}"
       expect(response["id"]).to eq(call_req[:id])
       expect(response).to include("error")
       expect(response["error"]["code"]).to eq(-32_001) # VectorMCP::NotFoundError code
@@ -381,7 +381,7 @@ RSpec.describe "VectorMCP Server (Stdio Integration)" do
     it "returns a parse error for invalid JSON" do
       # Send raw invalid JSON string
       invalid_json_string = '{"jsonrpc": "2.0", "id": 1, "method": "test'
-      VectorMCP.logger.debug "[TEST->] #{invalid_json_string}"
+      VectorMCP.logger_for("integration.test").debug "[TEST->] #{invalid_json_string}"
       stdin.puts(invalid_json_string)
       stdin.flush
 

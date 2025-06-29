@@ -98,8 +98,8 @@ module VectorMCP
       @name = name_pos || name || "UnnamedServer"
       @version = version
       @protocol_version = options[:protocol_version] || PROTOCOL_VERSION
-      @logger = VectorMCP.logger
-      @logger.level = options[:log_level] if options[:log_level]
+      @logger = VectorMCP.logger_for("server")
+      # NOTE: log level should be configured via VectorMCP.configure_logging instead
 
       @transport = nil
       @tools = {}
@@ -133,7 +133,7 @@ module VectorMCP
     # @param transport [:stdio, :sse, VectorMCP::Transport::Base] The transport to use.
     #   Can be a symbol (`:stdio`, `:sse`) or an initialized transport instance.
     #   If a symbol is provided, the method will instantiate the corresponding transport class.
-    #   If `:sse` is chosen, ensure `async` and `falcon` gems are available.
+    #   If `:sse` is chosen, it uses Puma as the HTTP server.
     # @param options [Hash] Transport-specific options (e.g., `:host`, `:port` for SSE).
     #   These are passed to the transport's constructor if a symbol is provided for `transport`.
     # @return [void]
@@ -148,7 +148,7 @@ module VectorMCP
                              require_relative "transport/sse"
                              VectorMCP::Transport::SSE.new(self, **options)
                            rescue LoadError => e
-                             logger.fatal("SSE transport requires additional dependencies. Install the 'async' and 'falcon' gems.")
+                             logger.fatal("SSE transport requires additional dependencies.")
                              raise NotImplementedError, "SSE transport dependencies not available: #{e.message}"
                            end
                          when VectorMCP::Transport::Base # Allow passing an initialized transport instance

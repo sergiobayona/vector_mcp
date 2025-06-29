@@ -18,6 +18,7 @@ RSpec.describe VectorMCP::Handlers::Core do
   before do
     # Stub global logger for methods using VectorMCP.logger
     allow(VectorMCP).to receive(:logger).and_return(logger)
+    allow(VectorMCP).to receive(:logger_for).and_return(logger)
     allow(logger).to receive(:level=)
 
     # Mock security middleware to allow all requests by default
