@@ -46,7 +46,7 @@ module VectorMCP
         return false unless matches_operation_type?(context)
 
         # Check custom conditions
-        @conditions.all? { |key, value| check_condition(key, value, context) }
+        @conditions.all? { |key, value| condition_matches?(key, value, context) }
       end
 
       # Compare hooks for sorting by priority
@@ -74,39 +74,51 @@ module VectorMCP
 
       def matches_operation_type?(context)
         operation_prefix = @hook_type.split("_")[1..].join("_")
+
+        return true if transport_or_auth_hook?(operation_prefix)
+
+        operation_matches?(operation_prefix, context.operation_type)
+      end
+
+      def condition_matches?(key, value, context)
+        case key
+        when :only_operations, :except_operations
+          operation_condition_matches?(key, value, context)
+        when :only_users, :except_users
+          user_condition_matches?(key, value, context)
+        else
+          true # Unknown conditions are ignored
+        end
+      end
+
+      def transport_or_auth_hook?(operation_prefix)
+        %w[request response transport_error auth auth_error].include?(operation_prefix)
+      end
+
+      def operation_matches?(operation_prefix, operation_type)
         case operation_prefix
         when "tool_call", "tool_error"
-          context.operation_type == :tool_call
+          operation_type == :tool_call
         when "resource_read", "resource_error"
-          context.operation_type == :resource_read
+          operation_type == :resource_read
         when "prompt_get", "prompt_error"
-          context.operation_type == :prompt_get
+          operation_type == :prompt_get
         when "sampling_request", "sampling_response", "sampling_error"
-          context.operation_type == :sampling
-        when "request", "response", "transport_error"
-          true # Transport hooks apply to all operations
-        when "auth", "auth_error"
-          context.operation_type == :authentication
+          operation_type == :sampling
         else
           true
         end
       end
 
-      def check_condition(key, value, context)
-        case key
-        when :only_operations
-          Array(value).include?(context.operation_name)
-        when :except_operations
-          !Array(value).include?(context.operation_name)
-        when :only_users
-          user_id = context.user&.[](:user_id) || context.user&.[]("user_id")
-          Array(value).include?(user_id)
-        when :except_users
-          user_id = context.user&.[](:user_id) || context.user&.[]("user_id")
-          !Array(value).include?(user_id)
-        else
-          true # Unknown conditions are ignored
-        end
+      def operation_condition_matches?(key, value, context)
+        included = Array(value).include?(context.operation_name)
+        key == :only_operations ? included : !included
+      end
+
+      def user_condition_matches?(key, value, context)
+        user_id = context.user&.[](:user_id) || context.user&.[]("user_id")
+        included = Array(value).include?(user_id)
+        key == :only_users ? included : !included
       end
 
       def create_middleware_instance(_context)

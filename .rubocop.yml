@@ -39,7 +39,7 @@ Metrics/ClassLength:
 
 # Increase module length limits
 Metrics/ModuleLength:
-  Max: 250
+  Max: 300
 
 # Increase line length
 Layout/LineLength:

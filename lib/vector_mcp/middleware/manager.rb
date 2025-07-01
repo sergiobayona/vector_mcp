@@ -62,59 +62,9 @@ module VectorMCP
 
         return context if hooks.empty?
 
-        start_time = Time.now
-        executed_count = 0
-
-        @logger.debug("Executing middleware hooks") do
-          {
-            hook_type: hook_type_str,
-            hook_count: hooks.size,
-            operation: context.operation_name
-          }
-        end
-
-        hooks.each do |hook|
-          break if context.skip_remaining_hooks
-
-          hook.execute(context)
-          executed_count += 1
-        rescue MiddlewareError => e
-          @logger.error("Critical middleware error") do
-            {
-              middleware: e.middleware_class&.name,
-              hook_type: hook_type_str,
-              error: e.message
-            }
-          end
-
-          # Set error in context and stop execution for critical errors
-          context.error = e
-          break
-        rescue StandardError => e
-          @logger.error("Unexpected middleware error") do
-            {
-              hook_type: hook_type_str,
-              error: e.message
-            }
-          end
-          # Continue with other hooks for non-critical errors
-        end
-
-        execution_time = Time.now - start_time
-        context.add_metadata(:middleware_timing, {
-                               hook_type: hook_type_str,
-                               execution_time: execution_time,
-                               hooks_executed: executed_count,
-                               hooks_total: hooks.size
-                             })
-
-        @logger.debug("Completed middleware execution") do
-          {
-            hook_type: hook_type_str,
-            execution_time: execution_time,
-            hooks_executed: executed_count
-          }
-        end
+        execution_state = initialize_execution_state(hook_type_str, hooks, context)
+        execute_hook_chain(hooks, context, execution_state)
+        finalize_execution(context, execution_state)
 
         context
       end
@@ -161,6 +111,80 @@ module VectorMCP
 
       def get_sorted_hooks(hook_type)
         @hooks[hook_type].to_a
+      end
+
+      def initialize_execution_state(hook_type_str, hooks, context)
+        start_time = Time.now
+
+        @logger.debug("Executing middleware hooks") do
+          {
+            hook_type: hook_type_str,
+            hook_count: hooks.size,
+            operation: context.operation_name
+          }
+        end
+
+        {
+          hook_type: hook_type_str,
+          start_time: start_time,
+          executed_count: 0,
+          total_hooks: hooks.size
+        }
+      end
+
+      def execute_hook_chain(hooks, context, execution_state)
+        hooks.each do |hook|
+          break if context.skip_remaining_hooks
+
+          hook.execute(context)
+          execution_state[:executed_count] += 1
+        rescue MiddlewareError => e
+          handle_critical_error(e, execution_state[:hook_type], context)
+          break
+        rescue StandardError => e
+          handle_standard_error(e, execution_state[:hook_type])
+          # Continue with other hooks for non-critical errors
+        end
+      end
+
+      def finalize_execution(context, execution_state)
+        execution_time = Time.now - execution_state[:start_time]
+
+        context.add_metadata(:middleware_timing, {
+                               hook_type: execution_state[:hook_type],
+                               execution_time: execution_time,
+                               hooks_executed: execution_state[:executed_count],
+                               hooks_total: execution_state[:total_hooks]
+                             })
+
+        @logger.debug("Completed middleware execution") do
+          {
+            hook_type: execution_state[:hook_type],
+            execution_time: execution_time,
+            hooks_executed: execution_state[:executed_count]
+          }
+        end
+      end
+
+      def handle_critical_error(error, hook_type, context)
+        @logger.error("Critical middleware error") do
+          {
+            middleware: error.middleware_class&.name,
+            hook_type: hook_type,
+            error: error.message
+          }
+        end
+
+        context.error = error
+      end
+
+      def handle_standard_error(error, hook_type)
+        @logger.error("Unexpected middleware error") do
+          {
+            hook_type: hook_type,
+            error: error.message
+          }
+        end
       end
     end
   end

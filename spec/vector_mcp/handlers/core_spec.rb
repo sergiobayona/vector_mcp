@@ -7,17 +7,24 @@ RSpec.describe VectorMCP::Handlers::Core do
   let(:logger) { instance_double(Logger, debug: nil, info: nil, error: nil) }
   let(:session) { double("session") }
   let(:security_middleware) { double("security_middleware") }
+  let(:middleware_manager) { double("middleware_manager") }
   let(:server) do
     # Default empty registries
     tools = {}
     resources = {}
     prompts = {}
-    double("server", tools: tools, resources: resources, prompts: prompts, logger: logger, security_middleware: security_middleware)
+    double("server", tools: tools, resources: resources, prompts: prompts, logger: logger, security_middleware: security_middleware,
+                     middleware_manager: middleware_manager)
   end
 
   before do
     # Stub global logger for methods using VectorMCP.logger
     allow(VectorMCP).to receive(:logger).and_return(logger)
+
+    # Stub middleware manager to return context unchanged
+    allow(middleware_manager).to receive(:execute_hooks) do |_hook_type, context|
+      context
+    end
     allow(VectorMCP).to receive(:logger_for).and_return(logger)
     allow(logger).to receive(:level=)
 

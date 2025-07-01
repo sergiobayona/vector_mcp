@@ -2,56 +2,71 @@
 
 require "spec_helper"
 
-RSpec.describe "Middleware Integration" do
-  # Test middleware for integration testing
-  class IntegrationTestMiddleware < VectorMCP::Middleware::Base
-    attr_reader :hook_calls
+# Test middleware for integration testing
+class IntegrationTestMiddleware < VectorMCP::Middleware::Base
+  attr_reader :hook_calls
 
-    def initialize(config = {})
-      super
-      @hook_calls = []
-    end
+  def initialize(config = {})
+    super
+    @hook_calls = []
+  end
 
-    def before_tool_call(context)
-      @hook_calls << { hook: :before_tool_call, operation: context.operation_name, time: Time.now }
-    end
+  def before_tool_call(context)
+    @hook_calls << { hook: :before_tool_call, operation: context.operation_name, time: Time.now }
+  end
 
-    def after_tool_call(context)
-      @hook_calls << { hook: :after_tool_call, operation: context.operation_name, time: Time.now }
+  def after_tool_call(context)
+    @hook_calls << { hook: :after_tool_call, operation: context.operation_name, time: Time.now }
 
-      # Modify the result to show middleware was executed
-      return unless context.result && context.result[:content]
+    # Modify the result to show middleware was executed
+    return unless context.result && context.result[:content]
 
-      context.result[:content] = context.result[:content].map do |item|
-        if item[:text]
-          item.merge(text: "#{item[:text]} [modified by middleware]")
-        else
-          item
-        end
+    context.result[:content] = context.result[:content].map do |item|
+      if item[:text]
+        item.merge(text: "#{item[:text]} [modified by middleware]")
+      else
+        item
       end
-    end
-
-    def on_tool_error(context)
-      @hook_calls << { hook: :on_tool_error, operation: context.operation_name, time: Time.now }
-    end
-
-    def before_resource_read(context)
-      @hook_calls << { hook: :before_resource_read, operation: context.operation_name, time: Time.now }
-    end
-
-    def after_resource_read(context)
-      @hook_calls << { hook: :after_resource_read, operation: context.operation_name, time: Time.now }
-    end
-
-    def before_prompt_get(context)
-      @hook_calls << { hook: :before_prompt_get, operation: context.operation_name, time: Time.now }
-    end
-
-    def after_prompt_get(context)
-      @hook_calls << { hook: :after_prompt_get, operation: context.operation_name, time: Time.now }
     end
   end
 
+  def on_tool_error(context)
+    @hook_calls << { hook: :on_tool_error, operation: context.operation_name, time: Time.now }
+  end
+
+  def before_resource_read(context)
+    @hook_calls << { hook: :before_resource_read, operation: context.operation_name, time: Time.now }
+  end
+
+  def after_resource_read(context)
+    @hook_calls << { hook: :after_resource_read, operation: context.operation_name, time: Time.now }
+  end
+
+  def before_prompt_get(context)
+    @hook_calls << { hook: :before_prompt_get, operation: context.operation_name, time: Time.now }
+  end
+
+  def after_prompt_get(context)
+    @hook_calls << { hook: :after_prompt_get, operation: context.operation_name, time: Time.now }
+  end
+end
+
+# Test middleware classes for priority testing
+class FirstMiddleware < VectorMCP::Middleware::Base
+  def before_tool_call(context)
+    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+    context.metadata[:execution_order] << :first
+  end
+end
+
+class SecondMiddleware < VectorMCP::Middleware::Base
+  def before_tool_call(context)
+    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+    context.metadata[:execution_order] << :second
+  end
+end
+
+RSpec.describe "Middleware Integration" do
   let(:server) { VectorMCP::Server.new(name: "MiddlewareTestServer", version: "1.0.0") }
   let(:session) { VectorMCP::Session.new(server) }
   let(:middleware) { IntegrationTestMiddleware.new }
@@ -178,20 +193,6 @@ RSpec.describe "Middleware Integration" do
   end
 
   describe "Middleware priority and ordering" do
-    class FirstMiddleware < VectorMCP::Middleware::Base
-      def before_tool_call(context)
-        context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-        context.metadata[:execution_order] << :first
-      end
-    end
-
-    class SecondMiddleware < VectorMCP::Middleware::Base
-      def before_tool_call(context)
-        context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-        context.metadata[:execution_order] << :second
-      end
-    end
-
     it "executes middleware in priority order" do
       # Clear existing middleware and register new ones with specific priorities
       server.clear_middleware!

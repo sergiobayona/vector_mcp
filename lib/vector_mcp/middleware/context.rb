@@ -8,19 +8,20 @@ module VectorMCP
       attr_reader :operation_type, :operation_name, :params, :session, :server, :metadata
       attr_accessor :result, :error, :skip_remaining_hooks
 
-      # @param operation_type [Symbol] Type of operation (:tool_call, :resource_read, etc.)
-      # @param operation_name [String] Name of the specific operation being performed
-      # @param params [Hash] Request parameters
-      # @param session [VectorMCP::Session] Current session
-      # @param server [VectorMCP::Server] Server instance
-      # @param metadata [Hash] Additional metadata about the operation
-      def initialize(operation_type:, operation_name:, params:, session:, server:, metadata: {})
-        @operation_type = operation_type
-        @operation_name = operation_name
-        @params = params.dup.freeze # Immutable copy
-        @session = session
-        @server = server
-        @metadata = metadata.dup
+      # @param options [Hash] Context initialization options
+      # @option options [Symbol] :operation_type Type of operation (:tool_call, :resource_read, etc.)
+      # @option options [String] :operation_name Name of the specific operation being performed
+      # @option options [Hash] :params Request parameters
+      # @option options [VectorMCP::Session] :session Current session
+      # @option options [VectorMCP::Server] :server Server instance
+      # @option options [Hash] :metadata Additional metadata about the operation
+      def initialize(options = {})
+        @operation_type = options[:operation_type]
+        @operation_name = options[:operation_name]
+        @params = (options[:params] || {}).dup.freeze # Immutable copy
+        @session = options[:session]
+        @server = options[:server]
+        @metadata = (options[:metadata] || {}).dup
         @result = nil
         @error = nil
         @skip_remaining_hooks = false
