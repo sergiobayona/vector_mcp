@@ -12,9 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Ruby ${{ matrix.ruby }}
     strategy:
+      fail-fast: false
       matrix:
-        ruby:
-          - '3.4.2'
+        os: ['ubuntu-latest', 'macos-latest']
+        ruby: ['3.4.2', '3.3.8', '3.2.2', '3.1.4', '3.0.6', 'jruby']
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
