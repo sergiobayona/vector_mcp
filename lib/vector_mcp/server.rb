@@ -206,9 +206,9 @@ module VectorMCP
     # Enable authorization with optional policy configuration block
     # @param block [Proc] optional block for configuring authorization policies
     # @return [void]
-    def enable_authorization!(&)
+    def enable_authorization!(&block)
       @authorization.enable!
-      instance_eval(&) if block_given?
+      instance_eval(&block) if block_given?
       @logger.info("Authorization enabled")
     end
 
@@ -222,29 +222,29 @@ module VectorMCP
     # Add authorization policy for tools
     # @param block [Proc] policy block that receives (user, action, tool)
     # @return [void]
-    def authorize_tools(&)
-      @authorization.add_policy(:tool, &)
+    def authorize_tools(&block)
+      @authorization.add_policy(:tool, &block)
     end
 
     # Add authorization policy for resources
     # @param block [Proc] policy block that receives (user, action, resource)
     # @return [void]
-    def authorize_resources(&)
-      @authorization.add_policy(:resource, &)
+    def authorize_resources(&block)
+      @authorization.add_policy(:resource, &block)
     end
 
     # Add authorization policy for prompts
     # @param block [Proc] policy block that receives (user, action, prompt)
     # @return [void]
-    def authorize_prompts(&)
-      @authorization.add_policy(:prompt, &)
+    def authorize_prompts(&block)
+      @authorization.add_policy(:prompt, &block)
     end
 
     # Add authorization policy for roots
     # @param block [Proc] policy block that receives (user, action, root)
     # @return [void]
-    def authorize_roots(&)
-      @authorization.add_policy(:root, &)
+    def authorize_roots(&block)
+      @authorization.add_policy(:root, &block)
     end
 
     # Check if security features are enabled
@@ -320,8 +320,8 @@ module VectorMCP
     # Add custom authentication strategy
     # @param handler [Proc] custom authentication handler block
     # @return [void]
-    def add_custom_auth(&)
-      strategy = Security::Strategies::Custom.new(&)
+    def add_custom_auth(&block)
+      strategy = Security::Strategies::Custom.new(&block)
       @auth_manager.add_strategy(:custom, strategy)
     end
 
