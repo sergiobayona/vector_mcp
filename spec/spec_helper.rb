@@ -3,7 +3,6 @@
 # Add lib directory to load path
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
-require "pry-byebug"
 require "vector_mcp"
 require "simplecov"
 require "simplecov_json_formatter"

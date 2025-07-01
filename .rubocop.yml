@@ -1,7 +1,7 @@
 AllCops:
   NewCops: enable
   SuggestExtensions: false
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.0.6
 
 # Relax documentation requirements
 Style/Documentation:
@@ -39,7 +39,7 @@ Metrics/ClassLength:
 
 # Increase module length limits
 Metrics/ModuleLength:
-  Max: 250
+  Max: 300
 
 # Increase line length
 Layout/LineLength:

@@ -3,6 +3,7 @@
 require "json"
 require "uri"
 require "json-schema"
+require_relative "../middleware"
 
 module VectorMCP
   module Handlers
@@ -55,27 +56,23 @@ module VectorMCP
         tool_name = params["name"]
         arguments = params["arguments"] || {}
 
-        tool = server.tools[tool_name]
-        raise VectorMCP::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
+        context = create_tool_context(tool_name, params, session, server)
+        context = server.middleware_manager.execute_hooks(:before_tool_call, context)
+        return handle_middleware_error(context) if context.error?
 
-        # Security check: authenticate and authorize the request
-        security_result = check_tool_security(session, tool, server)
-        handle_security_failure(security_result) unless security_result[:success]
+        begin
+          tool = find_tool!(tool_name, server)
+          security_result = validate_tool_security!(session, tool, server)
+          validate_input_arguments!(tool_name, tool, arguments)
 
-        # Validate arguments against the tool's input schema
-        validate_input_arguments!(tool_name, tool, arguments)
+          result = execute_tool_handler(tool, arguments, security_result)
+          context.result = build_tool_result(result)
 
-        # Let StandardError propagate to Server#handle_request
-        # Pass session_context only if the handler supports it (for backward compatibility)
-        result = if [1, -1].include?(tool.handler.arity)
-                   tool.handler.call(arguments)
-                 else
-                   tool.handler.call(arguments, security_result[:session_context])
-                 end
-        {
-          isError: false,
-          content: VectorMCP::Util.convert_to_mcp_content(result)
-        }
+          context = server.middleware_manager.execute_hooks(:after_tool_call, context)
+          context.result
+        rescue StandardError => e
+          handle_tool_error(e, context, server)
+        end
       end
 
       # Handles the `resources/list` request.
@@ -104,27 +101,24 @@ module VectorMCP
       # @raise [VectorMCP::ForbiddenError] if authorization fails.
       def self.read_resource(params, session, server)
         uri_s = params["uri"]
-        raise VectorMCP::NotFoundError.new("Not Found", details: "Resource not found: #{uri_s}") unless server.resources[uri_s]
 
-        resource = server.resources[uri_s]
+        context = create_resource_context(uri_s, params, session, server)
+        context = server.middleware_manager.execute_hooks(:before_resource_read, context)
+        return handle_middleware_error(context) if context.error?
 
-        # Security check: authenticate and authorize the request
-        security_result = check_resource_security(session, resource, server)
-        handle_security_failure(security_result) unless security_result[:success]
+        begin
+          resource = find_resource!(uri_s, server)
+          security_result = validate_resource_security!(session, resource, server)
 
-        # Let StandardError propagate to Server#handle_request
-        # Pass session_context only if the handler supports it (for backward compatibility)
-        content_raw = if [1, -1].include?(resource.handler.arity)
-                        resource.handler.call(params)
-                      else
-                        resource.handler.call(params, security_result[:session_context])
-                      end
-        contents = VectorMCP::Util.convert_to_mcp_content(content_raw, mime_type: resource.mime_type)
-        contents.each do |item|
-          # Add URI to each content item if not already present
-          item[:uri] ||= uri_s
+          content_raw = execute_resource_handler(resource, params, security_result)
+          contents = process_resource_content(content_raw, resource, uri_s)
+
+          context.result = { contents: contents }
+          context = server.middleware_manager.execute_hooks(:after_resource_read, context)
+          context.result
+        rescue StandardError => e
+          handle_resource_error(e, context, server)
         end
-        { contents: contents }
       end
 
       # Handles the `prompts/list` request.
@@ -185,20 +179,51 @@ module VectorMCP
       # @raise [VectorMCP::NotFoundError] if the prompt name is not found.
       # @raise [VectorMCP::InvalidParamsError] if arguments are invalid.
       # @raise [VectorMCP::InternalError] if the prompt handler returns an invalid data structure.
-      def self.get_prompt(params, _session, server)
+      def self.get_prompt(params, session, server)
         prompt_name = params["name"]
-        prompt      = fetch_prompt(prompt_name, server)
 
-        arguments = params["arguments"] || {}
-        validate_arguments!(prompt_name, prompt, arguments)
+        # Create middleware context
+        context = VectorMCP::Middleware::Context.new(
+          operation_type: :prompt_get,
+          operation_name: prompt_name,
+          params: params,
+          session: session,
+          server: server,
+          metadata: { start_time: Time.now }
+        )
 
-        # Call the registered handler after arguments were validated
-        result_data = prompt.handler.call(arguments)
+        # Execute before_prompt_get hooks
+        context = server.middleware_manager.execute_hooks(:before_prompt_get, context)
+        return handle_middleware_error(context) if context.error?
 
-        validate_prompt_response!(prompt_name, result_data, server)
+        begin
+          prompt = fetch_prompt(prompt_name, server)
 
-        # Return the handler response directly (must match GetPromptResult schema)
-        result_data
+          arguments = params["arguments"] || {}
+          validate_arguments!(prompt_name, prompt, arguments)
+
+          # Call the registered handler after arguments were validated
+          result_data = prompt.handler.call(arguments)
+
+          validate_prompt_response!(prompt_name, result_data, server)
+
+          # Set result in context
+          context.result = result_data
+
+          # Execute after_prompt_get hooks
+          context = server.middleware_manager.execute_hooks(:after_prompt_get, context)
+
+          context.result
+        rescue StandardError => e
+          # Set error in context and execute error hooks
+          context.error = e
+          context = server.middleware_manager.execute_hooks(:on_prompt_error, context)
+
+          # Re-raise unless middleware handled the error
+          raise e unless context.result
+
+          context.result
+        end
       end
 
       # --- Notification Handlers ---
@@ -428,6 +453,134 @@ module VectorMCP
         end
       end
       private_class_method :handle_security_failure
+
+      # Handle middleware error by returning appropriate response or raising error
+      # @api private
+      # @param context [VectorMCP::Middleware::Context] The middleware context with error
+      # @return [Hash, nil] Response hash if middleware provided one
+      # @raise [StandardError] Re-raises the original error if not handled
+      def self.handle_middleware_error(context)
+        # If middleware provided a result, return it
+        return context.result if context.result
+
+        # Otherwise, re-raise the middleware error
+        raise context.error
+      end
+
+      # Tool helper methods
+
+      # Create middleware context for tool operations
+      def self.create_tool_context(tool_name, params, session, server)
+        VectorMCP::Middleware::Context.new(
+          operation_type: :tool_call,
+          operation_name: tool_name,
+          params: params,
+          session: session,
+          server: server,
+          metadata: { start_time: Time.now }
+        )
+      end
+
+      # Find and validate tool exists
+      def self.find_tool!(tool_name, server)
+        tool = server.tools[tool_name]
+        raise VectorMCP::NotFoundError.new("Not Found", details: "Tool not found: #{tool_name}") unless tool
+
+        tool
+      end
+
+      # Validate tool security
+      def self.validate_tool_security!(session, tool, server)
+        security_result = check_tool_security(session, tool, server)
+        handle_security_failure(security_result) unless security_result[:success]
+        security_result
+      end
+
+      # Execute tool handler with proper arity handling
+      def self.execute_tool_handler(tool, arguments, security_result)
+        if [1, -1].include?(tool.handler.arity)
+          tool.handler.call(arguments)
+        else
+          tool.handler.call(arguments, security_result[:session_context])
+        end
+      end
+
+      # Build tool result response
+      def self.build_tool_result(result)
+        {
+          isError: false,
+          content: VectorMCP::Util.convert_to_mcp_content(result)
+        }
+      end
+
+      # Handle tool execution errors
+      def self.handle_tool_error(error, context, server)
+        context.error = error
+        context = server.middleware_manager.execute_hooks(:on_tool_error, context)
+        raise error unless context.result
+
+        context.result
+      end
+
+      # Resource helper methods
+
+      # Create middleware context for resource operations
+      def self.create_resource_context(uri_s, params, session, server)
+        VectorMCP::Middleware::Context.new(
+          operation_type: :resource_read,
+          operation_name: uri_s,
+          params: params,
+          session: session,
+          server: server,
+          metadata: { start_time: Time.now }
+        )
+      end
+
+      # Find and validate resource exists
+      def self.find_resource!(uri_s, server)
+        raise VectorMCP::NotFoundError.new("Not Found", details: "Resource not found: #{uri_s}") unless server.resources[uri_s]
+
+        server.resources[uri_s]
+      end
+
+      # Validate resource security
+      def self.validate_resource_security!(session, resource, server)
+        security_result = check_resource_security(session, resource, server)
+        handle_security_failure(security_result) unless security_result[:success]
+        security_result
+      end
+
+      # Execute resource handler with proper arity handling
+      def self.execute_resource_handler(resource, params, security_result)
+        if [1, -1].include?(resource.handler.arity)
+          resource.handler.call(params)
+        else
+          resource.handler.call(params, security_result[:session_context])
+        end
+      end
+
+      # Process resource content and add URI
+      def self.process_resource_content(content_raw, resource, uri_s)
+        contents = VectorMCP::Util.convert_to_mcp_content(content_raw, mime_type: resource.mime_type)
+        contents.each do |item|
+          item[:uri] ||= uri_s
+        end
+        contents
+      end
+
+      # Handle resource execution errors
+      def self.handle_resource_error(error, context, server)
+        context.error = error
+        context = server.middleware_manager.execute_hooks(:on_resource_error, context)
+        raise error unless context.result
+
+        context.result
+      end
+
+      private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :validate_tool_security!,
+                           :execute_tool_handler, :build_tool_result, :handle_tool_error, :create_resource_context,
+                           :find_resource!, :validate_resource_security!, :execute_resource_handler,
+                           :process_resource_content, :handle_resource_error
     end
   end
 end

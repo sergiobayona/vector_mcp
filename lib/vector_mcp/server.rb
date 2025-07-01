@@ -19,6 +19,7 @@ require_relative "security/session_context"
 require_relative "security/strategies/api_key"
 require_relative "security/strategies/jwt_token"
 require_relative "security/strategies/custom"
+require_relative "middleware"
 
 module VectorMCP
   # The `Server` class is the central component for an MCP server implementation.
@@ -70,7 +71,7 @@ module VectorMCP
     PROTOCOL_VERSION = "2024-11-05"
 
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests,
-                :auth_manager, :authorization, :security_middleware
+                :auth_manager, :authorization, :security_middleware, :middleware_manager
     attr_accessor :transport
 
     # Initializes a new VectorMCP server.
@@ -120,6 +121,9 @@ module VectorMCP
       @auth_manager = Security::AuthManager.new
       @authorization = Security::Authorization.new
       @security_middleware = Security::Middleware.new(@auth_manager, @authorization)
+
+      # Initialize middleware manager
+      @middleware_manager = Middleware::Manager.new
 
       setup_default_handlers
 
@@ -202,9 +206,9 @@ module VectorMCP
     # Enable authorization with optional policy configuration block
     # @param block [Proc] optional block for configuring authorization policies
     # @return [void]
-    def enable_authorization!(&)
+    def enable_authorization!(&block)
       @authorization.enable!
-      instance_eval(&) if block_given?
+      instance_eval(&block) if block_given?
       @logger.info("Authorization enabled")
     end
 
@@ -218,29 +222,29 @@ module VectorMCP
     # Add authorization policy for tools
     # @param block [Proc] policy block that receives (user, action, tool)
     # @return [void]
-    def authorize_tools(&)
-      @authorization.add_policy(:tool, &)
+    def authorize_tools(&block)
+      @authorization.add_policy(:tool, &block)
     end
 
     # Add authorization policy for resources
     # @param block [Proc] policy block that receives (user, action, resource)
     # @return [void]
-    def authorize_resources(&)
-      @authorization.add_policy(:resource, &)
+    def authorize_resources(&block)
+      @authorization.add_policy(:resource, &block)
     end
 
     # Add authorization policy for prompts
     # @param block [Proc] policy block that receives (user, action, prompt)
     # @return [void]
-    def authorize_prompts(&)
-      @authorization.add_policy(:prompt, &)
+    def authorize_prompts(&block)
+      @authorization.add_policy(:prompt, &block)
     end
 
     # Add authorization policy for roots
     # @param block [Proc] policy block that receives (user, action, root)
     # @return [void]
-    def authorize_roots(&)
-      @authorization.add_policy(:root, &)
+    def authorize_roots(&block)
+      @authorization.add_policy(:root, &block)
     end
 
     # Check if security features are enabled
@@ -253,6 +257,46 @@ module VectorMCP
     # @return [Hash] security configuration status
     def security_status
       @security_middleware.security_status
+    end
+
+    # --- Middleware Management ---
+
+    # Register middleware for specific hook types
+    # @param middleware_class [Class] Middleware class inheriting from VectorMCP::Middleware::Base
+    # @param hooks [Symbol, Array<Symbol>] Hook types to register for (e.g., :before_tool_call, [:before_tool_call, :after_tool_call])
+    # @param priority [Integer] Execution priority (lower numbers execute first, default: 100)
+    # @param conditions [Hash] Conditions for when middleware should run
+    # @option conditions [Array<String>] :only_operations Only run for these operations
+    # @option conditions [Array<String>] :except_operations Don't run for these operations
+    # @option conditions [Array<String>] :only_users Only run for these user IDs
+    # @option conditions [Array<String>] :except_users Don't run for these user IDs
+    # @option conditions [Boolean] :critical If true, errors in this middleware stop execution
+    # @example
+    #   server.use_middleware(MyMiddleware, :before_tool_call)
+    #   server.use_middleware(AuthMiddleware, [:before_request, :after_response], priority: 10)
+    #   server.use_middleware(LoggingMiddleware, :after_tool_call, conditions: { only_operations: ['important_tool'] })
+    def use_middleware(middleware_class, hooks, priority: Middleware::Hook::DEFAULT_PRIORITY, conditions: {})
+      @middleware_manager.register(middleware_class, hooks, priority: priority, conditions: conditions)
+      @logger.info("Registered middleware: #{middleware_class.name}")
+    end
+
+    # Remove all middleware hooks for a specific class
+    # @param middleware_class [Class] Middleware class to remove
+    def remove_middleware(middleware_class)
+      @middleware_manager.unregister(middleware_class)
+      @logger.info("Removed middleware: #{middleware_class.name}")
+    end
+
+    # Get middleware statistics
+    # @return [Hash] Statistics about registered middleware
+    def middleware_stats
+      @middleware_manager.stats
+    end
+
+    # Clear all middleware (useful for testing)
+    def clear_middleware!
+      @middleware_manager.clear!
+      @logger.info("Cleared all middleware")
     end
 
     private
@@ -276,8 +320,8 @@ module VectorMCP
     # Add custom authentication strategy
     # @param handler [Proc] custom authentication handler block
     # @return [void]
-    def add_custom_auth(&)
-      strategy = Security::Strategies::Custom.new(&)
+    def add_custom_auth(&block)
+      strategy = Security::Strategies::Custom.new(&block)
       @auth_manager.add_strategy(:custom, strategy)
     end
 

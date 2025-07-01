@@ -43,6 +43,7 @@ ruby examples/auth_server.rb        # Authentication and authorization demo
 ruby examples/validation_demo.rb    # Input validation examples
 ruby examples/logging_demo.rb       # Structured logging demonstration
 ruby examples/cli_client.rb         # Command-line client example
+ruby examples/middleware_examples.rb # Pluggable middleware demonstrations
 ```
 
 ### Logging Configuration
@@ -74,6 +75,7 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 - **Security** (`lib/vector_mcp/security/`): Authentication and authorization framework
 - **Logging** (`lib/vector_mcp/logging/`): Structured logging system with observability features
 - **Image Processing** (`lib/vector_mcp/image_util.rb`): Image handling and MCP format conversion
+- **Middleware** (`lib/vector_mcp/middleware/`): Pluggable hook system for custom behavior
 
 ### Key Features
 
@@ -85,6 +87,7 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 - **Security**: Comprehensive authentication and authorization system
 - **Logging**: Component-based structured logging with multiple outputs and formats
 - **Image Processing**: Full image handling pipeline with format detection and validation
+- **Middleware**: Pluggable hooks for custom behavior around all MCP operations
 
 ### Request Flow
 
@@ -348,6 +351,179 @@ end
 - Regularly audit and test security configurations
 - Monitor authentication failures and suspicious activity
 - Use structured logging for security event tracking
+
+## Middleware System
+
+VectorMCP provides a comprehensive middleware framework that allows developers to inject custom behavior around all MCP operations without modifying core code.
+
+### Middleware Architecture
+
+**✅ Hook Points Available:**
+- **Tool Operations**: `before_tool_call`, `after_tool_call`, `on_tool_error`
+- **Resource Operations**: `before_resource_read`, `after_resource_read`, `on_resource_error`
+- **Prompt Operations**: `before_prompt_get`, `after_prompt_get`, `on_prompt_error`
+- **Sampling Operations**: `before_sampling_request`, `after_sampling_response`, `on_sampling_error`
+- **Transport Operations**: `before_request`, `after_response`, `on_transport_error`
+- **Authentication**: `before_auth`, `after_auth`, `on_auth_error`
+
+**✅ Core Components:**
+- **`VectorMCP::Middleware::Manager`** - Central hook registry and execution engine
+- **`VectorMCP::Middleware::Hook`** - Individual hook definition with priority support
+- **`VectorMCP::Middleware::Context`** - Execution context passed to hooks
+- **`VectorMCP::Middleware::Base`** - Base class for middleware implementations
+
+### Basic Middleware Usage
+
+**Creating Middleware:**
+```ruby
+class LoggingMiddleware < VectorMCP::Middleware::Base
+  def before_tool_call(context)
+    logger.info("Tool call started", {
+      operation: context.operation_name,
+      user_id: context.user&.[](:user_id)
+    })
+  end
+
+  def after_tool_call(context)
+    logger.info("Tool call completed", {
+      operation: context.operation_name,
+      success: context.success?
+    })
+  end
+end
+```
+
+**Registering Middleware:**
+```ruby
+# Register for specific hooks
+server.use_middleware(LoggingMiddleware, [:before_tool_call, :after_tool_call])
+
+# Register with priority (lower numbers execute first)
+server.use_middleware(AuthMiddleware, :before_request, priority: 10)
+
+# Register with conditions
+server.use_middleware(PiiMiddleware, :after_tool_call, 
+  conditions: { only_operations: ['sensitive_tool'] })
+```
+
+### Advanced Middleware Features
+
+**Priority-Based Execution:**
+```ruby
+# High priority middleware (executes first)
+server.use_middleware(SecurityMiddleware, :before_tool_call, priority: 10)
+
+# Normal priority middleware (executes after)
+server.use_middleware(LoggingMiddleware, :before_tool_call, priority: 100)
+```
+
+**Conditional Execution:**
+```ruby
+# Only run for specific operations
+server.use_middleware(ValidationMiddleware, :before_tool_call,
+  conditions: { only_operations: ['data_processing', 'file_upload'] })
+
+# Skip for certain users
+server.use_middleware(RateLimitMiddleware, :before_tool_call,
+  conditions: { except_users: ['admin_user_123'] })
+```
+
+**Error Handling and Recovery:**
+```ruby
+class RetryMiddleware < VectorMCP::Middleware::Base
+  def on_tool_error(context)
+    if retryable_error?(context.error)
+      # Implement retry logic
+      context.result = retry_operation(context)
+      # Setting result clears the error
+    end
+  end
+end
+```
+
+### Built-in Middleware Examples
+
+**PII Redaction:**
+- Automatically scrubs sensitive information from inputs and outputs
+- Configurable patterns for different data types
+- Supports credit cards, SSNs, emails, custom patterns
+
+**Request Retry:**
+- Automatic retries with exponential backoff
+- Configurable retry counts and delay strategies
+- Error classification for retry decisions
+
+**Rate Limiting:**
+- Per-user, per-tool rate limiting
+- Sliding window implementation
+- Configurable limits and time windows
+
+**Enhanced Logging:**
+- Business metrics and performance tracking
+- Request/response context capture
+- Error classification and alerting
+
+### Middleware Development Guidelines
+
+**Best Practices:**
+- Keep middleware focused on single concerns
+- Use appropriate hook types for your use case
+- Handle errors gracefully to avoid breaking the request chain
+- Use priority to control execution order
+- Test middleware in isolation and integration
+
+**Error Handling:**
+```ruby
+class SafeMiddleware < VectorMCP::Middleware::Base
+  def before_tool_call(context)
+    # Always wrap middleware logic in error handling
+    perform_middleware_logic(context)
+  rescue StandardError => e
+    # Log error but don't break the chain
+    logger.error("Middleware failed", error: e.message)
+    # Don't re-raise unless critical
+  end
+end
+```
+
+**Testing Middleware:**
+```ruby
+# Test middleware in isolation
+middleware = MyMiddleware.new
+context = VectorMCP::Middleware::Context.new(...)
+middleware.before_tool_call(context)
+expect(context.metadata[:custom_key]).to eq("expected_value")
+
+# Test middleware integration
+server.use_middleware(MyMiddleware, :before_tool_call)
+# Test actual tool calls through handlers
+```
+
+### Common Use Cases
+
+**Data Processing Pipeline:**
+- Input validation and sanitization
+- Output formatting and transformation
+- Data encryption/decryption
+- Audit trail generation
+
+**Observability:**
+- Performance metrics collection
+- Distributed tracing integration
+- Custom monitoring and alerting
+- Business intelligence data capture
+
+**Security Enhancements:**
+- Additional authentication checks
+- Request/response inspection
+- Threat detection and blocking
+- Compliance logging
+
+**Development Tools:**
+- Request/response debugging
+- Performance profiling
+- A/B testing support
+- Feature flag integration
 
 ## Code Quality and Maintenance
 

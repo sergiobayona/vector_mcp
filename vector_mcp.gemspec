@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
                      "with comprehensive security features, structured logging, and production-ready capabilities."
   spec.homepage = "https://github.com/sergiobayona/vector_mcp"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_ruby_version = ">= 3.0.6"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/sergiobayona/vector_mcp"
