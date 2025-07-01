@@ -21,11 +21,6 @@ Comprehensive examples of VectorMCP's key capabilities like authentication, vali
 
 Production-ready logging patterns, structured output, and monitoring integration.
 
-### 🌐 Browser Automation?
-**Web control** → [`browser_automation/`](./browser_automation/)
-
-Complete browser automation system with Chrome extension and security features.
-
 ### 🎯 Real-World Use Cases?
 **Production patterns** → [`use_cases/`](./use_cases/)
 
@@ -53,14 +48,6 @@ examples/
 │   ├── structured_logging.rb    # JSON output and context
 │   ├── security_logging.rb      # Audit trails and events
 │   └── log_analysis.rb         # Log processing tools
-│
-├── 🌐 browser_automation/       # Web automation system
-│   ├── basic_browser_server.rb  # Core browser automation
-│   ├── secure_browser_server.rb # Production with security
-│   ├── authorization_demo.rb     # Role-based browser access
-│   ├── browser_client_demo.rb   # MCP client for browsers
-│   ├── google_search_demo.rb    # Search automation example
-│   └── chrome_extension/        # Browser extension files
 │
 └── 🎯 use_cases/                # Real-world implementations
     ├── file_operations.rb       # File system automation
@@ -129,14 +116,12 @@ All examples demonstrate VectorMCP's security-first approach:
 
 ### Advanced Journey  
 1. **Production Logging**: `logging/structured_logging.rb`
-2. **Browser Automation**: `browser_automation/basic_browser_server.rb`
-3. **Real Applications**: `use_cases/file_operations.rb`
+2. **Real Applications**: `use_cases/file_operations.rb`
 
 ### Security-Focused Journey
 1. **Authentication**: `core_features/authentication.rb`
 2. **File Security**: `core_features/filesystem_roots.rb`
 3. **Audit Logging**: `logging/security_logging.rb`
-4. **Browser Security**: `browser_automation/secure_browser_server.rb`
 
 ---
 
@@ -149,9 +134,6 @@ ruby examples/path/to/example.rb
 # With debug output
 DEBUG=1 ruby examples/path/to/example.rb
 
-# Run browser automation (requires extension)
-ruby examples/browser_automation/basic_browser_server.rb
-
 # Test logging output
 ruby examples/logging/structured_logging.rb | jq .
 ```
@@ -162,11 +144,10 @@ ruby examples/logging/structured_logging.rb | jq .
 
 ### 🎯 Most Popular
 - **`getting_started/minimal_server.rb`** - Learn MCP basics in 5 minutes
-- **`browser_automation/google_search_demo.rb`** - See browser automation in action
 - **`core_features/authentication.rb`** - Production security patterns
+- **`logging/structured_logging.rb`** - Production observability
 
 ### 🔥 Advanced Use Cases
-- **`browser_automation/secure_browser_server.rb`** - Full-featured browser automation
 - **`logging/security_logging.rb`** - Audit trail implementation
 - **`use_cases/file_operations.rb`** - Secure file system operations
 
@@ -197,7 +178,6 @@ When adding new examples:
 
 - **Getting Started Issues**: Check `getting_started/README.md`
 - **Feature Questions**: Browse `core_features/README.md`  
-- **Browser Automation**: See `browser_automation/README.md`
 - **Production Deployment**: Review `use_cases/README.md`
 
 Happy coding with VectorMCP! 🚀

@@ -505,6 +505,5 @@ Ready to build production applications with VectorMCP?
 **Need more examples?** Check out:
 - **[File System MCP](https://github.com/sergiobayona/file_system_mcp)** - Real-world file operations
 - **[Core Features](../core_features/)** - Security and validation patterns
-- **[Browser Automation](../browser_automation/)** - Web automation workflows
 
 Happy building with VectorMCP! 🚀

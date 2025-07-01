@@ -340,23 +340,6 @@ end
 - **Best Practices**: Production deployment recommendations
 - **Troubleshooting**: Common security configuration issues
 
-### Remaining Security Enhancements
-
-**Phase 2: Advanced Security (Planned)**
-- **Cross-Prompt Injection Prevention** - Content sanitization for LLM safety
-- **Tool Execution Sandboxing** - Isolated execution environments
-- **Credential Protection** - Secure secret management
-- **Session Timeouts** - Automatic session expiration
-- **CSRF Protection** - Cross-site request forgery prevention
-
-### Windows-Inspired Security Controls
-
-1. **Proxy-Mediated Communication** - Security middleware layer
-2. **Granular Permissions** - Per-tool capability declarations  
-3. **Authentication Strategies** - Multiple authentication methods
-4. **Runtime Context** - Secure session and user context management
-5. **Defense in Depth** - Multiple security layers
-
 ### Security Best Practices
 
 - Always enable authentication for production deployments
