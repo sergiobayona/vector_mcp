@@ -95,10 +95,43 @@ module VectorMCP
     def sample(request_params, timeout: nil)
       validate_sampling_preconditions
 
-      sampling_req_obj = VectorMCP::Sampling::Request.new(request_params)
-      @logger.info("[Session #{@id}] Sending sampling/createMessage request to client.")
+      # Create middleware context for sampling
+      context = VectorMCP::Middleware::Context.new(
+        operation_type: :sampling,
+        operation_name: "createMessage",
+        params: request_params,
+        session: self,
+        server: @server,
+        metadata: { start_time: Time.now, timeout: timeout }
+      )
 
-      send_sampling_request(sampling_req_obj, timeout)
+      # Execute before_sampling_request hooks
+      context = @server.middleware_manager.execute_hooks(:before_sampling_request, context)
+      raise context.error if context.error?
+
+      begin
+        sampling_req_obj = VectorMCP::Sampling::Request.new(request_params)
+        @logger.info("[Session #{@id}] Sending sampling/createMessage request to client.")
+
+        result = send_sampling_request(sampling_req_obj, timeout)
+
+        # Set result in context
+        context.result = result
+
+        # Execute after_sampling_response hooks
+        context = @server.middleware_manager.execute_hooks(:after_sampling_response, context)
+
+        context.result
+      rescue StandardError => e
+        # Set error in context and execute error hooks
+        context.error = e
+        context = @server.middleware_manager.execute_hooks(:on_sampling_error, context)
+
+        # Re-raise unless middleware handled the error
+        raise e unless context.result
+
+        context.result
+      end
     end
 
     private
