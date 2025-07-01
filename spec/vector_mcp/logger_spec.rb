@@ -498,7 +498,7 @@ RSpec.describe VectorMCP::Logger do
         logger.info("message", array: [1, 2, 3], hash: { nested: "value" })
       end
       expect(output.string).to include("array=[1, 2, 3]")
-      expect(output.string).to include('hash={"nested"=>"value"}').or include("hash={:nested=>\"value\"}")
+      expect(output.string).to include('hash={"nested"=>"value"}').or include("hash={nested: \"value\"}")
     end
 
     it "handles special characters in component name" do
