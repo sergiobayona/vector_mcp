@@ -8,7 +8,6 @@ gemspec
 group :development, :test do
   gem "bundler", "~> 2.0"
   gem "irb"
-  gem "pry-byebug"
   gem "rack-test", "~> 2.1"
   gem "rake", "~> 13.0"
   gem "redcarpet", "~> 3.5"
