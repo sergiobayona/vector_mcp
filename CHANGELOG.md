@@ -1,3 +1,71 @@
+## [0.3.2] – 2025-07-02
+
+### Added
+
+* **Comprehensive Middleware System**: Pluggable hook system for custom behavior around all MCP operations
+  * **Hook Points**: Support for all major operations including tools, resources, prompts, sampling, transport, and authentication
+  * **Priority-Based Execution**: Control middleware execution order with configurable priorities
+  * **Conditional Execution**: Run middleware only for specific operations, users, or conditions
+  * **Context Management**: Rich execution context with operation metadata and session information
+  * **Error Handling**: Graceful error recovery with middleware-specific error hooks
+  * **Built-in Middleware**: PII redaction, request retry, rate limiting, and enhanced logging examples
+
+* **Enhanced Examples Organization**: Comprehensive example reorganization for better developer experience
+  * **Getting Started Examples**: `examples/getting_started/` with basic server implementations
+  * **Core Features Examples**: `examples/core_features/` demonstrating key capabilities
+  * **Use Cases Examples**: `examples/use_cases/` with real-world application scenarios
+  * **Logging Examples**: `examples/logging/` showcasing structured logging capabilities
+  * **Middleware Examples**: `examples/middleware_examples.rb` and `examples/simple_middleware_demo.rb`
+
+* **Refactored Logging System**: Enhanced logging architecture with better performance and flexibility
+  * **Simplified API**: Streamlined `VectorMCP.logger_for(component)` interface
+  * **Performance Improvements**: Optimized log formatting and output handling
+  * **Better Component Organization**: Hierarchical logger management with cleaner separation
+
+### Changed
+
+* **Middleware Integration**: Core server architecture enhanced to support middleware hooks
+  * **Server Methods**: New `use_middleware`, `middleware_stats`, `remove_middleware`, and `clear_middleware` methods
+  * **Handler Integration**: All core handlers now support middleware execution around operations
+  * **Session Context**: Enhanced session context with middleware metadata and execution tracking
+
+* **Example Structure**: Major reorganization of examples for better discoverability
+  * **Categorized Examples**: Logical grouping by functionality and use case
+  * **Enhanced Documentation**: Each example category includes detailed README files
+  * **Use Case Focus**: Real-world scenarios like data analysis, file operations, and web scraping
+
+* **Backward Compatibility**: All middleware features are opt-in with zero impact on existing servers
+  * **Default Behavior**: Servers without middleware continue working exactly as before
+  * **Optional Integration**: Middleware can be added incrementally to existing applications
+
+### Fixed
+
+* **Ruby Version Compatibility**: Enhanced support for older Ruby versions
+* **Code Quality**: Multiple bug fixes and improvements identified through expanded test coverage
+* **Performance**: Optimized middleware execution path for minimal overhead when no middleware is registered
+
+### Security
+
+* **Middleware Security**: Security-aware middleware execution
+  * **Session Context Integration**: Middleware has access to authentication and authorization context
+  * **Secure Error Handling**: Middleware errors handled securely without information leakage
+  * **Permission-Aware Hooks**: Middleware can respect user permissions and security policies
+
+### Testing
+
+* **Comprehensive Middleware Tests**: 50+ tests covering all middleware functionality
+  * **Hook Execution Tests**: Verification of all hook types and execution order
+  * **Priority and Condition Tests**: Complex scenario testing for middleware orchestration
+  * **Integration Tests**: End-to-end testing with real server operations
+  * **Performance Tests**: Overhead measurement and resource usage validation
+
+### Technical Details
+
+* **API Compatibility**: All middleware features maintain full backward compatibility
+* **Performance**: Minimal overhead when middleware is not used, efficient execution when enabled
+* **Memory Management**: Proper cleanup and resource management for long-running servers
+* **Thread Safety**: Concurrent middleware execution with proper synchronization
+
 ## [0.3.1] – 2025-06-25
 
 ### Added
