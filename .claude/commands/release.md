@@ -48,7 +48,35 @@ Ensure we have the latest changes from the remote repository:
 - If local version is newer → Ready for release (verify changelog)
 - If local version is older → Update to appropriate new version
 
-### 4. Run Full Test Suite
+### 4. Documentation Review
+
+**CRITICAL**: Verify README.md reflects all new features since last release:
+
+```bash
+# Check commits since last published version tag
+!git log --oneline $(git describe --tags --abbrev=0)..HEAD
+
+# Review README.md for feature completeness
+!grep -n "## Features\|### Features\|## What's New" README.md
+```
+
+**README.md Review Checklist:**
+- [ ] All new features from commits are documented
+- [ ] Installation instructions are current
+- [ ] Usage examples reflect new capabilities
+- [ ] API documentation matches current version
+- [ ] Breaking changes are clearly noted
+- [ ] Links and references are working
+
+**Common README.md Sections to Update:**
+- Features list
+- Installation/Setup instructions
+- Usage examples and code samples
+- API documentation
+- Breaking changes section
+- Known issues or limitations
+
+### 5. Run Full Test Suite
 
 Ensure all tests pass before release:
 
@@ -60,7 +88,7 @@ This runs the default task which includes:
 - RSpec test suite
 - RuboCop linting and style checks
 
-### 5. Generate Documentation
+### 6. Generate Documentation
 
 Update the documentation:
 
@@ -68,7 +96,7 @@ Update the documentation:
 !bundle exec rake yard
 ```
 
-### 6. Version Update
+### 7. Version Update
 
 Now you need to:
 
@@ -99,7 +127,7 @@ Current version is displayed above from step 3.
 - Security improvements
 ```
 
-### 7. Build and Test the Gem
+### 8. Build and Test the Gem
 
 Build the gem locally to ensure it packages correctly:
 
@@ -107,19 +135,20 @@ Build the gem locally to ensure it packages correctly:
 !gem build vector_mcp.gemspec
 ```
 
-### 8. Commit Release Changes
+### 9. Commit Release Changes
 
 Commit the version and changelog updates:
 
 ```bash
-!git add lib/vector_mcp/version.rb CHANGELOG.md
+!git add lib/vector_mcp/version.rb CHANGELOG.md README.md
 !git commit -m "Release version X.Y.Z
 
 - Update version to X.Y.Z
-- Update CHANGELOG.md with release notes"
+- Update CHANGELOG.md with release notes
+- Update README.md with new features"
 ```
 
-### 9. Create Git Tag
+### 10. Create Git Tag
 
 Create a version tag:
 
@@ -127,7 +156,7 @@ Create a version tag:
 !git tag -a vX.Y.Z -m "Release version X.Y.Z"
 ```
 
-### 10. Push to Repository
+### 11. Push to Repository
 
 Push the changes and tags to the repository:
 
@@ -136,7 +165,7 @@ Push the changes and tags to the repository:
 !git push origin vX.Y.Z
 ```
 
-### 11. Release to RubyGems
+### 12. Release to RubyGems
 
 **IMPORTANT:** This step publishes the gem publicly. Make sure you're ready!
 
@@ -144,7 +173,7 @@ Push the changes and tags to the repository:
 !gem push vector_mcp-X.Y.Z.gem
 ```
 
-### 12. Verify Release
+### 13. Verify Release
 
 Check that the gem was published successfully:
 
@@ -152,7 +181,7 @@ Check that the gem was published successfully:
 !gem list vector_mcp --remote --exact
 ```
 
-### 13. Clean Up
+### 14. Clean Up
 
 Remove the local gem file:
 
@@ -174,6 +203,7 @@ Remove the local gem file:
 2. Ensure local version is properly incremented
 3. Verify no version conflicts exist
 4. Double-check CHANGELOG.md reflects the correct version
+5. Verify README.md documents all new features since last release
 
 **Common Issues:**
 - **Same Version**: Local version matches published → Increment version number
