@@ -28,13 +28,25 @@ Ensure we have the latest changes from the remote repository:
 !git pull origin main
 ```
 
-### 3. Version Information
+### 3. Version Comparison Check
 
-Current version information:
+**CRITICAL**: Compare local version against published gem version to prevent conflicts:
 
 ```bash
+# Check current local version
 !grep -n "VERSION" lib/vector_mcp/version.rb
+
+# Check latest published version on RubyGems
+!gem list vector_mcp --remote --exact
+
+# Alternative: Check specific version info
+!gem query --remote --exact --name vector_mcp
 ```
+
+**Version Analysis:**
+- If local version matches published version → Need to bump version
+- If local version is newer → Ready for release (verify changelog)
+- If local version is older → Update to appropriate new version
 
 ### 4. Run Full Test Suite
 
@@ -63,7 +75,7 @@ Now you need to:
 1. **Update the version** in `lib/vector_mcp/version.rb`
 2. **Update CHANGELOG.md** with the new version and release notes
 
-Current version is: `@lib/vector_mcp/version.rb`
+Current version is displayed above from step 3.
 
 **Version Update Guidelines:**
 - **Patch** (0.3.2 → 0.3.3): Bug fixes, security patches
@@ -155,6 +167,19 @@ Remove the local gem file:
 - [ ] Update any dependent projects
 - [ ] Announce the release (if applicable)
 
+## Version Conflict Prevention
+
+**Before Any Release:**
+1. Always check published version first
+2. Ensure local version is properly incremented
+3. Verify no version conflicts exist
+4. Double-check CHANGELOG.md reflects the correct version
+
+**Common Issues:**
+- **Same Version**: Local version matches published → Increment version number
+- **Lower Version**: Local version is older → Update to appropriate new version
+- **Version Gaps**: Missing intermediate versions → Consider if gap is intentional
+
 ## Rollback Procedure
 
 If you need to rollback a release:
@@ -191,10 +216,16 @@ If you need to rollback a release:
 - Run tests individually to identify issues: `bundle exec rspec spec/path/to/specific_spec.rb`
 - Check for missing dependencies or configuration issues
 
+**Version conflicts:**
+- Check published versions: `gem list vector_mcp --remote --all`
+- Verify local version is appropriate: `grep VERSION lib/vector_mcp/version.rb`
+- Ensure version follows semantic versioning
+
 **RubyGems push fails:**
 - Verify you're authenticated: `gem signin`
 - Check network connectivity and RubyGems status
 - Ensure the version doesn't already exist
+- Verify version format is correct (no leading 'v')
 
 **Permission denied:**
 - Verify you have push permissions to the gem
