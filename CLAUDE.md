@@ -19,6 +19,8 @@ bin/console        # Interactive Ruby console with the gem loaded
 
 ```bash
 rake               # Run default task (tests + linting)
+rake spec          # Run RSpec test suite only
+rake rubocop       # Run RuboCop linting only
 bundle exec rspec          # Run RSpec test suite  
 bundle exec rspec ./spec/vector_mcp/examples_spec.rb # run a single test file
 bundle exec rspec ./spec/vector_mcp/logging_spec.rb # run logging tests
@@ -35,15 +37,32 @@ rake doc           # Alias for yard (outputs to doc/ directory)
 ### Example Usage
 
 ```bash
-ruby examples/simple_server.rb      # Basic MCP server demo
-ruby examples/stdio_server.rb       # Stdio transport example
-ruby examples/roots_demo.rb         # Filesystem roots demonstration
-ruby examples/http_server.rb        # HTTP server with SSE transport example
-ruby examples/auth_server.rb        # Authentication and authorization demo
-ruby examples/validation_demo.rb    # Input validation examples
-ruby examples/logging_demo.rb       # Structured logging demonstration
-ruby examples/cli_client.rb         # Command-line client example
-ruby examples/middleware_examples.rb # Pluggable middleware demonstrations
+# Getting Started Examples
+ruby examples/getting_started/minimal_server.rb          # Simplest MCP server
+ruby examples/getting_started/basic_stdio_server.rb      # Command-line integration
+ruby examples/getting_started/basic_http_server.rb       # Web-based integration (deprecated SSE)
+ruby examples/getting_started/basic_http_stream_server.rb # MCP-compliant HTTP streaming
+
+# Core Features Examples
+ruby examples/core_features/authentication.rb        # Authentication demo
+ruby examples/core_features/filesystem_roots.rb      # Filesystem boundaries
+ruby examples/core_features/input_validation.rb      # Schema validation
+ruby examples/core_features/cli_client.rb           # Command-line client
+
+# Logging Examples
+ruby examples/logging/basic_logging.rb              # Component-based logging
+ruby examples/logging/structured_logging.rb         # JSON structured output
+ruby examples/logging/security_logging.rb           # Security audit logging
+ruby examples/logging/log_analysis.rb               # Log processing tools
+
+# Use Cases Examples
+ruby examples/use_cases/file_operations.rb          # File system operations
+ruby examples/use_cases/data_analysis.rb            # Data processing workflows
+ruby examples/use_cases/web_scraping.rb             # Content extraction
+
+# Middleware Examples
+ruby examples/middleware_examples.rb                # Comprehensive middleware demo
+ruby examples/simple_middleware_demo.rb             # Basic middleware patterns
 ```
 
 ### Logging Configuration
@@ -65,10 +84,15 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
   - `Server::MessageHandling` (`lib/vector_mcp/server/message_handling.rb`): Request/notification processing
 - **Transport Layer** (`lib/vector_mcp/transport/`): Communication protocols
   - `Stdio` (`lib/vector_mcp/transport/stdio.rb`): Standard input/output (stable)
-  - `Sse` (`lib/vector_mcp/transport/sse.rb`): Server-Sent Events over HTTP (stable) with enhanced components
+  - `HttpStream` (`lib/vector_mcp/transport/http_stream.rb`): **RECOMMENDED** - MCP-compliant streamable HTTP transport
+    - `HttpStream::SessionManager`: Thread-safe session lifecycle management
+    - `HttpStream::EventStore`: Event storage for resumable connections
+    - `HttpStream::StreamHandler`: Server-Sent Events streaming with resumability
+  - `Sse` (`lib/vector_mcp/transport/sse.rb`): **DEPRECATED** - Server-Sent Events over HTTP (deprecated as of MCP spec 2024-11-05)
     - `SSE::StreamManager`: Server-Sent Events streaming management
     - `SSE::ClientConnection`: Individual client connection handling
     - `SSE::MessageHandler`: SSE-specific message processing
+  - **Note**: SSE Transport deprecated in favor of HTTP Stream Transport per MCP specification 2024-11-05
 - **Handlers** (`lib/vector_mcp/handlers/`): Request processing logic with authorization checks
 - **Sampling** (`lib/vector_mcp/sampling/`): Server-initiated LLM requests with streaming support
 - **Definitions** (`lib/vector_mcp/definitions.rb`): Tool, Resource, and Prompt definitions with image support
@@ -100,7 +124,9 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 6. Handlers dispatch to registered tools/resources/prompts with session context
 7. Responses sent back via stdout
 
-**SSE Transport:**
+**SSE Transport (DEPRECATED):**
+⚠️ **Note**: SSE Transport is deprecated as of MCP specification 2024-11-05. Use HTTP Stream Transport instead.
+
 1. Client establishes SSE connection (`GET /sse`)
 2. Server sends session info and message endpoint URL
 3. Client sends JSON-RPC requests (`POST /message?session_id=<id>`) with authentication headers
@@ -110,6 +136,17 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 7. Server processes requests and sends responses via SSE stream
 8. Handlers dispatch to registered tools/resources/prompts with authenticated session context
 9. All responses formatted according to MCP specification
+
+**HTTP Stream Transport (Recommended):**
+1. Client sends JSON-RPC requests (`POST /mcp`) with `Mcp-Session-Id` header
+2. Server creates or reuses session based on header value
+3. Session initialization via standard MCP `initialize` method
+4. Optional: Client connects to streaming via `GET /mcp` for server-initiated messages
+5. Resumable connections: Client can specify `Last-Event-ID` header to resume from specific event
+6. Session management: Explicit termination via `DELETE /mcp` endpoint
+7. Security middleware validates authentication and authorization per request
+8. Event storage: Server maintains event history for connection resumability
+9. Full MCP specification compliance with streamable HTTP transport requirements
 
 ## Development Guidelines
 
@@ -145,13 +182,13 @@ Use VectorMCP-specific error classes:
 
 ### Dependencies
 
-**Runtime**: base64, concurrent-ruby, json-schema, jwt, puma, rack
+**Runtime**: base64, bigdecimal, concurrent-ruby, json-schema, jwt, puma, rack
 **Development**: rspec, rubocop, simplecov, yard, pry-byebug
 **Optional**: jwt (for JWT authentication strategy)
 
 ### Version Management
 
-Version defined in `lib/vector_mcp/version.rb` (currently 0.3.0)
+Version defined in `lib/vector_mcp/version.rb` (currently 0.3.2)
 
 ## Logging
 
@@ -559,11 +596,36 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 - File and data-based resource creation
 - Error handling for invalid image data
 
+**Middleware:**
+- Hook execution and priority testing
+- Context management and execution order
+- Integration with core MCP operations
+- Error handling and recovery scenarios
+
+### Development Configuration
+
+**RuboCop Configuration** (`.rubocop.yml`):
+- Target Ruby version: 3.0.6
+- Relaxed documentation requirements
+- Increased method/class length limits for examples
+- Double-quoted string literals enforced
+
+**RSpec Configuration** (`.rspec`):
+- Documentation format output
+- Color output enabled
+- Automatic spec_helper loading
+
+**YARD Configuration** (`.yardopts`):
+- Documentation output to `doc/` directory
+- Markdown markup with redcarpet provider
+- Custom title: "VectorMCP Documentation"
+
 ### Development Workflow
 
 1. **Setup**: Run `bin/setup` for development environment
 2. **Testing**: Use `rake` for full test suite including linting
 3. **Quality**: Ensure `bundle exec rubocop` passes
 4. **Logging**: Use `VectorMCP.logger_for(component)` for component-specific logging
-5. **Security**: Test with `examples/auth_server.rb` for security scenarios
-6. **Documentation**: Update YARD docs and run `rake yard`
+5. **Security**: Test with `examples/core_features/authentication.rb` for security scenarios
+6. **Transport**: Note that SSE Transport is deprecated - migrate to HTTP Stream Transport per MCP spec 2024-11-05
+7. **Documentation**: Update YARD docs and run `rake yard`
