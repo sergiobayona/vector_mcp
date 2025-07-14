@@ -345,7 +345,7 @@ module VectorMCP
       # @return [Array] Rack response triplet
       def handle_post_request(env)
         session_id = extract_session_id(env)
-        session = @session_manager.get_or_create_session(session_id)
+        session = @session_manager.get_or_create_session(session_id, env)
 
         request_body = read_request_body(env)
         message = parse_json_message(request_body)
@@ -376,7 +376,7 @@ module VectorMCP
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
-        session = @session_manager.get_session(session_id)
+        session = @session_manager.get_or_create_session(session_id, env)
         return not_found_response unless session
 
         @stream_handler.handle_streaming_request(env, session)

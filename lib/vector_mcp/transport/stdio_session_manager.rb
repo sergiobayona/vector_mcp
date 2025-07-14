@@ -123,8 +123,9 @@ module VectorMCP
       def create_global_session
         now = Time.now
 
-        # Create VectorMCP session context
-        session_context = VectorMCP::Session.new(@transport.server, @transport, id: GLOBAL_SESSION_ID)
+        # Create VectorMCP session context with minimal request context
+        request_context = VectorMCP::RequestContext.minimal("stdio")
+        session_context = VectorMCP::Session.new(@transport.server, @transport, id: GLOBAL_SESSION_ID, request_context: request_context)
 
         # Create internal session record using base session manager struct
         session = BaseSessionManager::Session.new(

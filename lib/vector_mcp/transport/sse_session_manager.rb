@@ -139,12 +139,12 @@ module VectorMCP
       # Creates the single shared session for SSE transport.
       #
       # @return [BaseSessionManager::Session] The shared session
-      def create_shared_session
+      def create_shared_session(rack_env = nil)
         session_id = "sse_shared_session_#{SecureRandom.uuid}"
         now = Time.now
 
-        # Create VectorMCP session context
-        session_context = VectorMCP::Session.new(@transport.server, @transport, id: session_id)
+        # Create VectorMCP session context with request context
+        session_context = create_session_with_context(session_id, rack_env)
 
         # Create internal session record using base session manager struct
         session = BaseSessionManager::Session.new(
@@ -158,6 +158,19 @@ module VectorMCP
         @sessions[session_id] = session
         logger.info { "Shared SSE session created: #{session_id}" }
         session
+      end
+
+      # Creates a VectorMCP::Session with proper request context from Rack environment
+      def create_session_with_context(session_id, rack_env)
+        if rack_env
+          # Create request context from Rack environment
+          request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "sse")
+          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
+        else
+          # Fallback to minimal context for cases where rack_env is not available
+          request_context = VectorMCP::RequestContext.minimal("sse")
+          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
+        end
       end
 
       # Closes a client connection safely.
