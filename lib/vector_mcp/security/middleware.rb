@@ -133,35 +133,9 @@ module VectorMCP
       # @param env [Hash] the Rack environment
       # @return [Hash] extracted request data
       def extract_from_rack_env(env)
-        # Extract headers (HTTP_ prefixed in Rack env)
-        headers = {}
-        env.each do |key, value|
-          next unless key.start_with?("HTTP_")
-
-          # Convert HTTP_X_API_KEY to X-API-Key format
-          header_name = key[5..].split("_").map do |part|
-            case part.upcase
-            when "API" then "API" # Keep API in all caps
-            else part.capitalize
-            end
-          end.join("-")
-          headers[header_name] = value
-        end
-
-        # Add special headers
-        headers["Authorization"] = env["HTTP_AUTHORIZATION"] if env["HTTP_AUTHORIZATION"]
-        headers["Content-Type"] = env["CONTENT_TYPE"] if env["CONTENT_TYPE"]
-
-        # Extract query parameters
-        params = {}
-        if env["QUERY_STRING"]
-          require "uri"
-          params = URI.decode_www_form(env["QUERY_STRING"]).to_h
-        end
-
         {
-          headers: headers,
-          params: params,
+          headers: VectorMCP::Util.extract_headers_from_rack_env(env),
+          params: VectorMCP::Util.extract_params_from_rack_env(env),
           method: env["REQUEST_METHOD"],
           path: env["PATH_INFO"],
           rack_env: env
