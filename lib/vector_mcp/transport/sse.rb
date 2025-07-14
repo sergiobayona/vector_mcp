@@ -106,13 +106,32 @@ module VectorMCP
 
       # --- Public methods for Server to send notifications ---
 
+      # Sends a JSON-RPC notification to the first available client session.
+      # If no clients are connected, returns false.
+      #
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the message was sent successfully, false otherwise.
+      def send_notification(method, params = nil)
+        return false if @clients.empty?
+
+        # Send to first available client
+        first_client = @clients.values.first
+        return false unless first_client
+
+        message = { jsonrpc: "2.0", method: method }
+        message[:params] = params if params
+
+        StreamManager.enqueue_message(first_client, message)
+      end
+
       # Sends a JSON-RPC notification to a specific client session via its SSE stream.
       #
       # @param session_id [String] The ID of the client session to send the notification to.
       # @param method [String] The method name of the notification.
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [Boolean] True if the message was successfully enqueued, false otherwise (e.g., client not found).
-      def send_notification(session_id, method, params = nil)
+      def send_notification_to_session(session_id, method, params = nil)
         message = { jsonrpc: "2.0", method: method }
         message[:params] = params if params
 

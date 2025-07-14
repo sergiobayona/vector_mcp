@@ -271,20 +271,50 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     end
 
     describe "#send_notification" do
+      it "sends notification to first available session" do
+        expect(transport.session_manager).to receive(:active_session_ids).and_return([session_id])
+        expect(transport.stream_handler).to receive(:send_message_to_session).with(
+          mock_session,
+          hash_including(jsonrpc: "2.0", method: method_name, params: params)
+        )
+
+        result = transport.send_notification(method_name, params)
+        expect(result).to be true
+      end
+
+      it "returns false when no sessions available" do
+        expect(transport.session_manager).to receive(:active_session_ids).and_return([])
+
+        result = transport.send_notification(method_name, params)
+        expect(result).to be false
+      end
+
+      it "builds notification without params when not provided" do
+        expect(transport.session_manager).to receive(:active_session_ids).and_return([session_id])
+        expect(transport.stream_handler).to receive(:send_message_to_session).with(
+          mock_session,
+          hash_including(jsonrpc: "2.0", method: method_name)
+        )
+
+        transport.send_notification(method_name)
+      end
+    end
+
+    describe "#send_notification_to_session" do
       it "sends notification to specific session" do
         expect(transport.stream_handler).to receive(:send_message_to_session).with(
           mock_session,
           hash_including(jsonrpc: "2.0", method: method_name, params: params)
         )
 
-        result = transport.send_notification(session_id, method_name, params)
+        result = transport.send_notification_to_session(session_id, method_name, params)
         expect(result).to be true
       end
 
       it "returns false for non-existent sessions" do
         allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(nil)
 
-        result = transport.send_notification(session_id, method_name, params)
+        result = transport.send_notification_to_session(session_id, method_name, params)
         expect(result).to be false
       end
 
@@ -294,7 +324,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           hash_including(jsonrpc: "2.0", method: method_name)
         )
 
-        transport.send_notification(session_id, method_name)
+        transport.send_notification_to_session(session_id, method_name)
       end
     end
 

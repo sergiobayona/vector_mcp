@@ -122,13 +122,27 @@ module VectorMCP
         handle_request_error(method, path, e)
       end
 
+      # Sends a notification to the first available session.
+      #
+      # @param method [String] The notification method name
+      # @param params [Hash, Array, nil] The notification parameters
+      # @return [Boolean] True if notification was sent successfully
+      def send_notification(method, params = nil)
+        # Find the first available session
+        first_session = find_first_session
+        return false unless first_session
+
+        message = build_notification(method, params)
+        @stream_handler.send_message_to_session(first_session, message)
+      end
+
       # Sends a notification to a specific session.
       #
       # @param session_id [String] The target session ID
       # @param method [String] The notification method name
       # @param params [Hash, Array, nil] The notification parameters
       # @return [Boolean] True if notification was sent successfully
-      def send_notification(session_id, method, params = nil)
+      def send_notification_to_session(session_id, method, params = nil)
         session = @session_manager.get_session(session_id)
         return false unless session
 
@@ -612,6 +626,16 @@ module VectorMCP
           return session if session&.streaming?
         end
         nil
+      end
+
+      # Finds the first available session (streaming or non-streaming).
+      #
+      # @return [SessionManager::Session, nil] The first available session or nil if none found
+      def find_first_session
+        session_ids = @session_manager.active_session_ids
+        return nil if session_ids.empty?
+
+        @session_manager.get_session(session_ids.first)
       end
     end
   end

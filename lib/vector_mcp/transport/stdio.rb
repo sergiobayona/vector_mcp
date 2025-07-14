@@ -109,6 +109,29 @@ module VectorMCP
         write_message(notification)
       end
 
+      # Sends a JSON-RPC notification message to a specific session.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param _session_id [String] The session ID (ignored for stdio transport).
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the notification was sent successfully.
+      def send_notification_to_session(_session_id, method, params = nil)
+        send_notification(method, params)
+        true
+      end
+
+      # Broadcasts a JSON-RPC notification message to all sessions.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Integer] Number of sessions the notification was sent to (always 1 for stdio).
+      def broadcast_notification(method, params = nil)
+        send_notification(method, params)
+        1
+      end
+
       # Sends a server-initiated JSON-RPC request to the client and waits for a response.
       # This is a blocking call.
       #

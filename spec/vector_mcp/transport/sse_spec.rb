@@ -109,6 +109,42 @@ RSpec.describe VectorMCP::Transport::SSE do
   end
 
   describe "#send_notification" do
+    let(:method_name) { "test/notification" }
+    let(:params) { { key: "value" } }
+    let(:mock_client_conn) { instance_double(VectorMCP::Transport::SSE::ClientConnection, session_id: "test-session-123") }
+
+    context "when clients are available" do
+      before do
+        clients["test-session-123"] = mock_client_conn
+        allow(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).and_return(true)
+      end
+
+      it "enqueues the notification to first available client" do
+        expected_message = { jsonrpc: "2.0", method: method_name, params: params }
+        expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
+
+        result = transport.send_notification(method_name, params)
+        expect(result).to be true
+      end
+
+      it "works without params" do
+        expected_message = { jsonrpc: "2.0", method: method_name }
+        expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
+
+        result = transport.send_notification(method_name)
+        expect(result).to be true
+      end
+    end
+
+    context "when no clients are available" do
+      it "returns false" do
+        result = transport.send_notification(method_name, params)
+        expect(result).to be false
+      end
+    end
+  end
+
+  describe "#send_notification_to_session" do
     let(:session_id) { "test-session-123" }
     let(:method_name) { "test/notification" }
     let(:params) { { key: "value" } }
@@ -124,7 +160,7 @@ RSpec.describe VectorMCP::Transport::SSE do
         expected_message = { jsonrpc: "2.0", method: method_name, params: params }
         expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
 
-        result = transport.send_notification(session_id, method_name, params)
+        result = transport.send_notification_to_session(session_id, method_name, params)
         expect(result).to be true
       end
 
@@ -132,14 +168,14 @@ RSpec.describe VectorMCP::Transport::SSE do
         expected_message = { jsonrpc: "2.0", method: method_name }
         expect(VectorMCP::Transport::SSE::StreamManager).to receive(:enqueue_message).with(mock_client_conn, expected_message)
 
-        result = transport.send_notification(session_id, method_name)
+        result = transport.send_notification_to_session(session_id, method_name)
         expect(result).to be true
       end
     end
 
     context "when client does not exist" do
       it "returns false" do
-        result = transport.send_notification("nonexistent", method_name, params)
+        result = transport.send_notification_to_session("nonexistent", method_name, params)
         expect(result).to be false
       end
     end
