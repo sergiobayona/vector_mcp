@@ -388,7 +388,7 @@ RSpec.describe VectorMCP::Transport::SSE do
     end
 
     it "logs the shutdown" do
-      expect(mock_logger).to receive(:info).with("Cleaning up 2 client connection(s)...")
+      expect(mock_logger).to receive(:info).with("Cleaning up 2 client connection(s)")
       expect(mock_logger).to receive(:info).with("SSE transport stopped")
       transport.stop
     end

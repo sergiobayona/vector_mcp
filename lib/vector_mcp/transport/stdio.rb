@@ -4,6 +4,7 @@
 require "json"
 require_relative "../errors"
 require_relative "../util"
+require_relative "stdio_session_manager"
 require "securerandom" # For generating unique request IDs
 require "timeout"      # For request timeouts
 
@@ -20,6 +21,8 @@ module VectorMCP
       attr_reader :server
       # @return [Logger] The logger instance, shared with the server.
       attr_reader :logger
+      # @return [StdioSessionManager] The session manager for this transport.
+      attr_reader :session_manager
 
       # Timeout for waiting for a response to a server-initiated request (in seconds)
       DEFAULT_REQUEST_TIMEOUT = 30 # Configurable if needed
@@ -27,9 +30,12 @@ module VectorMCP
       # Initializes a new Stdio transport.
       #
       # @param server [VectorMCP::Server] The server instance that will handle messages.
-      def initialize(server)
+      # @param options [Hash] Optional configuration options.
+      # @option options [Boolean] :enable_session_manager (false) Whether to enable the unified session manager.
+      def initialize(server, options = {})
         @server = server
         @logger = server.logger
+        @session_manager = options[:enable_session_manager] ? StdioSessionManager.new(self) : nil
         @input_mutex = Mutex.new
         @output_mutex = Mutex.new
         @running = false
@@ -207,7 +213,6 @@ module VectorMCP
 
         return handle_outgoing_response(message) if outgoing_response?(message)
 
-        ensure_session_exists
         handle_server_message(message)
       end
 
@@ -219,7 +224,21 @@ module VectorMCP
         message["id"] && !message["method"] && (message.key?("result") || message.key?("error"))
       end
 
-      # Ensures a global session exists for this stdio transport.
+      # Gets the global session for this stdio transport.
+      # @api private
+      # @return [VectorMCP::Session] The current session.
+      def get_session
+        # Try session manager first, fallback to old method for backward compatibility
+        if @session_manager
+          session_wrapper = @session_manager.get_global_session
+          return session_wrapper.context if session_wrapper
+        end
+        
+        # Fallback to old session creation for backward compatibility
+        ensure_session_exists
+      end
+
+      # Ensures a global session exists for this stdio transport (legacy method).
       # @api private
       # @return [VectorMCP::Session] The current session.
       def ensure_session_exists
@@ -231,7 +250,7 @@ module VectorMCP
       # @param message [Hash] The parsed message.
       # @return [void]
       def handle_server_message(message)
-        session = ensure_session_exists
+        session = get_session
         session_id = session.id
 
         begin
@@ -246,11 +265,11 @@ module VectorMCP
 
       # --- Run helpers (private) ---
 
-      # Creates a new session for the stdio connection.
+      # Gets the session for the stdio connection.
       # @api private
-      # @return [VectorMCP::Session] The newly created session.
+      # @return [VectorMCP::Session] The session.
       def create_session
-        VectorMCP::Session.new(@server, self)
+        get_session
       end
 
       # Launches the input reading loop in a new thread.
@@ -273,6 +292,7 @@ module VectorMCP
       def shutdown_transport
         @running = false
         @input_thread&.kill if @input_thread&.alive?
+        @session_manager&.cleanup_all_sessions
         logger.info("Stdio transport shut down")
       end
 

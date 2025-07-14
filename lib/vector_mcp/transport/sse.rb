@@ -9,6 +9,7 @@ require "concurrent-ruby"
 require_relative "../errors"
 require_relative "../util"
 require_relative "../session"
+require_relative "sse_session_manager"
 require_relative "sse/client_connection"
 require_relative "sse/stream_manager"
 require_relative "sse/message_handler"
@@ -41,7 +42,7 @@ module VectorMCP
     # @attr_reader port [Integer] The port number the server will listen on.
     # @attr_reader path_prefix [String] The base URL path for MCP endpoints (e.g., "/mcp").
     class SSE
-      attr_reader :logger, :server, :host, :port, :path_prefix
+      attr_reader :logger, :server, :host, :port, :path_prefix, :session_manager
 
       # Initializes a new SSE transport.
       #
@@ -50,6 +51,7 @@ module VectorMCP
       # @option options [String] :host ("localhost") The hostname or IP to bind to.
       # @option options [Integer] :port (8000) The port to listen on.
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints.
+      # @option options [Boolean] :enable_session_manager (false) Whether to enable the unified session manager.
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
@@ -61,9 +63,12 @@ module VectorMCP
         @sse_path = "#{@path_prefix}/sse"
         @message_path = "#{@path_prefix}/message"
 
-        # Thread-safe client storage using concurrent-ruby
+        # Thread-safe client storage using concurrent-ruby (legacy approach)
         @clients = Concurrent::Hash.new
         @session = nil # Global session for this transport instance, initialized in run
+        
+        # Optionally initialize session manager with unified session management
+        @session_manager = options[:enable_session_manager] ? SseSessionManager.new(self) : nil
         @puma_server = nil
         @running = false
 
@@ -77,7 +82,7 @@ module VectorMCP
       # @raise [StandardError] if there's a fatal error during server startup.
       def run
         logger.info("Starting server with Puma SSE transport on #{@host}:#{@port}")
-        create_session
+        create_session unless @session_manager # Only create session if not using session manager
         start_puma_server
       rescue StandardError => e
         handle_fatal_error(e)
@@ -169,9 +174,26 @@ module VectorMCP
       # Stops the transport and cleans up resources
       def stop
         @running = false
-        cleanup_clients
+        if @session_manager
+          @session_manager.cleanup_all_sessions
+        else
+          cleanup_clients
+        end
         @puma_server&.stop
         logger.info("SSE transport stopped")
+      end
+
+      # Cleans up all client connections (legacy mode)
+      def cleanup_clients
+        logger.info("Cleaning up #{@clients.size} client connection(s)")
+        @clients.each_value do |client_conn|
+          begin
+            client_conn.close if client_conn.respond_to?(:close)
+          rescue StandardError => e
+            logger.warn("Error closing client connection: #{e.message}")
+          end
+        end
+        @clients.clear
       end
 
       # --- Private methods ---
@@ -196,8 +218,7 @@ module VectorMCP
         @puma_server.run.join # This blocks until server stops
         logger.info("Puma server stopped.")
       ensure
-        cleanup_clients
-        @session = nil
+        @session_manager.cleanup_all_sessions
         logger.info("SSE transport and resources shut down.")
       end
 
@@ -213,12 +234,6 @@ module VectorMCP
         end
       end
 
-      # Cleans up resources for all connected clients on server shutdown.
-      def cleanup_clients
-        logger.info("Cleaning up #{@clients.size} client connection(s)...")
-        @clients.each_value(&:close)
-        @clients.clear
-      end
 
       # Handles fatal errors during server startup or main run loop.
       def handle_fatal_error(error)
@@ -264,7 +279,13 @@ module VectorMCP
 
         # Create client connection
         client_conn = ClientConnection.new(session_id, logger)
-        @clients[session_id] = client_conn
+        
+        # Store client connection
+        if @session_manager
+          @session_manager.register_client(session_id, client_conn)
+        else
+          @clients[session_id] = client_conn
+        end
 
         # Build message POST URL for this client
         message_post_url = build_post_url(session_id)
@@ -287,10 +308,18 @@ module VectorMCP
                                 "Missing session_id parameter")
         end
 
-        client_conn = @clients[session_id]
+        # Get client connection and session
+        if @session_manager
+          client_conn = @session_manager.all_clients[session_id]
+          shared_session = @session_manager.get_shared_session.context
+        else
+          client_conn = @clients[session_id]
+          shared_session = @session
+        end
+        
         return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id") unless client_conn
 
-        MessageHandler.new(@server, @session, logger).handle_post_message(env, client_conn)
+        MessageHandler.new(@server, shared_session, logger).handle_post_message(env, client_conn)
       end
 
       # Helper methods
