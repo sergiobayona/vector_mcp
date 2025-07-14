@@ -5,6 +5,7 @@ require "securerandom"
 require "puma"
 require "rack"
 require "concurrent-ruby"
+require "timeout"
 
 require_relative "../errors"
 require_relative "../util"
@@ -49,6 +50,7 @@ module VectorMCP
       DEFAULT_PATH_PREFIX = "/mcp"
       DEFAULT_SESSION_TIMEOUT = 300 # 5 minutes
       DEFAULT_EVENT_RETENTION = 100 # Keep last 100 events for resumability
+      DEFAULT_REQUEST_TIMEOUT = 30 # Default timeout for server-initiated requests
 
       # Initializes a new HTTP Stream transport.
       #
@@ -72,6 +74,15 @@ module VectorMCP
         @session_manager = HttpStream::SessionManager.new(self, @session_timeout)
         @event_store = HttpStream::EventStore.new(@event_retention)
         @stream_handler = HttpStream::StreamHandler.new(self)
+
+        # Initialize request tracking for server-initiated requests
+        @outgoing_request_responses = Concurrent::Hash.new
+        @outgoing_request_conditions = Concurrent::Hash.new
+        @request_mutex = Mutex.new
+        @request_id_generator = Enumerator.new do |y|
+          i = 0
+          loop { y << "vecmcp_http_#{i += 1}_#{SecureRandom.hex(4)}" }
+        end
 
         @puma_server = nil
         @running = false
@@ -135,12 +146,70 @@ module VectorMCP
         @session_manager.broadcast_message(message)
       end
 
+      # Sends a server-initiated JSON-RPC request compatible with Session expectations.
+      # This method will block until a response is received or the timeout is reached.
+      # For HTTP transport, this requires finding an appropriate session with streaming connection.
+      #
+      # @param method [String] The request method name
+      # @param params [Hash, Array, nil] The request parameters
+      # @param timeout [Numeric] How long to wait for a response, in seconds
+      # @return [Object] The result part of the client's response
+      # @raise [VectorMCP::SamplingError, VectorMCP::SamplingTimeoutError] if the client returns an error or times out
+      # @raise [ArgumentError] if method is blank or no streaming session found
+      def send_request(method, params = nil, timeout: DEFAULT_REQUEST_TIMEOUT)
+        raise ArgumentError, "Method cannot be blank" if method.to_s.strip.empty?
+
+        # Find the first session with streaming connection
+        # In HTTP transport, we need an active streaming connection to send server-initiated requests
+        streaming_session = find_streaming_session
+        raise ArgumentError, "No streaming session available for server-initiated requests" unless streaming_session
+
+        send_request_to_session(streaming_session.id, method, params, timeout: timeout)
+      end
+
+      # Sends a server-initiated JSON-RPC request to a specific session and waits for a response.
+      # This method will block until a response is received or the timeout is reached.
+      #
+      # @param session_id [String] The target session ID
+      # @param method [String] The request method name
+      # @param params [Hash, Array, nil] The request parameters
+      # @param timeout [Numeric] How long to wait for a response, in seconds
+      # @return [Object] The result part of the client's response
+      # @raise [VectorMCP::SamplingError, VectorMCP::SamplingTimeoutError] if the client returns an error or times out
+      # @raise [ArgumentError] if method is blank or session not found
+      def send_request_to_session(session_id, method, params = nil, timeout: DEFAULT_REQUEST_TIMEOUT)
+        raise ArgumentError, "Method cannot be blank" if method.to_s.strip.empty?
+        raise ArgumentError, "Session ID cannot be blank" if session_id.to_s.strip.empty?
+
+        session = @session_manager.get_session(session_id)
+        raise ArgumentError, "Session not found: #{session_id}" unless session
+
+        raise ArgumentError, "Session must have streaming connection for server-initiated requests" unless session.streaming?
+
+        request_id = @request_id_generator.next
+        request_payload = { jsonrpc: "2.0", id: request_id, method: method }
+        request_payload[:params] = params if params
+
+        setup_request_tracking(request_id)
+        logger.debug { "Sending request ID #{request_id} to session #{session_id}: #{method}" }
+
+        # Send request via existing streaming connection
+        unless @stream_handler.send_message_to_session(session, request_payload)
+          cleanup_request_tracking(request_id)
+          raise VectorMCP::SamplingError, "Failed to send request to session #{session_id}"
+        end
+
+        response = wait_for_response(request_id, method, timeout)
+        process_response(response, request_id, method)
+      end
+
       # Stops the transport and cleans up resources.
       #
       # @return [void]
       def stop
         logger.info { "Stopping HttpStream transport" }
         @running = false
+        cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
         @puma_server&.stop
         logger.info { "HttpStream transport stopped" }
@@ -228,6 +297,7 @@ module VectorMCP
       #
       # @return [void]
       def cleanup_server
+        cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
         @running = false
         logger.info { "HttpStream server cleanup completed" }
@@ -265,6 +335,13 @@ module VectorMCP
 
         request_body = read_request_body(env)
         message = parse_json_message(request_body)
+
+        # Check if this is a response to a server-initiated request
+        if outgoing_response?(message)
+          handle_outgoing_response(message)
+          # For responses, return 202 Accepted with no body
+          return [202, { "Mcp-Session-Id" => session.id }, []]
+        end
 
         result = @server.handle_message(message, session.context, session.id)
 
@@ -389,6 +466,152 @@ module VectorMCP
       def handle_fatal_error(error)
         logger.fatal { "Fatal error in HttpStream transport: #{error.message}" }
         exit(1)
+      end
+
+      # Request tracking helpers for server-initiated requests
+
+      # Sets up tracking for an outgoing request.
+      #
+      # @param request_id [String] The request ID to track
+      # @return [void]
+      def setup_request_tracking(request_id)
+        condition = ConditionVariable.new
+        @request_mutex.synchronize do
+          @outgoing_request_conditions[request_id] = condition
+        end
+      end
+
+      # Waits for a response to an outgoing request.
+      #
+      # @param request_id [String] The request ID to wait for
+      # @param method [String] The request method name
+      # @param timeout [Numeric] How long to wait
+      # @return [Hash] The response data
+      # @raise [VectorMCP::SamplingTimeoutError] if timeout occurs
+      def wait_for_response(request_id, method, timeout)
+        condition = @outgoing_request_conditions[request_id]
+
+        @request_mutex.synchronize do
+          Timeout.timeout(timeout) do
+            condition.wait(@request_mutex) until @outgoing_request_responses.key?(request_id)
+            @outgoing_request_responses.delete(request_id)
+          end
+        rescue Timeout::Error
+          logger.warn { "Timeout waiting for response to request ID #{request_id} (#{method}) after #{timeout}s" }
+          cleanup_request_tracking(request_id)
+          raise VectorMCP::SamplingTimeoutError, "Timeout waiting for client response to '#{method}' request (ID: #{request_id})"
+        ensure
+          @outgoing_request_conditions.delete(request_id)
+        end
+      end
+
+      # Processes the response from an outgoing request.
+      #
+      # @param response [Hash, nil] The response data
+      # @param request_id [String] The request ID
+      # @param method [String] The request method name
+      # @return [Object] The result data
+      # @raise [VectorMCP::SamplingError] if response contains an error or is nil
+      def process_response(response, request_id, method)
+        if response.nil?
+          raise VectorMCP::SamplingError, "No response received for '#{method}' request (ID: #{request_id}) - this indicates a logic error."
+        end
+
+        if response.key?(:error)
+          err = response[:error]
+          logger.warn { "Client returned error for request ID #{request_id} (#{method}): #{err.inspect}" }
+          raise VectorMCP::SamplingError, "Client returned an error for '#{method}' request (ID: #{request_id}): [#{err[:code]}] #{err[:message]}"
+        end
+
+        response[:result]
+      end
+
+      # Cleans up tracking for a request.
+      #
+      # @param request_id [String] The request ID to clean up
+      # @return [void]
+      def cleanup_request_tracking(request_id)
+        @request_mutex.synchronize do
+          @outgoing_request_responses.delete(request_id)
+          @outgoing_request_conditions.delete(request_id)
+        end
+      end
+
+      # Checks if a message is a response to an outgoing request.
+      #
+      # @param message [Hash] The parsed message
+      # @return [Boolean] True if this is an outgoing response
+      def outgoing_response?(message)
+        return false unless message["id"]
+        return false if message["method"]
+
+        message.key?("result") || message.key?("error")
+      end
+
+      # Handles a response to an outgoing request.
+      #
+      # @param message [Hash] The parsed response message
+      # @return [void]
+      def handle_outgoing_response(message)
+        request_id = message["id"]
+        logger.debug { "Received response for outgoing request ID #{request_id}" }
+
+        @request_mutex.synchronize do
+          # Store the response (convert keys to symbols for consistency)
+          response_data = deep_transform_keys(message, &:to_sym)
+          @outgoing_request_responses[request_id] = response_data
+
+          # Signal any thread waiting for this response
+          condition = @outgoing_request_conditions[request_id]
+          if condition
+            condition.signal
+            logger.debug { "Signaled condition for request ID #{request_id}" }
+          else
+            logger.warn { "Received response for request ID #{request_id} but no thread is waiting" }
+          end
+        end
+      end
+
+      # Recursively transforms hash keys using the given block.
+      #
+      # @param obj [Object] The object to transform (Hash, Array, or other)
+      # @return [Object] The transformed object
+      def deep_transform_keys(obj, &block)
+        case obj
+        when Hash
+          obj.transform_keys(&block).transform_values { |v| deep_transform_keys(v, &block) }
+        when Array
+          obj.map { |v| deep_transform_keys(v, &block) }
+        else
+          obj
+        end
+      end
+
+      # Cleans up all pending requests during shutdown.
+      #
+      # @return [void]
+      def cleanup_all_pending_requests
+        return if @outgoing_request_conditions.empty?
+
+        logger.info { "Cleaning up #{@outgoing_request_conditions.size} pending requests" }
+
+        @request_mutex.synchronize do
+          # Signal all waiting threads to wake up
+          @outgoing_request_conditions.each_value(&:broadcast)
+          @outgoing_request_conditions.clear
+          @outgoing_request_responses.clear
+        end
+      end
+
+      # Finds the first session with an active streaming connection.
+      #
+      # @return [SessionManager::Session, nil] The first streaming session or nil if none found
+      def find_streaming_session
+        @session_manager.active_session_ids.each do |session_id|
+          session = @session_manager.get_session(session_id)
+          return session if session&.streaming?
+        end
+        nil
       end
     end
   end
