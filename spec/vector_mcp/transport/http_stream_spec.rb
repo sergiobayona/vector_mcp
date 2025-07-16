@@ -130,7 +130,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
       before do
         # Mock session manager to return a session
-        allow(transport.session_manager).to receive(:get_or_create_session).with(session_id).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
         allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
         allow(transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
       end
@@ -171,7 +171,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
 
         it "creates session when no session ID provided" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(nil).and_return(mock_session)
+          allow(transport.session_manager).to receive(:get_or_create_session).with(nil, anything).and_return(mock_session)
 
           post "/mcp", json_request.to_json, "CONTENT_TYPE" => "application/json"
 
@@ -189,7 +189,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
 
         it "returns 404 for non-existent sessions" do
-          allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(nil)
+          allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(nil)
 
           get "/mcp", {}, valid_headers
 
@@ -238,6 +238,71 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(last_response.body).to eq("Method Not Allowed")
         end
       end
+
+      describe "Origin validation" do
+        let(:restricted_transport) { described_class.new(mock_mcp_server, allowed_origins: ["https://example.com"]) }
+        let(:restricted_app) { restricted_transport }
+
+        context "with unrestricted origins (default)" do
+          it "allows requests without Origin header" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "allows requests with any Origin header" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
+
+            expect(last_response.status).to eq(200)
+          end
+        end
+
+        context "with restricted origins" do
+          let(:app) { restricted_app }
+
+          before do
+            allow(restricted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+          end
+
+          it "allows requests without Origin header" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "allows requests from allowed origins" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://example.com")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "rejects requests from disallowed origins" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
+
+            expect(last_response.status).to eq(403)
+            expect(last_response.body).to eq("Origin not allowed")
+          end
+
+          it "rejects GET requests from disallowed origins" do
+            get "/mcp", {}, valid_headers.merge("HTTP_ORIGIN" => "https://malicious.com")
+
+            expect(last_response.status).to eq(403)
+            expect(last_response.body).to eq("Origin not allowed")
+          end
+
+          it "rejects DELETE requests from disallowed origins" do
+            delete "/mcp", {}, valid_headers.merge("HTTP_ORIGIN" => "https://malicious.com")
+
+            expect(last_response.status).to eq(403)
+            expect(last_response.body).to eq("Origin not allowed")
+          end
+        end
+      end
     end
   end
 
@@ -251,7 +316,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     end
 
     it "integrates with session manager for POST requests" do
-      expect(transport.session_manager).to receive(:get_or_create_session).with(session_id)
+      expect(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything)
 
       post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
            "HTTP_MCP_SESSION_ID" => session_id, "CONTENT_TYPE" => "application/json"

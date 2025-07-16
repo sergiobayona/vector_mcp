@@ -61,6 +61,7 @@ module VectorMCP
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints
       # @option options [Integer] :session_timeout (300) Session timeout in seconds
       # @option options [Integer] :event_retention (100) Number of events to retain for resumability
+      # @option options [Array<String>] :allowed_origins (["*"]) List of allowed origins for CORS. Use ["*"] to allow all origins.
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
@@ -69,6 +70,7 @@ module VectorMCP
         @path_prefix = normalize_path_prefix(options[:path_prefix] || DEFAULT_PATH_PREFIX)
         @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
         @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
+        @allowed_origins = options[:allowed_origins] || ["*"]
 
         # Initialize components
         @session_manager = HttpStream::SessionManager.new(self, @session_timeout)
@@ -327,6 +329,11 @@ module VectorMCP
         return handle_health_check if path == "/"
         return not_found_response unless path == @path_prefix
 
+        # Validate origin for security (MCP specification requirement)
+        unless valid_origin?(env)
+          return forbidden_response("Origin not allowed")
+        end
+
         case method
         when "POST"
           handle_post_request(env)
@@ -461,9 +468,26 @@ module VectorMCP
         [400, { "Content-Type" => "text/plain" }, [message]]
       end
 
+      def forbidden_response(message = "Forbidden")
+        [403, { "Content-Type" => "text/plain" }, [message]]
+      end
+
       def method_not_allowed_response(allowed_methods)
         [405, { "Content-Type" => "text/plain", "Allow" => allowed_methods.join(", ") },
          ["Method Not Allowed"]]
+      end
+
+      # Validates the Origin header for security
+      #
+      # @param env [Hash] The Rack environment
+      # @return [Boolean] True if origin is allowed, false otherwise
+      def valid_origin?(env)
+        return true if @allowed_origins.include?("*")
+
+        origin = env["HTTP_ORIGIN"]
+        return true if origin.nil? # Allow requests without Origin header (e.g., server-to-server)
+
+        @allowed_origins.include?(origin)
       end
 
       # Logging and error handling
