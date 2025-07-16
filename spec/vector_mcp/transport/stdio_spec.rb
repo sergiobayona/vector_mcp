@@ -225,6 +225,44 @@ RSpec.describe VectorMCP::Transport::Stdio do
     end
   end
 
+  describe "#send_notification_to_session" do
+    let(:original_stdout) { $stdout }
+    let(:output) { StringIO.new }
+
+    before { $stdout = output }
+    after { $stdout = original_stdout }
+
+    it "writes a correct JSON-RPC notification (ignoring session_id)" do
+      result = transport.send_notification_to_session("session-123", "someMethod", { foo: "bar" })
+      json = JSON.parse(output.string)
+      expect(json).to eq({
+                           "jsonrpc" => "2.0",
+                           "method" => "someMethod",
+                           "params" => { "foo" => "bar" }
+                         })
+      expect(result).to be true
+    end
+  end
+
+  describe "#broadcast_notification" do
+    let(:original_stdout) { $stdout }
+    let(:output) { StringIO.new }
+
+    before { $stdout = output }
+    after { $stdout = original_stdout }
+
+    it "writes a correct JSON-RPC notification and returns 1" do
+      result = transport.broadcast_notification("someMethod", { foo: "bar" })
+      json = JSON.parse(output.string)
+      expect(json).to eq({
+                           "jsonrpc" => "2.0",
+                           "method" => "someMethod",
+                           "params" => { "foo" => "bar" }
+                         })
+      expect(result).to eq(1)
+    end
+  end
+
   describe "#shutdown" do
     it "sets @running to false and kills the input thread" do
       fake_thread = instance_double(Thread, alive?: true, kill: nil)
