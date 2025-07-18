@@ -247,13 +247,13 @@ module VectorMCP
       VectorMCP::Sampling::Result.new(raw_result)
     rescue ArgumentError => e
       @logger.error("[Session #{@id}] Invalid parameters for sampling request or result: #{e.message}")
-      raise VectorMCP::SamplingError, "Invalid sampling parameters or malformed client response: #{e.message}", details: { original_error: e.to_s }
+      raise VectorMCP::SamplingError.new("Invalid sampling parameters or malformed client response: #{e.message}", details: { original_error: e.to_s })
     rescue VectorMCP::SamplingError => e
       @logger.warn("[Session #{@id}] Sampling request failed: #{e.message}")
       raise e
     rescue StandardError => e
       @logger.error("[Session #{@id}] Unexpected error during sampling: #{e.class.name}: #{e.message}")
-      raise VectorMCP::SamplingError, "An unexpected error occurred during sampling: #{e.message}", details: { original_error: e.to_s }
+      raise VectorMCP::SamplingError.new("An unexpected error occurred during sampling: #{e.message}", details: { original_error: e.to_s })
     end
   end
 end
