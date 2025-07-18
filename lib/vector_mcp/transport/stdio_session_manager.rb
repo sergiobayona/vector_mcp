@@ -31,6 +31,14 @@ module VectorMCP
         @global_session
       end
 
+      # Gets or creates the global session for stdio transport.
+      # This is an alias for get_global_session for stdio transport.
+      #
+      # @return [Session] The global session
+      def get_or_create_global_session
+        get_global_session
+      end
+
       # Override: Gets session by ID, but always returns the global session for stdio.
       #
       # @param session_id [String] The session ID (ignored for stdio)
@@ -84,6 +92,13 @@ module VectorMCP
       # @return [Boolean] Always true
       def has_sessions?
         true
+      end
+
+      # Gets all sessions for stdio transport (just the one global session).
+      #
+      # @return [Array<Session>] Array containing the global session
+      def get_all_sessions
+        [@global_session].compact
       end
 
       protected

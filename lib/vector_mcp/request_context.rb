@@ -82,9 +82,13 @@ module VectorMCP
 
     # Check if this is an HTTP-based transport.
     #
-    # @return [Boolean] True if method and path are present
+    # @return [Boolean] True if method is an HTTP method and path is present
     def http_transport?
-      !@method.nil? && !@path.nil?
+      return false unless @method && @path
+      
+      # Check if method is an HTTP method
+      http_methods = %w[GET POST PUT DELETE HEAD OPTIONS PATCH TRACE CONNECT]
+      http_methods.include?(@method.upcase)
     end
 
     # Create a minimal request context for non-HTTP transports.
