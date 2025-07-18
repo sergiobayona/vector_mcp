@@ -150,7 +150,7 @@ module VectorMCP
               cleanup_connection(session)
             end
 
-            # Keep connection alive
+            # Keep connection alive until thread completes
             connection.thread.join
           end
         end
@@ -203,11 +203,20 @@ module VectorMCP
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @return [void]
         def keep_alive_loop(session, yielder)
+          start_time = Time.now
+          max_duration = 300 # 5 minutes maximum connection time
+          
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
             connection = @active_connections[session.id]
             break if connection.nil? || connection.closed?
+
+            # Check if connection has been alive too long
+            if Time.now - start_time > max_duration
+              logger.debug { "Connection for #{session.id} reached maximum duration, closing" }
+              break
+            end
 
             # Send heartbeat
             heartbeat_event = {

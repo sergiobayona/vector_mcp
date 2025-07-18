@@ -65,7 +65,7 @@ module VectorMCP
           security_result = validate_tool_security!(session, tool, server)
           validate_input_arguments!(tool_name, tool, arguments)
 
-          result = execute_tool_handler(tool, arguments, security_result)
+          result = execute_tool_handler(tool, arguments, security_result, session)
           context.result = build_tool_result(result)
 
           context = server.middleware_manager.execute_hooks(:after_tool_call, context)
@@ -510,11 +510,11 @@ module VectorMCP
       end
 
       # Execute tool handler with proper arity handling
-      def self.execute_tool_handler(tool, arguments, security_result)
+      def self.execute_tool_handler(tool, arguments, security_result, session)
         if [1, -1].include?(tool.handler.arity)
           tool.handler.call(arguments)
         else
-          tool.handler.call(arguments, security_result[:session_context])
+          tool.handler.call(arguments, session)
         end
       end
 

@@ -4,8 +4,8 @@ require "spec_helper"
 require "vector_mcp/handlers/core"
 
 RSpec.describe VectorMCP::Handlers::Core do
-  let(:logger) { instance_double(Logger, debug: nil, info: nil, error: nil) }
-  let(:session) { double("session") }
+  let(:logger) { instance_double(Logger, debug: nil, info: nil, warn: nil, error: nil) }
+  let(:session) { double("session", id: "test-session-id") }
   let(:security_middleware) { double("security_middleware") }
   let(:middleware_manager) { double("middleware_manager") }
   let(:server) do

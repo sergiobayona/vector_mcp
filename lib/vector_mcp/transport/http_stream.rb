@@ -368,7 +368,7 @@ module VectorMCP
 
         # Set session ID header in response
         headers = { "Mcp-Session-Id" => session.id }
-        json_response(result, headers)
+        json_rpc_response(result, message["id"], headers)
       rescue VectorMCP::ProtocolError => e
         json_error_response(e.request_id, e.code, e.message, e.details)
       rescue JSON::ParserError => e
@@ -451,6 +451,12 @@ module VectorMCP
       def json_response(data, headers = {})
         response_headers = { "Content-Type" => "application/json" }.merge(headers)
         [200, response_headers, [data.to_json]]
+      end
+
+      def json_rpc_response(result, request_id, headers = {})
+        response = { jsonrpc: "2.0", id: request_id, result: result }
+        response_headers = { "Content-Type" => "application/json" }.merge(headers)
+        [200, response_headers, [response.to_json]]
       end
 
       def json_error_response(id, code, message, data = nil)
