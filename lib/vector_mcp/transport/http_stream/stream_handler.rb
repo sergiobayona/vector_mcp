@@ -46,7 +46,7 @@ module VectorMCP
         def handle_streaming_request(env, session)
           last_event_id = extract_last_event_id(env)
 
-          logger.info { "Starting SSE stream for session #{session.id}" }
+          logger.info("Starting SSE stream for session #{session.id}")
 
           headers = build_sse_headers
           body = create_sse_stream(session, last_event_id)
@@ -74,11 +74,11 @@ module VectorMCP
             sse_event = format_sse_event(event_data, "message", event_id)
             connection.yielder << sse_event
 
-            logger.debug { "Message sent to session #{session.id}" }
+            logger.debug("Message sent to session #{session.id}")
 
             true
           rescue StandardError => e
-            logger.error { "Error sending message to session #{session.id}: #{e.message}" }
+            logger.error("Error sending message to session #{session.id}: #{e.message}")
 
             # Mark connection as closed and clean up
             cleanup_connection(session)
@@ -97,7 +97,7 @@ module VectorMCP
         #
         # @return [void]
         def cleanup_all_connections
-          logger.info { "Cleaning up all streaming connections: #{@active_connections.size}" }
+          logger.info("Cleaning up all streaming connections: #{@active_connections.size}")
 
           @active_connections.each_value(&:close)
 
@@ -145,7 +145,7 @@ module VectorMCP
             connection.thread = Thread.new do
               stream_to_client(session, yielder, last_event_id)
             rescue StandardError => e
-              logger.error { "Error in streaming thread for #{session.id}: #{e.message}" }
+              logger.error("Error in streaming thread for #{session.id}: #{e.message}")
             ensure
               cleanup_connection(session)
             end
@@ -190,7 +190,7 @@ module VectorMCP
         def replay_events(yielder, last_event_id)
           missed_events = @transport.event_store.get_events_after(last_event_id)
 
-          logger.info { "Replaying #{missed_events.length} missed events from #{last_event_id}" }
+          logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
 
           missed_events.each do |event|
             yielder << event.to_sse_format
@@ -214,7 +214,7 @@ module VectorMCP
 
             # Check if connection has been alive too long
             if Time.now - start_time > max_duration
-              logger.debug { "Connection for #{session.id} reached maximum duration, closing" }
+              logger.debug("Connection for #{session.id} reached maximum duration, closing")
               break
             end
 
@@ -229,7 +229,7 @@ module VectorMCP
               event_id = @transport.event_store.store_event(heartbeat_event.to_json, "heartbeat")
               yielder << format_sse_event(heartbeat_event.to_json, "heartbeat", event_id)
             rescue StandardError
-              logger.debug { "Heartbeat failed for #{session.id}, connection likely closed" }
+              logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
               break
             end
           end
@@ -247,7 +247,7 @@ module VectorMCP
           lines << "event: #{type}" if type
           lines << "data: #{data}"
           lines << ""
-          lines.join("\n")
+          lines.join("\n") + "\n"
         end
 
         # Cleans up a specific connection.
@@ -261,7 +261,7 @@ module VectorMCP
           connection.close
           @transport.session_manager.remove_streaming_connection(session)
 
-          logger.debug { "Streaming connection cleaned up for #{session.id}" }
+          logger.debug("Streaming connection cleaned up for #{session.id}")
         end
       end
     end

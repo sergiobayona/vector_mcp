@@ -114,6 +114,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       allow(mock_session).to receive(:streaming?).and_return(true)
       allow(mock_connection).to receive(:closed?).and_return(false)
       allow(mock_connection).to receive(:yielder).and_return(mock_yielder)
+      allow(mock_connection).to receive(:close)
+      allow(mock_session_manager).to receive(:remove_streaming_connection)
       allow(mock_event_store).to receive(:store_event).and_return("event-789")
       allow(mock_yielder).to receive(:<<)
     end
@@ -368,7 +370,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       allow(mock_event_store).to receive(:store_event).and_return("event-123")
       allow(mock_event_store).to receive(:get_events_after).and_return([])
       allow(mock_yielder).to receive(:<<)
-      allow(Thread).to receive(:new).and_return(mock_thread)
+      allow(Thread).to receive(:new).and_yield.and_return(mock_thread)
       allow(mock_thread).to receive(:join)
     end
 
@@ -376,19 +378,33 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       it "creates streaming connection and registers it" do
         expect(mock_session_manager).to receive(:set_streaming_connection).with(mock_session, anything)
         
-        stream_handler.send(:create_sse_stream, mock_session, nil)
+        enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
+        # Execute the enumerator block to trigger the setup
+        enumerator.peek rescue nil
       end
 
       it "sends initial connection established event" do
         expect(mock_event_store).to receive(:store_event).with(anything, "connection")
         
-        stream_handler.send(:create_sse_stream, mock_session, nil)
+        enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
+        # Execute the enumerator block to trigger the setup
+        begin
+          enumerator.first
+        rescue StopIteration
+          # Expected when enumerator is exhausted
+        end
       end
 
       it "starts streaming thread" do
         expect(Thread).to receive(:new).and_yield
         
-        stream_handler.send(:create_sse_stream, mock_session, nil)
+        enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
+        # Execute the enumerator block to trigger the setup
+        begin
+          enumerator.first
+        rescue StopIteration
+          # Expected when enumerator is exhausted
+        end
       end
     end
 
@@ -482,6 +498,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
     describe "#close" do
       it "marks connection as closed" do
+        allow(mock_thread).to receive(:kill)
         connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
           mock_session, mock_yielder, mock_thread, false
         )
@@ -546,19 +563,31 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       it "logs streaming thread errors" do
         error_message = "Streaming thread error"
-        allow(Thread).to receive(:new).and_yield.and_raise(StandardError.new(error_message))
+        allow(stream_handler).to receive(:stream_to_client).and_raise(StandardError.new(error_message))
         
         expect(mock_logger).to receive(:error).with(/Error in streaming thread for #{session_id}: #{error_message}/)
         
-        expect { stream_handler.send(:create_sse_stream, mock_session, nil) }.to raise_error(StandardError)
+        enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
+        # The error is caught and logged inside the thread, so the enumerator should not raise
+        begin
+          enumerator.first
+        rescue StopIteration
+          # Expected when enumerator is exhausted
+        end
       end
 
       it "ensures connection cleanup on thread error" do
-        allow(Thread).to receive(:new).and_yield.and_raise(StandardError.new("Thread error"))
+        # Test that cleanup_connection is called when an error occurs in the thread
+        allow(stream_handler).to receive(:stream_to_client).and_raise(StandardError.new("Thread error"))
+        expect(stream_handler).to receive(:cleanup_connection).with(mock_session)
         
-        expect(mock_session_manager).to receive(:remove_streaming_connection).with(mock_session)
-        
-        expect { stream_handler.send(:create_sse_stream, mock_session, nil) }.to raise_error(StandardError)
+        enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
+        # The error is caught and cleanup happens inside the thread
+        begin
+          enumerator.first
+        rescue StopIteration
+          # Expected when enumerator is exhausted
+        end
       end
     end
 
@@ -569,6 +598,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(mock_session).to receive(:streaming?).and_return(true)
         allow(mock_connection).to receive(:closed?).and_return(false)
         allow(mock_connection).to receive(:yielder).and_return(mock_yielder)
+        allow(mock_connection).to receive(:close)
+        allow(mock_session_manager).to receive(:remove_streaming_connection)
         allow(mock_yielder).to receive(:<<)
         stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
       end
