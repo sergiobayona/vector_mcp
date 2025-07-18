@@ -23,7 +23,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       server_info: mock_server_info,
       server_capabilities: mock_server_capabilities,
       protocol_version: "2024-11-05",
-      handle_message: { "jsonrpc" => "2.0", "id" => 1, "result" => "success" },
+      handle_message: "success",
       security_middleware: nil
     )
   end
@@ -146,6 +146,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
 
           response_data = JSON.parse(last_response.body)
+          expect(response_data["jsonrpc"]).to eq("2.0")
+          expect(response_data["id"]).to eq(1)
           expect(response_data["result"]).to eq("success")
         end
 

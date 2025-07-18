@@ -138,12 +138,14 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
   end
 
   describe "transport integration" do
+    let(:real_transport) { VectorMCP::Transport::HttpStream.new(server, port: 0) }
     let(:mock_session) { instance_double(VectorMCP::Transport::HttpStream::SessionManager::Session) }
     let(:mock_vector_session) { instance_double(VectorMCP::Session) }
     let(:mock_request_context) { instance_double(VectorMCP::RequestContext) }
 
     before do
       allow(mock_session).to receive(:context).and_return(mock_vector_session)
+      allow(mock_session).to receive(:id).and_return("test-session")
       allow(mock_vector_session).to receive(:request_context).and_return(mock_request_context)
       allow(mock_vector_session).to receive(:id).and_return("test-session")
       allow(mock_request_context).to receive(:headers).and_return({})
@@ -152,33 +154,42 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
 
     describe "handle_post_request" do
       it "passes rack_env to session creation" do
-        allow(transport).to receive(:extract_session_id).and_return("test-session")
-        allow(session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
-        allow(transport).to receive(:read_request_body).and_return('{"jsonrpc":"2.0","method":"test","id":1}')
-        allow(transport).to receive(:process_message).and_return({ jsonrpc: "2.0", id: 1, result: "ok" })
+        # Use real transport but mock its session manager
+        real_session_manager = real_transport.instance_variable_get(:@session_manager)
+        allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        allow(server).to receive(:handle_message).and_return({ jsonrpc: "2.0", id: 1, result: "ok" })
+        
+        rack_env = {
+          "REQUEST_METHOD" => "POST",
+          "HTTP_MCP_SESSION_ID" => "test-session",
+          "rack.input" => StringIO.new('{"jsonrpc":"2.0","method":"test","id":1}')
+        }
 
-        result = transport.send(:handle_post_request, anything)
+        result = real_transport.send(:handle_post_request, rack_env)
 
-        expect(session_manager).to have_received(:get_or_create_session).with("test-session", anything)
+        expect(real_session_manager).to have_received(:get_or_create_session).with("test-session", anything)
         expect(result).to be_an(Array) # Rack response
       end
     end
 
     describe "handle_get_request" do
-      let(:stream_handler) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler) }
-
-      before do
-        allow(transport).to receive(:instance_variable_get).with(:@stream_handler).and_return(stream_handler)
-        allow(stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
-      end
-
       it "passes rack_env to session creation for streaming" do
-        allow(transport).to receive(:extract_session_id).and_return("test-session")
-        allow(session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        # Use real transport but mock its session manager and stream handler
+        real_session_manager = real_transport.instance_variable_get(:@session_manager)
+        real_stream_handler = real_transport.instance_variable_get(:@stream_handler)
+        
+        allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        allow(real_stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
+        
+        rack_env = {
+          "REQUEST_METHOD" => "GET",
+          "HTTP_MCP_SESSION_ID" => "test-session",
+          "HTTP_ACCEPT" => "text/event-stream"
+        }
 
-        result = transport.send(:handle_get_request, anything)
+        result = real_transport.send(:handle_get_request, rack_env)
 
-        expect(session_manager).to have_received(:get_or_create_session).with("test-session", anything)
+        expect(real_session_manager).to have_received(:get_or_create_session).with("test-session", anything)
         expect(result).to be_an(Array) # Rack response
       end
     end

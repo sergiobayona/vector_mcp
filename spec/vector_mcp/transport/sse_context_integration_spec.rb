@@ -26,7 +26,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
 
     describe "create_shared_session" do
       it "creates session with context from rack_env" do
-        session = session_manager.create_shared_session(rack_env)
+        session = session_manager.send(:create_shared_session, rack_env)
 
         expect(session.id).to start_with("sse_shared_session_")
         expect(session.context).to be_a(VectorMCP::Session)
@@ -47,7 +47,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
       end
 
       it "creates session with minimal context when rack_env is nil" do
-        session = session_manager.create_shared_session(nil)
+        session = session_manager.send(:create_shared_session, nil)
 
         expect(session.id).to start_with("sse_shared_session_")
         expect(session.context).to be_a(VectorMCP::Session)
@@ -63,7 +63,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
       end
 
       it "creates session with minimal context when rack_env is empty" do
-        session = session_manager.create_shared_session({})
+        session = session_manager.send(:create_shared_session, {})
 
         expect(session.id).to start_with("sse_shared_session_")
 
@@ -121,7 +121,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
 
     it "maintains context across session lifecycle" do
       # Create session
-      session = session_manager.create_shared_session(simple_rack_env)
+      session = session_manager.send(:create_shared_session, simple_rack_env)
       session_id = session.id
 
       # Verify session is stored and context is maintained
@@ -135,7 +135,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
     end
 
     it "preserves context when session is touched" do
-      session = session_manager.create_shared_session(simple_rack_env)
+      session = session_manager.send(:create_shared_session, simple_rack_env)
       original_context = session.context.request_context
 
       # Touch session (simulate activity)
@@ -161,7 +161,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
     end
 
     it "captures SSE-specific headers and parameters" do
-      session = session_manager.create_shared_session(streaming_rack_env)
+      session = session_manager.send(:create_shared_session, streaming_rack_env)
 
       request_context = session.context.request_context
       expect(request_context.header("Accept")).to eq("text/event-stream")
@@ -173,7 +173,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
 
     it "handles SSE reconnection scenarios" do
       # Initial connection
-      initial_session = session_manager.create_shared_session(streaming_rack_env)
+      initial_session = session_manager.send(:create_shared_session, streaming_rack_env)
       initial_session.context.request_context
 
       # Reconnection with Last-Event-ID
@@ -182,7 +182,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
                                                  "QUERY_STRING" => "reconnect=true"
                                                })
 
-      reconnect_session = session_manager.create_shared_session(reconnect_env)
+      reconnect_session = session_manager.send(:create_shared_session, reconnect_env)
       reconnect_context = reconnect_session.context.request_context
 
       expect(reconnect_context.header("Last-Event-Id")).to eq("event-456")
@@ -201,7 +201,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
         "HTTP_ACCEPT" => "application/json" # Not typical for SSE
       }
 
-      session = session_manager.create_shared_session(malformed_env)
+      session = session_manager.send(:create_shared_session, malformed_env)
 
       expect(session.id).to start_with("sse_shared_session_")
       request_context = session.context.request_context
@@ -224,7 +224,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
             "PATH_INFO" => "/concurrent",
             "HTTP_X_THREAD_ID" => "thread-#{i}"
           }
-          sessions << session_manager.create_shared_session(env)
+          sessions << session_manager.send(:create_shared_session, env)
         end
       end
 
