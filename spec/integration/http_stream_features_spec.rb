@@ -40,7 +40,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       }
     ) do |args, session|
       # Use sampling to ask the client
-      result = session.sample(
+      result = session.sample({
         messages: [
           {
             role: "user",
@@ -52,12 +52,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         ],
         system_prompt: "You are a helpful assistant.",
         max_tokens: 100
-      )
+      })
       
       response = { initial_response: result.content }
       
       if args["follow_up"]
-        follow_up_result = session.sample(
+        follow_up_result = session.sample({
           messages: [
             {
               role: "user",
@@ -69,7 +69,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
           ],
           system_prompt: "You are a helpful assistant.",
           max_tokens: 100
-        )
+        })
         response[:follow_up_response] = follow_up_result.content
       end
       
@@ -86,7 +86,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         required: ["message"]
       }
     ) do |args, session|
-      result = session.sample(
+      result = session.sample({
         messages: [
           {
             role: "user",
@@ -98,7 +98,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         ],
         system_prompt: "Echo back the session information.",
         max_tokens: 50
-      )
+      })
       
       {
         session_id: session.id,

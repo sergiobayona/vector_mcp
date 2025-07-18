@@ -112,9 +112,34 @@ module HttpStreamIntegrationHelpers
     })
     
     response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
+    
+    # Debug: Print response if not successful
+    if response.code != "200"
+      puts "Tool call failed with status #{response.code}"
+      puts "Response body: #{response.body}"
+    end
+    
     expect(response.code).to eq("200")
     
-    parse_json_rpc_response(response)
+    json_response = parse_json_rpc_response(response)
+    
+    # Extract the tool result from the JSON-RPC response
+    if json_response["result"] && json_response["result"]["content"]
+      content = json_response["result"]["content"]
+      if content.is_a?(Array) && content.first && content.first["text"]
+        # Try to parse the tool result as JSON
+        begin
+          JSON.parse(content.first["text"])
+        rescue JSON::ParserError
+          # If it's not JSON, return the text as-is
+          content.first["text"]
+        end
+      else
+        json_response["result"]
+      end
+    else
+      json_response
+    end
   end
 
   # Helper method to list tools

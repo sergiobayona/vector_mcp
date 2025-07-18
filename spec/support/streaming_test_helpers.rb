@@ -249,6 +249,7 @@ module StreamingTestHelpers
         jsonrpc: "2.0",
         id: request_id,
         result: {
+          model: "test-model",
           role: "assistant",
           content: {
             type: "text",
