@@ -243,7 +243,14 @@ module VectorMCP
       send_request_kwargs = {}
       send_request_kwargs[:timeout] = timeout if timeout
 
-      raw_result = @transport.send_request(*send_request_args, **send_request_kwargs)
+      # For HTTP transport, we need to use send_request_to_session to target this specific session
+      if @transport.respond_to?(:send_request_to_session)
+        raw_result = @transport.send_request_to_session(@id, *send_request_args, **send_request_kwargs)
+      else
+        # Fallback to generic send_request for other transports
+        raw_result = @transport.send_request(*send_request_args, **send_request_kwargs)
+      end
+      
       VectorMCP::Sampling::Result.new(raw_result)
     rescue ArgumentError => e
       @logger.error("[Session #{@id}] Invalid parameters for sampling request or result: #{e.message}")

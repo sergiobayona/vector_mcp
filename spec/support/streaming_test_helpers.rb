@@ -221,11 +221,18 @@ module StreamingTestHelpers
       request_id = message["id"]
       params = message["params"] || {}
       
-      # Generate appropriate response based on configuration
-      response_content = @sampling_responses["sampling/createMessage"] || 
-                        generate_default_sampling_response(params)
-      
-      send_sampling_response(request_id, response_content)
+      # Check if we have a configured response
+      if @sampling_responses.key?("sampling/createMessage")
+        response_content = @sampling_responses["sampling/createMessage"]
+        send_sampling_response(request_id, response_content)
+      elsif @sampling_responses.key?(:no_response)
+        # Don't respond at all - this will cause a timeout
+        return
+      else
+        # Generate default response
+        response_content = generate_default_sampling_response(params)
+        send_sampling_response(request_id, response_content)
+      end
     end
 
     def generate_default_sampling_response(params)

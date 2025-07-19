@@ -119,9 +119,15 @@ module HttpStreamIntegrationHelpers
       puts "Response body: #{response.body}"
     end
     
-    expect(response.code).to eq("200")
-    
     json_response = parse_json_rpc_response(response)
+    
+    # Return error response if present
+    if json_response["error"]
+      return json_response["error"]
+    end
+    
+    # Otherwise expect success
+    expect(response.code).to eq("200")
     
     # Extract the tool result from the JSON-RPC response
     if json_response["result"] && json_response["result"]["content"]
