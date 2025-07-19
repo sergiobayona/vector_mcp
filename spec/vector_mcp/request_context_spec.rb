@@ -6,7 +6,7 @@ RSpec.describe VectorMCP::RequestContext do
   describe "#initialize" do
     it "creates a context with default values" do
       context = described_class.new
-      
+
       expect(context.headers).to eq({})
       expect(context.params).to eq({})
       expect(context.method).to be_nil
@@ -22,7 +22,7 @@ RSpec.describe VectorMCP::RequestContext do
         path: "/api/test",
         transport_metadata: { transport_type: "http" }
       )
-      
+
       expect(context.headers).to eq({ "Content-Type" => "application/json" })
       expect(context.params).to eq({ "key" => "value" })
       expect(context.method).to eq("POST")
@@ -32,10 +32,10 @@ RSpec.describe VectorMCP::RequestContext do
 
     it "normalizes and freezes data" do
       context = described_class.new(
-        headers: { :content_type => "application/json" },
-        params: { :api_key => "secret" }
+        headers: { content_type: "application/json" },
+        params: { api_key: "secret" }
       )
-      
+
       expect(context.headers).to eq({ "content_type" => "application/json" })
       expect(context.params).to eq({ "api_key" => "secret" })
       expect(context.headers).to be_frozen
@@ -52,7 +52,7 @@ RSpec.describe VectorMCP::RequestContext do
         path: "/users",
         transport_metadata: { transport_type: "sse" }
       )
-      
+
       expected = {
         headers: { "Authorization" => "Bearer token" },
         params: { "id" => "123" },
@@ -60,7 +60,7 @@ RSpec.describe VectorMCP::RequestContext do
         path: "/users",
         transport_metadata: { "transport_type" => "sse" }
       }
-      
+
       expect(context.to_h).to eq(expected)
     end
   end
@@ -158,7 +158,7 @@ RSpec.describe VectorMCP::RequestContext do
   describe ".minimal" do
     it "creates a minimal context for non-HTTP transports" do
       context = described_class.minimal("stdio")
-      
+
       expect(context.headers).to eq({})
       expect(context.params).to eq({})
       expect(context.method).to eq("STDIO")
@@ -183,7 +183,7 @@ RSpec.describe VectorMCP::RequestContext do
 
     it "creates context from Rack environment" do
       context = described_class.from_rack_env(rack_env, "http_stream")
-      
+
       expect(context.method).to eq("POST")
       expect(context.path).to eq("/api/test")
       expect(context.header("Authorization")).to eq("Bearer token123")
@@ -204,7 +204,7 @@ RSpec.describe VectorMCP::RequestContext do
         headers: { "Authorization" => "Bearer token" },
         params: { "id" => "123" }
       )
-      
+
       result = context.to_s
       expect(result).to include("RequestContext")
       expect(result).to include("method=GET")
@@ -217,7 +217,7 @@ RSpec.describe VectorMCP::RequestContext do
   describe "#inspect" do
     it "returns a detailed string representation" do
       context = described_class.new(method: "POST", path: "/test")
-      
+
       result = context.inspect
       expect(result).to include("VectorMCP::RequestContext")
       expect(result).to include("method=\"POST\"")
@@ -241,7 +241,7 @@ RSpec.describe VectorMCP::RequestContext do
         headers: { "X-Count" => 42 },
         params: { "active" => true }
       )
-      
+
       expect(context.header("X-Count")).to eq("42")
       expect(context.param("active")).to eq("true")
     end
@@ -252,7 +252,7 @@ RSpec.describe VectorMCP::RequestContext do
         params: nil,
         transport_metadata: []
       )
-      
+
       expect(context.headers).to eq({})
       expect(context.params).to eq({})
       expect(context.transport_metadata).to eq({})

@@ -205,7 +205,7 @@ module VectorMCP
         def keep_alive_loop(session, yielder)
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
-          
+
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
@@ -247,7 +247,7 @@ module VectorMCP
           lines << "event: #{type}" if type
           lines << "data: #{data}"
           lines << ""
-          lines.join("\n") + "\n"
+          "#{lines.join("\n")}\n"
         end
 
         # Cleans up a specific connection.

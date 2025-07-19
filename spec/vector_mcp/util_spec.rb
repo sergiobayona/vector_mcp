@@ -638,29 +638,29 @@ RSpec.describe VectorMCP::Util do
         env = { "QUERY_STRING" => "string=hello&number=123&boolean=true&empty=" }
         result = described_class.extract_params_from_rack_env(env)
         expect(result).to eq({
-          "string" => "hello",
-          "number" => "123",
-          "boolean" => "true",
-          "empty" => ""
-        })
+                               "string" => "hello",
+                               "number" => "123",
+                               "boolean" => "true",
+                               "empty" => ""
+                             })
       end
 
       it "handles special characters in parameter names" do
         env = { "QUERY_STRING" => "param_with_underscore=value&param-with-dash=value2" }
         result = described_class.extract_params_from_rack_env(env)
         expect(result).to eq({
-          "param_with_underscore" => "value",
-          "param-with-dash" => "value2"
-        })
+                               "param_with_underscore" => "value",
+                               "param-with-dash" => "value2"
+                             })
       end
 
       it "handles API key parameter formats" do
         env = { "QUERY_STRING" => "api_key=secret123&apikey=secret456" }
         result = described_class.extract_params_from_rack_env(env)
         expect(result).to eq({
-          "api_key" => "secret123",
-          "apikey" => "secret456"
-        })
+                               "api_key" => "secret123",
+                               "apikey" => "secret456"
+                             })
       end
     end
   end

@@ -260,8 +260,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
     end
 
     it "returns array of session IDs" do
-      session1 = session_manager.create_session("session-1")
-      session2 = session_manager.create_session("session-2")
+      session_manager.create_session("session-1")
+      session_manager.create_session("session-2")
 
       result = session_manager.active_session_ids
 
@@ -371,8 +371,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
   describe "#cleanup_all_sessions" do
     it "terminates all sessions" do
-      session1 = session_manager.create_session("session-1")
-      session2 = session_manager.create_session("session-2")
+      session_manager.create_session("session-1")
+      session_manager.create_session("session-2")
 
       session_manager.cleanup_all_sessions
 

@@ -19,12 +19,10 @@ module HttpStreamIntegrationHelpers
   def wait_for_server_start(base_url, timeout: 10)
     Timeout.timeout(timeout) do
       loop do
-        begin
-          Net::HTTP.get_response(URI("#{base_url}/"))
-          break
-        rescue Errno::ECONNREFUSED
-          sleep(0.1)
-        end
+        Net::HTTP.get_response(URI("#{base_url}/"))
+        break
+      rescue Errno::ECONNREFUSED
+        sleep(0.1)
       end
     end
   rescue Timeout::Error
@@ -35,7 +33,7 @@ module HttpStreamIntegrationHelpers
   def make_http_request(method, base_url, path, body: nil, headers: {}, session_id: nil)
     uri = URI("#{base_url}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)
-    
+
     request = case method.upcase
               when "GET"
                 Net::HTTP::Get.new(uri)
@@ -46,12 +44,12 @@ module HttpStreamIntegrationHelpers
               else
                 raise "Unsupported HTTP method: #{method}"
               end
-    
+
     headers.each { |k, v| request[k] = v }
     request["Mcp-Session-Id"] = session_id if session_id
     request["Content-Type"] = "application/json" if body
     request.body = body.to_json if body
-    
+
     http.request(request)
   end
 
@@ -70,16 +68,16 @@ module HttpStreamIntegrationHelpers
   # Helper method to initialize an MCP session
   def initialize_mcp_session(base_url, session_id, client_info: nil)
     client_info ||= { name: "test-client", version: "1.0.0" }
-    
+
     init_request = create_json_rpc_request("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: client_info
-    })
-    
+                                             protocolVersion: "2024-11-05",
+                                             capabilities: {},
+                                             clientInfo: client_info
+                                           })
+
     response = make_http_request("POST", base_url, "/mcp", body: init_request, session_id: session_id)
     expect(response.code).to eq("200")
-    
+
     data = parse_json_rpc_response(response)
     # HttpStream transport returns raw results, not JSON-RPC wrapped
     if data["result"]
@@ -88,7 +86,7 @@ module HttpStreamIntegrationHelpers
       # For HttpStream, we expect raw response data
       expect(data).not_to be_nil
     end
-    
+
     response
   end
 
@@ -98,37 +96,35 @@ module HttpStreamIntegrationHelpers
       "Accept" => "text/event-stream",
       "Cache-Control" => "no-cache"
     }
-    
-    make_http_request("GET", base_url, "/mcp", 
-                      headers: default_headers.merge(headers), 
+
+    make_http_request("GET", base_url, "/mcp",
+                      headers: default_headers.merge(headers),
                       session_id: session_id)
   end
 
   # Helper method to call a tool
   def call_tool(base_url, session_id, tool_name, arguments = {})
     request = create_json_rpc_request("tools/call", {
-      name: tool_name,
-      arguments: arguments
-    })
-    
+                                        name: tool_name,
+                                        arguments: arguments
+                                      })
+
     response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
-    
+
     # Debug: Print response if not successful
     if response.code != "200"
       puts "Tool call failed with status #{response.code}"
       puts "Response body: #{response.body}"
     end
-    
+
     json_response = parse_json_rpc_response(response)
-    
+
     # Return error response if present
-    if json_response["error"]
-      return json_response["error"]
-    end
-    
+    return json_response["error"] if json_response["error"]
+
     # Otherwise expect success
     expect(response.code).to eq("200")
-    
+
     # Extract the tool result from the JSON-RPC response
     if json_response["result"] && json_response["result"]["content"]
       content = json_response["result"]["content"]
@@ -153,7 +149,7 @@ module HttpStreamIntegrationHelpers
     request = create_json_rpc_request("tools/list", {})
     response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
     expect(response.code).to eq("200")
-    
+
     parse_json_rpc_response(response)
   end
 
@@ -162,20 +158,20 @@ module HttpStreamIntegrationHelpers
     request = create_json_rpc_request("resources/read", { uri: uri })
     response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
     expect(response.code).to eq("200")
-    
+
     parse_json_rpc_response(response)
   end
 
   # Helper method to get a prompt
   def get_prompt(base_url, session_id, name, arguments = {})
     request = create_json_rpc_request("prompts/get", {
-      name: name,
-      arguments: arguments
-    })
-    
+                                        name: name,
+                                        arguments: arguments
+                                      })
+
     response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
     expect(response.code).to eq("200")
-    
+
     parse_json_rpc_response(response)
   end
 
@@ -223,7 +219,7 @@ module HttpStreamIntegrationHelpers
           a: { type: "number" },
           b: { type: "number" }
         },
-        required: ["a", "b"]
+        required: %w[a b]
       }
     ) { |args| args["a"] + args["b"] }
 
@@ -235,7 +231,7 @@ module HttpStreamIntegrationHelpers
         properties: {},
         required: []
       }
-    ) { |args| raise StandardError, "Test error" }
+    ) { |_args| raise StandardError, "Test error" }
   end
 
   # Register standard test resources
@@ -271,13 +267,13 @@ module HttpStreamIntegrationHelpers
       name: "simple_prompt",
       description: "Simple prompt with no arguments",
       arguments: []
-    ) { |args| "Simple prompt response" }
+    ) { |_args| "Simple prompt response" }
   end
 
   # Server lifecycle management
   def start_test_server(server, port, host: "localhost")
     transport = VectorMCP::Transport::HttpStream.new(server, port: port, host: host)
-    
+
     server_thread = Thread.new do
       transport.run
     rescue StandardError
@@ -286,7 +282,7 @@ module HttpStreamIntegrationHelpers
 
     # Wait for server to start
     wait_for_server_start("http://#{host}:#{port}")
-    
+
     [transport, server_thread]
   end
 
@@ -297,27 +293,27 @@ module HttpStreamIntegrationHelpers
   end
 
   # Concurrent testing helper
-  def run_concurrent_sessions(base_url, session_count: 3, &block)
+  def run_concurrent_sessions(base_url, session_count: 3)
     sessions = []
     threads = []
-    
+
     session_count.times do |i|
       session_id = "concurrent-session-#{i}"
       sessions << session_id
-      
+
       threads << Thread.new do
-        initialize_mcp_session(base_url, session_id, client_info: { 
-          name: "test-client-#{i}", 
-          version: "1.0.0" 
-        })
-        
+        initialize_mcp_session(base_url, session_id, client_info: {
+                                 name: "test-client-#{i}",
+                                 version: "1.0.0"
+                               })
+
         yield(session_id, i) if block_given?
       end
     end
-    
+
     # Wait for all threads to complete
     threads.each(&:join)
-    
+
     sessions
   end
 
@@ -351,21 +347,19 @@ module HttpStreamIntegrationHelpers
     def handle_stream
       uri = URI("#{@base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Accept"] = "text/event-stream"
       request["Cache-Control"] = "no-cache"
-      
+
       http.request(request) do |response|
         response.read_body do |chunk|
           break unless @running
-          
+
           # Parse SSE events
           parse_sse_events(chunk) do |message|
-            if message["method"] == "sampling/createMessage"
-              handle_sampling_request(message)
-            end
+            handle_sampling_request(message) if message["method"] == "sampling/createMessage"
           end
         end
       end
@@ -376,21 +370,21 @@ module HttpStreamIntegrationHelpers
     def parse_sse_events(chunk)
       chunk.split("\n\n").each do |event_data|
         next if event_data.strip.empty?
-        
+
         event_lines = event_data.split("\n")
         data = nil
-        
+
         event_lines.each do |line|
-          data = line[6..-1] if line.start_with?("data: ")
+          data = line[6..] if line.start_with?("data: ")
         end
-        
-        if data
-          begin
-            message = JSON.parse(data)
-            yield message
-          rescue JSON::ParserError
-            # Ignore malformed JSON
-          end
+
+        next unless data
+
+        begin
+          message = JSON.parse(data)
+          yield message
+        rescue JSON::ParserError
+          # Ignore malformed JSON
         end
       end
     end
@@ -398,7 +392,7 @@ module HttpStreamIntegrationHelpers
     def handle_sampling_request(message)
       method = message["method"]
       request_id = message["id"]
-      
+
       # Create a mock response
       response = {
         jsonrpc: "2.0",
@@ -411,7 +405,7 @@ module HttpStreamIntegrationHelpers
           }
         }
       }
-      
+
       # Send response back to server
       send_response(response)
     end
@@ -419,12 +413,12 @@ module HttpStreamIntegrationHelpers
     def send_response(response)
       uri = URI("#{@base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Post.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Content-Type"] = "application/json"
       request.body = response.to_json
-      
+
       http.request(request)
     end
   end

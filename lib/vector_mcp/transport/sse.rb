@@ -66,7 +66,7 @@ module VectorMCP
         # Thread-safe client storage using concurrent-ruby (legacy approach)
         @clients = Concurrent::Hash.new
         @session = nil # Global session for this transport instance, initialized in run
-        
+
         # Optionally initialize session manager with unified session management
         @session_manager = options[:enable_session_manager] ? SseSessionManager.new(self) : nil
         @puma_server = nil
@@ -187,11 +187,9 @@ module VectorMCP
       def cleanup_clients
         logger.info("Cleaning up #{@clients.size} client connection(s)")
         @clients.each_value do |client_conn|
-          begin
-            client_conn.close if client_conn.respond_to?(:close)
-          rescue StandardError => e
-            logger.warn("Error closing client connection: #{e.message}")
-          end
+          client_conn.close if client_conn.respond_to?(:close)
+        rescue StandardError => e
+          logger.warn("Error closing client connection: #{e.message}")
         end
         @clients.clear
       end
@@ -233,7 +231,6 @@ module VectorMCP
           stop
         end
       end
-
 
       # Handles fatal errors during server startup or main run loop.
       def handle_fatal_error(error)
@@ -279,7 +276,7 @@ module VectorMCP
 
         # Create client connection
         client_conn = ClientConnection.new(session_id, logger)
-        
+
         # Store client connection
         if @session_manager
           @session_manager.register_client(session_id, client_conn)
@@ -316,7 +313,7 @@ module VectorMCP
           client_conn = @clients[session_id]
           shared_session = @session
         end
-        
+
         return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id") unless client_conn
 
         MessageHandler.new(@server, shared_session, logger).handle_post_message(env, client_conn)

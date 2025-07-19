@@ -16,8 +16,8 @@ module VectorMCP
       # @param transport [Stdio] The parent transport instance
       # @param session_timeout [Integer] Session timeout in seconds (ignored for stdio)
       def initialize(transport, session_timeout = 300)
-        super(transport, session_timeout)
-        
+        super
+
         # Create the single global session for stdio transport
         @global_session = create_global_session
       end
@@ -43,7 +43,7 @@ module VectorMCP
       #
       # @param session_id [String] The session ID (ignored for stdio)
       # @return [Session] The global session
-      def get_session(session_id = nil)
+      def get_session(_session_id = nil)
         get_global_session
       end
 
@@ -51,7 +51,7 @@ module VectorMCP
       #
       # @param session_id [String, nil] The session ID (ignored)
       # @return [Session] The global session
-      def get_or_create_session(session_id = nil)
+      def get_or_create_session(_session_id = nil)
         get_global_session
       end
 
@@ -59,7 +59,7 @@ module VectorMCP
       #
       # @param session_id [String, nil] The session ID (ignored)
       # @return [Session] The global session
-      def create_session(session_id = nil)
+      def create_session(_session_id = nil)
         # For stdio, always return the existing global session
         get_global_session
       end
@@ -68,7 +68,7 @@ module VectorMCP
       #
       # @param session_id [String] The session ID (ignored)
       # @return [Boolean] Always false (session cannot be terminated individually)
-      def terminate_session(session_id)
+      def terminate_session(_session_id)
         # For stdio, the session is only terminated when the transport shuts down
         false
       end
@@ -114,12 +114,12 @@ module VectorMCP
       end
 
       # Override: Stdio can always send messages (single session assumption).
-      def can_send_message_to_session?(session)
+      def can_send_message_to_session?(_session)
         true
       end
 
       # Override: Sends messages via the transport's notification mechanism.
-      def send_message_to_session(session, message)
+      def send_message_to_session(_session, message)
         # For stdio, we send notifications directly via the transport
         @transport.send_notification(message["method"], message["params"])
         true

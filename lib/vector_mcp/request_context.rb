@@ -85,7 +85,7 @@ module VectorMCP
     # @return [Boolean] True if method is an HTTP method and path is present
     def http_transport?
       return false unless @method && @path
-      
+
       # Check if method is an HTTP method
       http_methods = %w[GET POST PUT DELETE HEAD OPTIONS PATCH TRACE CONNECT]
       http_methods.include?(@method.upcase)

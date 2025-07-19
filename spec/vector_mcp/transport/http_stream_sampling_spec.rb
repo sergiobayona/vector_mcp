@@ -140,9 +140,9 @@ RSpec.describe VectorMCP::Transport::HttpStream, "#send_request sampling support
         # Verify response was stored
         stored_response = transport.instance_variable_get(:@outgoing_request_responses)[request_id]
         expect(stored_response).to eq({
-          id: request_id,
-          result: { text: "Hello" }
-        })
+                                        id: request_id,
+                                        result: { text: "Hello" }
+                                      })
       end
     end
   end

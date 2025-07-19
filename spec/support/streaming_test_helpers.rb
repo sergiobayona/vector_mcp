@@ -10,7 +10,7 @@ module StreamingTestHelpers
   # Enhanced mock streaming client for testing HTTP streaming features
   class MockStreamingClient
     attr_reader :session_id, :base_url, :events_received, :connection_state
-    
+
     def initialize(session_id, base_url)
       @session_id = session_id
       @base_url = base_url
@@ -29,20 +29,19 @@ module StreamingTestHelpers
     def start_streaming(headers: {})
       @mutex.synchronize do
         return false if @running
+
         @running = true
         @connection_state = :connecting
       end
 
       @stream_thread = Thread.new do
-        begin
-          handle_stream(headers)
-        rescue => e
-          @connection_state = :error
-          handle_error(:connection_error, e)
-        ensure
-          @connection_state = :disconnected
-          @running = false
-        end
+        handle_stream(headers)
+      rescue StandardError => e
+        @connection_state = :error
+        handle_error(:connection_error, e)
+      ensure
+        @connection_state = :disconnected
+        @running = false
       end
 
       # Wait for connection to establish
@@ -54,7 +53,7 @@ module StreamingTestHelpers
       @mutex.synchronize do
         @running = false
       end
-      
+
       @stream_thread&.join(2)
       @stream_thread&.kill if @stream_thread&.alive?
       @stream_thread = nil
@@ -137,13 +136,13 @@ module StreamingTestHelpers
         if response.code.to_i == 200
           @connection_state = :connected
           trigger_callback(:connected)
-          
+
           buffer = ""
           response.read_body do |chunk|
             break unless @running
-            
+
             buffer += chunk
-            
+
             # Process complete events (ending with double newline)
             while buffer.include?("\n\n")
               event_data, buffer = buffer.split("\n\n", 2)
@@ -160,18 +159,16 @@ module StreamingTestHelpers
     def process_sse_event(event_data)
       event = parse_sse_event(event_data)
       @events_received << event
-      
+
       # Handle server-initiated requests
-      if event[:data] && event[:data].is_a?(Hash) && event[:data]["method"]
-        handle_server_request(event[:data])
-      end
-      
+      handle_server_request(event[:data]) if event[:data].is_a?(Hash) && event[:data]["method"]
+
       # Trigger method-specific handler
-      if event[:data] && event[:data].is_a?(Hash) && event[:data]["method"]
-        method = event[:data]["method"]
-        handler = @response_handlers[method]
-        handler.call(event) if handler
-      end
+      return unless event[:data].is_a?(Hash) && event[:data]["method"]
+
+      method = event[:data]["method"]
+      handler = @response_handlers[method]
+      handler&.call(event)
     end
 
     def parse_sse_event(event_data)
@@ -185,11 +182,11 @@ module StreamingTestHelpers
       event_data.split("\n").each do |line|
         case line
         when /^id:\s*(.+)$/
-          event[:id] = $1.strip
+          event[:id] = ::Regexp.last_match(1).strip
         when /^event:\s*(.+)$/
-          event[:event] = $1.strip
+          event[:event] = ::Regexp.last_match(1).strip
         when /^data:\s*(.+)$/
-          data_str = $1.strip
+          data_str = ::Regexp.last_match(1).strip
           begin
             event[:data] = JSON.parse(data_str)
           rescue JSON::ParserError
@@ -204,9 +201,9 @@ module StreamingTestHelpers
     def handle_server_request(message)
       method = message["method"]
       request_id = message["id"]
-      
+
       return unless request_id # Only handle requests, not notifications
-      
+
       case method
       when "sampling/createMessage"
         handle_sampling_request(message)
@@ -220,14 +217,14 @@ module StreamingTestHelpers
     def handle_sampling_request(message)
       request_id = message["id"]
       params = message["params"] || {}
-      
+
       # Check if we have a configured response
       if @sampling_responses.key?("sampling/createMessage")
         response_content = @sampling_responses["sampling/createMessage"]
         send_sampling_response(request_id, response_content)
       elsif @sampling_responses.key?(:no_response)
         # Don't respond at all - this will cause a timeout
-        return
+        nil
       else
         # Generate default response
         response_content = generate_default_sampling_response(params)
@@ -238,7 +235,7 @@ module StreamingTestHelpers
     def generate_default_sampling_response(params)
       messages = params["messages"] || []
       last_message = messages.last
-      
+
       if last_message && last_message["content"]
         content = last_message["content"]
         if content.is_a?(Hash) && content["text"]
@@ -264,7 +261,7 @@ module StreamingTestHelpers
           }
         }
       }
-      
+
       send_response_to_server(response)
     end
 
@@ -274,30 +271,30 @@ module StreamingTestHelpers
         id: request_id,
         result: result
       }
-      
+
       send_response_to_server(response)
     end
 
     def send_response_to_server(response)
       uri = URI("#{@base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Post.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Content-Type"] = "application/json"
       request.body = response.to_json
-      
+
       http.request(request)
     end
 
     def handle_error(error_type, error)
       handler = @error_handlers[error_type]
-      handler.call(error) if handler
+      handler&.call(error)
     end
 
     def trigger_callback(state)
       callback = @connection_callbacks[state]
-      callback.call if callback
+      callback&.call
     end
   end
 
@@ -314,18 +311,18 @@ module StreamingTestHelpers
       event_data.split("\n").each do |line|
         case line
         when /^id:\s*(.+)$/
-          event[:id] = $1.strip
+          event[:id] = ::Regexp.last_match(1).strip
         when /^event:\s*(.+)$/
-          event[:event] = $1.strip
+          event[:event] = ::Regexp.last_match(1).strip
         when /^data:\s*(.+)$/
-          data_str = $1.strip
+          data_str = ::Regexp.last_match(1).strip
           begin
             event[:data] = JSON.parse(data_str)
           rescue JSON::ParserError
             event[:data] = data_str
           end
         when /^retry:\s*(\d+)$/
-          event[:retry_interval] = $1.to_i
+          event[:retry_interval] = ::Regexp.last_match(1).to_i
         end
       end
 
@@ -338,7 +335,7 @@ module StreamingTestHelpers
       lines << "event: #{event}" if event
       lines << "data: #{data.is_a?(String) ? data : data.to_json}" if data
       lines << "retry: #{retry_interval}" if retry_interval
-      lines.join("\n") + "\n\n"
+      "#{lines.join("\n")}\n\n"
     end
   end
 
@@ -385,7 +382,7 @@ module StreamingTestHelpers
         events << {
           id: "#{prefix}-#{i}",
           event: "test",
-          data: { 
+          data: {
             message: "Test event #{i}",
             timestamp: Time.now.to_f,
             sequence: i
@@ -398,11 +395,11 @@ module StreamingTestHelpers
     # Validate event ordering
     def validate_event_sequence(events, expected_count)
       return false if events.size != expected_count
-      
+
       events.each_with_index do |event, index|
         return false unless event[:data] && event[:data]["sequence"] == index
       end
-      
+
       true
     end
   end
@@ -421,16 +418,16 @@ module StreamingTestHelpers
 
     def connect(headers: {})
       @state = :connecting
-      
+
       uri = URI("#{@base_url}/mcp")
       @connection = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Accept"] = "text/event-stream"
       request["Cache-Control"] = "no-cache"
       headers.each { |k, v| request[k] = v }
-      
+
       @connection.request(request) do |response|
         if response.code.to_i == 200
           @state = :connected
@@ -440,7 +437,7 @@ module StreamingTestHelpers
           raise "Connection failed: #{response.code}"
         end
       end
-    rescue => e
+    rescue StandardError => e
       @state = :error
       raise e
     end

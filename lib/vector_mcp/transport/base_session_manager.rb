@@ -237,7 +237,7 @@ module VectorMCP
       #
       # @param session [Session] The session to check
       # @return [Boolean] True if messaging is supported for this session
-      def can_send_message_to_session?(session)
+      def can_send_message_to_session?(_session)
         false # Override in subclasses
       end
 
@@ -247,7 +247,7 @@ module VectorMCP
       # @param session [Session] The target session
       # @param message [Hash] The message to send
       # @return [Boolean] True if message was sent successfully
-      def send_message_to_session(session, message)
+      def send_message_to_session(_session, _message)
         false # Override in subclasses
       end
 
@@ -307,14 +307,10 @@ module VectorMCP
       # @param criteria [Hash] The search criteria
       # @return [Boolean] True if session matches all criteria
       def matches_criteria?(session, criteria)
-        if criteria[:created_after]
-          return false unless session.created_at > criteria[:created_after]
-        end
+        return false if criteria[:created_after] && session.created_at <= criteria[:created_after]
 
-        if criteria[:metadata]
-          criteria[:metadata].each do |key, value|
-            return false unless session.metadata[key] == value
-          end
+        criteria[:metadata]&.each do |key, value|
+          return false unless session.metadata[key] == value
         end
 
         true

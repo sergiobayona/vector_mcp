@@ -71,9 +71,9 @@ RSpec.describe "Authentication Integration" do
     it "allows tool access with valid API key" do
       # Set session request context with valid API key
       session.set_request_context({
-        headers: { "X-API-Key" => "valid-key-123" },
-        params: {}
-      })
+                                    headers: { "X-API-Key" => "valid-key-123" },
+                                    params: {}
+                                  })
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -92,9 +92,9 @@ RSpec.describe "Authentication Integration" do
     it "rejects tool access with invalid API key" do
       # Set session request context with invalid API key
       session.set_request_context({
-        headers: { "X-API-Key" => "invalid-key" },
-        params: {}
-      })
+                                    headers: { "X-API-Key" => "invalid-key" },
+                                    params: {}
+                                  })
 
       expect do
         server.handle_message({
@@ -133,9 +133,9 @@ RSpec.describe "Authentication Integration" do
     it "allows access with authorized user" do
       # Set session request context with admin API key
       session.set_request_context({
-        headers: { "X-API-Key" => "admin-key" },
-        params: {}
-      })
+                                    headers: { "X-API-Key" => "admin-key" },
+                                    params: {}
+                                  })
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -154,9 +154,9 @@ RSpec.describe "Authentication Integration" do
     it "denies access to unauthorized user" do
       # Set session request context with user API key (not admin)
       session.set_request_context({
-        headers: { "X-API-Key" => "user-key" },
-        params: {}
-      })
+                                    headers: { "X-API-Key" => "user-key" },
+                                    params: {}
+                                  })
 
       expect do
         server.handle_message({

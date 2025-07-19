@@ -34,7 +34,7 @@ module VectorMCP
       @client_capabilities = nil
       @data = {} # Initialize user data hash
       @logger = server.logger
-      
+
       # Initialize request context
       @request_context = case request_context
                          when RequestContext
@@ -113,17 +113,17 @@ module VectorMCP
     # @return [RequestContext] The updated request context.
     def update_request_context(**attributes)
       current_attrs = @request_context.to_h
-      
+
       # Deep merge nested hashes like headers and params
       merged_attrs = current_attrs.dup
       attributes.each do |key, value|
-        if value.is_a?(Hash) && current_attrs[key].is_a?(Hash)
-          merged_attrs[key] = current_attrs[key].merge(value)
-        else
-          merged_attrs[key] = value
-        end
+        merged_attrs[key] = if value.is_a?(Hash) && current_attrs[key].is_a?(Hash)
+                              current_attrs[key].merge(value)
+                            else
+                              value
+                            end
       end
-      
+
       @request_context = RequestContext.new(**merged_attrs)
     end
 
@@ -244,17 +244,18 @@ module VectorMCP
       send_request_kwargs[:timeout] = timeout if timeout
 
       # For HTTP transport, we need to use send_request_to_session to target this specific session
-      if @transport.respond_to?(:send_request_to_session)
-        raw_result = @transport.send_request_to_session(@id, *send_request_args, **send_request_kwargs)
-      else
-        # Fallback to generic send_request for other transports
-        raw_result = @transport.send_request(*send_request_args, **send_request_kwargs)
-      end
-      
+      raw_result = if @transport.respond_to?(:send_request_to_session)
+                     @transport.send_request_to_session(@id, *send_request_args, **send_request_kwargs)
+                   else
+                     # Fallback to generic send_request for other transports
+                     @transport.send_request(*send_request_args, **send_request_kwargs)
+                   end
+
       VectorMCP::Sampling::Result.new(raw_result)
     rescue ArgumentError => e
       @logger.error("[Session #{@id}] Invalid parameters for sampling request or result: #{e.message}")
-      raise VectorMCP::SamplingError.new("Invalid sampling parameters or malformed client response: #{e.message}", details: { original_error: e.to_s })
+      raise VectorMCP::SamplingError.new("Invalid sampling parameters or malformed client response: #{e.message}",
+                                         details: { original_error: e.to_s })
     rescue VectorMCP::SamplingError => e
       @logger.warn("[Session #{@id}] Sampling request failed: #{e.message}")
       raise e

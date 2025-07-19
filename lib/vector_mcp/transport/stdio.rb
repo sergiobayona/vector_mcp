@@ -233,7 +233,7 @@ module VectorMCP
           session_wrapper = @session_manager.get_global_session
           return session_wrapper.context if session_wrapper
         end
-        
+
         # Fallback to old session creation for backward compatibility
         ensure_session_exists
       end

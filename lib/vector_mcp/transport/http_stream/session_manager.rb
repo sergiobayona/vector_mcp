@@ -50,9 +50,6 @@ module VectorMCP
         #
         # @param transport [HttpStream] The parent transport instance
         # @param session_timeout [Integer] Session timeout in seconds
-        def initialize(transport, session_timeout)
-          super(transport, session_timeout)
-        end
 
         # Overrides base implementation to create HTTP stream sessions with streaming connection metadata.
         def create_session(session_id = nil, rack_env = nil)
@@ -99,15 +96,14 @@ module VectorMCP
 
         # Creates a VectorMCP::Session with proper request context from Rack environment
         def create_session_with_context(session_id, rack_env)
-          if rack_env
-            # Create request context from Rack environment
-            request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-            VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
-          else
-            # Fallback to minimal context for cases where rack_env is not available
-            request_context = VectorMCP::RequestContext.minimal("http_stream")
-            VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
-          end
+          request_context = if rack_env
+                              # Create request context from Rack environment
+                              VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
+                            else
+                              # Fallback to minimal context for cases where rack_env is not available
+                              VectorMCP::RequestContext.minimal("http_stream")
+                            end
+          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
         end
 
         # Associates a streaming connection with a session.

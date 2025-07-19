@@ -231,7 +231,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
       threads.each(&:join)
 
       # Verify all sessions were created with unique IDs
-      session_ids = sessions.map { |s| s.id }
+      session_ids = sessions.map(&:id)
       expect(session_ids.uniq.length).to eq(5)
 
       # Verify each session has correct context

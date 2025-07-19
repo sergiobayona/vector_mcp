@@ -26,7 +26,7 @@ server.register_tool(
   }
 ) do |args, session|
   topic = args["topic"]
-  
+
   # Use sampling to ask the client for a response
   sampling_result = session.sample(
     messages: [
@@ -41,10 +41,10 @@ server.register_tool(
     system_prompt: "You are a helpful assistant engaging in conversation.",
     max_tokens: 500
   )
-  
+
   # Extract the response
   response_content = sampling_result.content
-  
+
   # Ask a follow-up question
   follow_up = session.sample(
     messages: [
@@ -70,7 +70,7 @@ server.register_tool(
     system_prompt: "You are a helpful assistant engaging in conversation.",
     max_tokens: 300
   )
-  
+
   {
     topic: topic,
     initial_response: response_content,
@@ -88,7 +88,7 @@ server.register_tool(
     properties: {},
     required: []
   }
-) do |args, session|
+) do |_args, session|
   # Use sampling to get the current time from the client
   time_result = session.sample(
     messages: [
@@ -103,7 +103,7 @@ server.register_tool(
     system_prompt: "Respond with the current date and time.",
     max_tokens: 100
   )
-  
+
   {
     session_id: session.id,
     transport_type: "HttpStream",

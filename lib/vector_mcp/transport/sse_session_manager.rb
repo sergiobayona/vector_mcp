@@ -18,8 +18,8 @@ module VectorMCP
       # @param session_timeout [Integer] Session timeout in seconds
       def initialize(transport, session_timeout = 300)
         @clients = Concurrent::Hash.new
-        super(transport, session_timeout)
-        
+        super
+
         # Create the single shared session for SSE transport
         @shared_session = create_shared_session
       end
@@ -76,7 +76,7 @@ module VectorMCP
       # @return [void]
       def cleanup_all_sessions
         logger.info { "Cleaning up #{@clients.size} client connection(s)" }
-        
+
         @clients.each_value do |client_conn|
           close_client_connection(client_conn)
         end
@@ -93,7 +93,7 @@ module VectorMCP
       end
 
       # Override: Called when the shared session is terminated.
-      def on_session_terminated(session)
+      def on_session_terminated(_session)
         # Clean up all client connections when session is terminated
         @clients.each_value do |client_conn|
           close_client_connection(client_conn)
@@ -107,12 +107,12 @@ module VectorMCP
       end
 
       # Override: Checks if any clients are connected to receive messages.
-      def can_send_message_to_session?(session)
+      def can_send_message_to_session?(_session)
         !@clients.empty?
       end
 
       # Override: Sends a message to the first available client.
-      def send_message_to_session(session, message)
+      def send_message_to_session(_session, message)
         return false if @clients.empty?
 
         first_client = @clients.values.first
@@ -125,9 +125,7 @@ module VectorMCP
       def broadcast_message(message)
         count = 0
         @clients.each_value do |client_conn|
-          if @transport.class::StreamManager.enqueue_message(client_conn, message)
-            count += 1
-          end
+          count += 1 if @transport.class::StreamManager.enqueue_message(client_conn, message)
         end
 
         logger.debug { "Message broadcasted to #{count} client(s)" }
@@ -162,15 +160,14 @@ module VectorMCP
 
       # Creates a VectorMCP::Session with proper request context from Rack environment
       def create_session_with_context(session_id, rack_env)
-        if rack_env
-          # Create request context from Rack environment
-          request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "sse")
-          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
-        else
-          # Fallback to minimal context for cases where rack_env is not available
-          request_context = VectorMCP::RequestContext.minimal("sse")
-          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
-        end
+        request_context = if rack_env
+                            # Create request context from Rack environment
+                            VectorMCP::RequestContext.from_rack_env(rack_env, "sse")
+                          else
+                            # Fallback to minimal context for cases where rack_env is not available
+                            VectorMCP::RequestContext.minimal("sse")
+                          end
+        VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
       end
 
       # Closes a client connection safely.

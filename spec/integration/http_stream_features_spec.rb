@@ -10,7 +10,6 @@ require "securerandom"
 require "vector_mcp/transport/http_stream"
 
 RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration do
-
   let(:test_port) { find_available_port }
   let(:base_url) { "http://localhost:#{test_port}" }
   let(:mcp_endpoint) { "#{base_url}/mcp" }
@@ -42,38 +41,38 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     ) do |args, session|
       # Use sampling to ask the client
       result = session.sample({
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: args["question"]
-            }
-          }
-        ],
-        system_prompt: "You are a helpful assistant.",
-        max_tokens: 100
-      })
-      
+                                messages: [
+                                  {
+                                    role: "user",
+                                    content: {
+                                      type: "text",
+                                      text: args["question"]
+                                    }
+                                  }
+                                ],
+                                system_prompt: "You are a helpful assistant.",
+                                max_tokens: 100
+                              })
+
       response = { initial_response: result.content }
-      
+
       if args["follow_up"]
         follow_up_result = session.sample({
-          messages: [
-            {
-              role: "user",
-              content: {
-                type: "text",
-                text: "Can you elaborate on that?"
-              }
-            }
-          ],
-          system_prompt: "You are a helpful assistant.",
-          max_tokens: 100
-        })
+                                            messages: [
+                                              {
+                                                role: "user",
+                                                content: {
+                                                  type: "text",
+                                                  text: "Can you elaborate on that?"
+                                                }
+                                              }
+                                            ],
+                                            system_prompt: "You are a helpful assistant.",
+                                            max_tokens: 100
+                                          })
         response[:follow_up_response] = follow_up_result.content
       end
-      
+
       response
     end
 
@@ -88,19 +87,19 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       }
     ) do |args, session|
       result = session.sample({
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text", 
-              text: "Session #{session.id}: #{args["message"]}"
-            }
-          }
-        ],
-        system_prompt: "Echo back the session information.",
-        max_tokens: 50
-      })
-      
+                                messages: [
+                                  {
+                                    role: "user",
+                                    content: {
+                                      type: "text",
+                                      text: "Session #{session.id}: #{args["message"]}"
+                                    }
+                                  }
+                                ],
+                                system_prompt: "Echo back the session information.",
+                                max_tokens: 50
+                              })
+
       {
         session_id: session.id,
         original_message: args["message"],
@@ -124,7 +123,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         "notification/test",
         { message: args["message"] }
       )
-      
+
       { notification_sent: true, message: args["message"] }
     end
 
@@ -171,10 +170,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "receives Server-Sent Events in proper format" do
         mock_client.start_streaming
-        
+
         # Wait for connection event or initial messages
         sleep(0.5)
-        
+
         # Events should be properly formatted
         events = mock_client.events_received
         if events.any?
@@ -186,10 +185,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "maintains connection state correctly" do
         expect(mock_client.connection_state).to eq(:disconnected)
-        
+
         mock_client.start_streaming
         expect(mock_client.connection_state).to eq(:connected)
-        
+
         mock_client.stop_streaming
         expect(mock_client.connection_state).to eq(:disconnected)
       end
@@ -212,9 +211,9 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "handles server-initiated sampling requests" do
         # Call a tool that uses sampling
         response = call_tool(base_url, session_id, "interactive_tool", {
-          question: "What is 2+2?"
-        })
-        
+                               question: "What is 2+2?"
+                             })
+
         # Should either succeed or fail with appropriate error
         if response["initial_response"]
           expect(response["initial_response"]).to be_a(Hash)
@@ -227,26 +226,26 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "validates JSON-RPC format for sampling requests" do
         sampling_received = false
-        
+
         mock_client.on_method("sampling/createMessage") do |event|
           sampling_received = true
           message = event[:data]
-          
+
           # Should be proper JSON-RPC format
           expect(message["jsonrpc"]).to eq("2.0")
           expect(message["id"]).not_to be_nil
           expect(message["method"]).to eq("sampling/createMessage")
           expect(message["params"]).to be_a(Hash)
         end
-        
+
         # Trigger sampling
         call_tool(base_url, session_id, "interactive_tool", {
-          question: "What is the capital of France?"
-        })
-        
+                    question: "What is the capital of France?"
+                  })
+
         # Give time for sampling to occur
         sleep(1)
-        
+
         # If sampling was attempted, it should be properly formatted
         # Note: May not receive sampling if no active streaming connection
       end
@@ -255,14 +254,14 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         # Create a session but don't start streaming connection
         timeout_session_id = "timeout-test-#{SecureRandom.hex(4)}"
         initialize_mcp_session(base_url, timeout_session_id)
-        # Note: NOT starting streaming connection - this should cause a "no streaming session" error
-        
+        # NOTE: NOT starting streaming connection - this should cause a "no streaming session" error
+
         response = call_tool(base_url, timeout_session_id, "interactive_tool", {
-          question: "This should fail due to no streaming connection"
-        })
-        
+                               question: "This should fail due to no streaming connection"
+                             })
+
         puts "DEBUG: Timeout test response = #{response.inspect}"
-        
+
         # Should receive error about no streaming session
         # The helper returns the error object directly if present
         if response["error"]
@@ -285,10 +284,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       before do
         initialize_mcp_session(base_url, session1_id)
         initialize_mcp_session(base_url, session2_id)
-        
+
         client1.set_sampling_response("sampling/createMessage", "Response from session 1")
         client2.set_sampling_response("sampling/createMessage", "Response from session 2")
-        
+
         client1.start_streaming
         client2.start_streaming
       end
@@ -301,20 +300,20 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "targets sampling to specific sessions" do
         # Call tool on session 1
         response1 = call_tool(base_url, session1_id, "session_specific_tool", {
-          message: "Hello from session 1"
-        })
-        
+                                message: "Hello from session 1"
+                              })
+
         # Call tool on session 2
         response2 = call_tool(base_url, session2_id, "session_specific_tool", {
-          message: "Hello from session 2"
-        })
-        
+                                message: "Hello from session 2"
+                              })
+
         # Both should either succeed or fail consistently
         if response1["session_id"]
           expect(response1["session_id"]).to eq(session1_id)
           expect(response1["original_message"]).to eq("Hello from session 1")
         end
-        
+
         if response2["session_id"]
           expect(response2["session_id"]).to eq(session2_id)
           expect(response2["original_message"]).to eq("Hello from session 2")
@@ -325,27 +324,25 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         # Each session should only receive its own sampling requests
         session1_requests = 0
         session2_requests = 0
-        
-        client1.on_method("sampling/createMessage") do |event|
+
+        client1.on_method("sampling/createMessage") do |_event|
           session1_requests += 1
         end
-        
-        client2.on_method("sampling/createMessage") do |event|
+
+        client2.on_method("sampling/createMessage") do |_event|
           session2_requests += 1
         end
-        
+
         # Call tool on session 1 only
         call_tool(base_url, session1_id, "session_specific_tool", {
-          message: "Test isolation"
-        })
-        
+                    message: "Test isolation"
+                  })
+
         sleep(1)
-        
+
         # Session 1 should receive sampling, session 2 should not
         # Note: May not receive if no streaming connection is active
-        if session1_requests > 0
-          expect(session2_requests).to eq(0)
-        end
+        expect(session2_requests).to eq(0) if session1_requests > 0
       end
     end
 
@@ -363,11 +360,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles sampling with no streaming connection" do
         # Don't start streaming client - no connection available
-        
+
         response = call_tool(base_url, session_id, "interactive_tool", {
-          question: "This should fail"
-        })
-        
+                               question: "This should fail"
+                             })
+
         # Should fail with appropriate error
         # The helper returns the error object directly if present
         if response["error"]
@@ -382,29 +379,29 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles malformed sampling responses" do
         mock_client.start_streaming
-        
+
         # Configure client to not send any default responses
         mock_client.set_sampling_response(:no_response, nil)
-        
+
         # Configure client to send malformed response
         mock_client.on_method("sampling/createMessage") do |event|
           # Send malformed JSON response
           malformed_response = {
             jsonrpc: "2.0",
-            id: event[:data]["id"],
+            id: event[:data]["id"]
             # Missing result field
           }
-          
+
           # Send directly to avoid response helpers
           mock_client.send(:send_response_to_server, malformed_response)
         end
-        
+
         response = call_tool(base_url, session_id, "interactive_tool", {
-          question: "This should handle malformed response"
-        })
-        
+                               question: "This should handle malformed response"
+                             })
+
         puts "DEBUG: Malformed response test response = #{response.inspect}"
-        
+
         # Should handle error gracefully
         # The helper returns the error object directly if present
         if response["error"]
@@ -417,23 +414,23 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles client disconnection during sampling" do
         mock_client.start_streaming
-        
+
         # Start a sampling request then disconnect
         tool_thread = Thread.new do
           call_tool(base_url, session_id, "interactive_tool", {
-            question: "This will be interrupted"
-          })
+                      question: "This will be interrupted"
+                    })
         end
-        
+
         # Give time for sampling to start
         sleep(0.5)
-        
+
         # Disconnect client
         mock_client.stop_streaming
-        
+
         # Tool should eventually return with error
         tool_thread.join(5)
-        
+
         # Should handle disconnection gracefully
         expect(tool_thread.alive?).to be false
       end
@@ -451,11 +448,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "stores events in the event store" do
         # Access the event store directly
         event_store = transport.event_store
-        
+
         # Store some test events
         event_id1 = event_store.store_event("test data 1", "test_event")
         event_id2 = event_store.store_event("test data 2", "test_event")
-        
+
         expect(event_store.event_count).to eq(2)
         expect(event_store.event_exists?(event_id1)).to be true
         expect(event_store.event_exists?(event_id2)).to be true
@@ -463,21 +460,21 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "generates unique event IDs" do
         event_store = transport.event_store
-        
+
         event_ids = []
         10.times do |i|
           event_ids << event_store.store_event("test data #{i}")
         end
-        
+
         expect(event_ids.uniq.length).to eq(10)
       end
 
       it "retrieves events by ID" do
         event_store = transport.event_store
-        
+
         event_id = event_store.store_event("test data", "test_event")
         events = event_store.get_events_after(nil)
-        
+
         expect(events.length).to eq(1)
         expect(events.first.id).to eq(event_id)
         expect(events.first.data).to eq("test data")
@@ -487,13 +484,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "handles event expiration in circular buffer" do
         # Create event store with small buffer
         small_event_store = VectorMCP::Transport::HttpStream::EventStore.new(3)
-        
+
         # Store more events than buffer size
         event_ids = []
         5.times do |i|
           event_ids << small_event_store.store_event("data #{i}")
         end
-        
+
         # Should only keep last 3 events
         expect(small_event_store.event_count).to eq(3)
         expect(small_event_store.event_exists?(event_ids[0])).to be false
@@ -517,34 +514,34 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "supports Last-Event-ID header" do
         # Start streaming connection
         mock_client.start_streaming
-        
+
         # Generate some events
         event_store = transport.event_store
         event_id = event_store.store_event("test event", "test")
-        
+
         # Stop and restart with Last-Event-ID
         mock_client.stop_streaming
-        
+
         resume_client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
         expect(resume_client.start_streaming(headers: { "Last-Event-ID" => event_id })).to be true
-        
+
         # Should be able to resume
         expect(resume_client.connected?).to be true
-        
+
         resume_client.stop_streaming
       end
 
       it "replays events after Last-Event-ID" do
         event_store = transport.event_store
-        
+
         # Store several events
         event_id1 = event_store.store_event("event 1", "test")
         event_id2 = event_store.store_event("event 2", "test")
         event_id3 = event_store.store_event("event 3", "test")
-        
+
         # Get events after event 1
         events = event_store.get_events_after(event_id1)
-        
+
         expect(events.length).to eq(2)
         expect(events[0].id).to eq(event_id2)
         expect(events[1].id).to eq(event_id3)
@@ -552,13 +549,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles invalid Last-Event-ID" do
         resume_client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
-        
+
         # Try to resume with invalid event ID
         expect(resume_client.start_streaming(headers: { "Last-Event-ID" => "invalid-id" })).to be true
-        
+
         # Should still connect (may return no events)
         expect(resume_client.connected?).to be true
-        
+
         resume_client.stop_streaming
       end
     end
@@ -566,21 +563,21 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     describe "2.3 Event Store Performance" do
       it "handles high event volume" do
         event_store = transport.event_store
-        
+
         # Store many events quickly
         start_time = Time.now
         event_count = 1000
-        
+
         event_count.times do |i|
           event_store.store_event("event #{i}", "performance_test")
         end
-        
+
         end_time = Time.now
         duration = end_time - start_time
-        
+
         # Should complete within reasonable time
         expect(duration).to be < 5.0
-        
+
         # Should maintain reasonable event count (may be less due to circular buffer)
         expect(event_store.event_count).to be > 0
       end
@@ -588,7 +585,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "is thread-safe for concurrent access" do
         event_store = transport.event_store
         event_ids = Concurrent::Array.new
-        
+
         # Store events from multiple threads
         threads = []
         10.times do |i|
@@ -599,9 +596,9 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
             end
           end
         end
-        
+
         threads.each(&:join)
-        
+
         # All events should be unique
         expect(event_ids.uniq.length).to eq(event_ids.length)
       end
@@ -618,30 +615,30 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "establishes connection with valid session" do
         client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
-        
+
         expect(client.start_streaming).to be true
         expect(client.connected?).to be true
-        
+
         client.stop_streaming
       end
 
       it "handles connection with missing session" do
         client = StreamingTestHelpers::MockStreamingClient.new("non-existent-session", base_url)
-        
+
         # Should still connect (server may create session)
         expect(client.start_streaming).to be true
-        
+
         client.stop_streaming
       end
 
       it "tracks connection state correctly" do
         client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
-        
+
         expect(client.connection_state).to eq(:disconnected)
-        
+
         client.start_streaming
         expect(client.connection_state).to eq(:connected)
-        
+
         client.stop_streaming
         expect(client.connection_state).to eq(:disconnected)
       end
@@ -659,13 +656,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "supports multiple concurrent streaming connections" do
         client1 = StreamingTestHelpers::MockStreamingClient.new(session1_id, base_url)
         client2 = StreamingTestHelpers::MockStreamingClient.new(session2_id, base_url)
-        
+
         expect(client1.start_streaming).to be true
         expect(client2.start_streaming).to be true
-        
+
         expect(client1.connected?).to be true
         expect(client2.connected?).to be true
-        
+
         client1.stop_streaming
         client2.stop_streaming
       end
@@ -673,14 +670,14 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "isolates sessions correctly" do
         client1 = StreamingTestHelpers::MockStreamingClient.new(session1_id, base_url)
         client2 = StreamingTestHelpers::MockStreamingClient.new(session2_id, base_url)
-        
+
         client1.start_streaming
         client2.start_streaming
-        
+
         # Each client should maintain separate session context
         expect(client1.session_id).to eq(session1_id)
         expect(client2.session_id).to eq(session2_id)
-        
+
         client1.stop_streaming
         client2.stop_streaming
       end
@@ -695,13 +692,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "cleans up resources on disconnect" do
         client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
-        
+
         client.start_streaming
         expect(client.connected?).to be true
-        
+
         # Simulate abrupt disconnection
         client.stop_streaming
-        
+
         # Should clean up properly
         expect(client.connected?).to be false
         expect(client.connection_state).to eq(:disconnected)
@@ -709,13 +706,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles server shutdown gracefully" do
         client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
-        
+
         client.start_streaming
         expect(client.connected?).to be true
-        
+
         # Server shutdown will be handled in after block
         # Client should detect disconnection
-        
+
         client.stop_streaming
       end
     end

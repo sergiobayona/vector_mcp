@@ -10,7 +10,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
   describe "#initialize with request_context" do
     it "initializes with default empty request context" do
       session = described_class.new(server, transport)
-      
+
       expect(session.request_context).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.headers).to eq({})
       expect(session.request_context.params).to eq({})
@@ -21,9 +21,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         headers: { "Authorization" => "Bearer token" },
         params: { "key" => "value" }
       )
-      
+
       session = described_class.new(server, transport, request_context: context)
-      
+
       expect(session.request_context).to eq(context)
       expect(session.request_context.header("Authorization")).to eq("Bearer token")
       expect(session.request_context.param("key")).to eq("value")
@@ -36,9 +36,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         method: "POST",
         path: "/api/test"
       }
-      
+
       session = described_class.new(server, transport, request_context: context_hash)
-      
+
       expect(session.request_context).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.header("X-API-Key")).to eq("secret")
       expect(session.request_context.param("id")).to eq("123")
@@ -55,9 +55,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         headers: { "Content-Type" => "application/json" },
         params: { "format" => "json" }
       )
-      
+
       result = session.set_request_context(context)
-      
+
       expect(result).to eq(context)
       expect(session.request_context).to eq(context)
     end
@@ -69,9 +69,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         method: "GET",
         path: "/status"
       }
-      
+
       result = session.set_request_context(context_hash)
-      
+
       expect(result).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.header("User-Agent")).to eq("TestClient")
       expect(session.request_context.param("version")).to eq("1.0")
@@ -80,9 +80,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
     end
 
     it "raises error for invalid context type" do
-      expect {
+      expect do
         session.set_request_context("invalid")
-      }.to raise_error(ArgumentError, /Request context must be a RequestContext or Hash/)
+      end.to raise_error(ArgumentError, /Request context must be a RequestContext or Hash/)
     end
   end
 
@@ -105,7 +105,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         headers: { "Authorization" => "Bearer newtoken", "X-Version" => "2.0" },
         params: { "page" => "2", "limit" => "50" }
       )
-      
+
       expect(result).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.header("Authorization")).to eq("Bearer newtoken")
       expect(session.request_context.header("X-Version")).to eq("2.0")
@@ -117,7 +117,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
 
     it "preserves existing attributes when not overridden" do
       session.update_request_context(headers: { "X-Custom" => "value" })
-      
+
       expect(session.request_context.header("Authorization")).to eq("Bearer token")
       expect(session.request_context.header("X-Custom")).to eq("value")
       expect(session.request_context.param("page")).to eq("1")
@@ -207,9 +207,9 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         "clientInfo" => { "name" => "TestClient", "version" => "1.0.0" },
         "capabilities" => { "tools" => {} }
       }
-      
+
       session.initialize!(params)
-      
+
       expect(session.request_context.header("User-Agent")).to eq("TestClient/1.0")
       expect(session.request_context.param("version")).to eq("1.0")
       expect(session.request_context.method).to eq("POST")
@@ -220,7 +220,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
   describe "backward compatibility" do
     it "maintains existing session functionality" do
       session = described_class.new(server, transport, id: "test-session")
-      
+
       expect(session.id).to eq("test-session")
       expect(session.server).to eq(server)
       expect(session.transport).to eq(transport)
@@ -231,7 +231,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
     it "allows setting custom session data" do
       session = described_class.new(server, transport)
       session.data[:custom_key] = "custom_value"
-      
+
       expect(session.data[:custom_key]).to eq("custom_value")
     end
   end

@@ -67,7 +67,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
         system_prompt: "You are a helpful assistant.",
         max_tokens: 100
       )
-      
+
       { response: result.content }
     end
 
@@ -112,12 +112,10 @@ RSpec.describe "HTTP Stream Transport Integration" do
   def wait_for_server_start
     Timeout.timeout(10) do
       loop do
-        begin
-          Net::HTTP.get_response(URI("#{base_url}/"))
-          break
-        rescue Errno::ECONNREFUSED
-          sleep(0.1)
-        end
+        Net::HTTP.get_response(URI("#{base_url}/"))
+        break
+      rescue Errno::ECONNREFUSED
+        sleep(0.1)
       end
     end
   rescue Timeout::Error
@@ -128,7 +126,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
   def make_request(method, path, body: nil, headers: {}, session_id: nil)
     uri = URI("#{base_url}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)
-    
+
     request = case method.upcase
               when "GET"
                 Net::HTTP::Get.new(uri)
@@ -139,12 +137,12 @@ RSpec.describe "HTTP Stream Transport Integration" do
               else
                 raise "Unsupported HTTP method: #{method}"
               end
-    
+
     headers.each { |k, v| request[k] = v }
     request["Mcp-Session-Id"] = session_id if session_id
     request["Content-Type"] = "application/json" if body
     request.body = body.to_json if body
-    
+
     http.request(request)
   end
 
@@ -175,14 +173,14 @@ RSpec.describe "HTTP Stream Transport Integration" do
   describe "Session Management" do
     it "accepts requests with session ID header" do
       session_id = "test-session-123"
-      
+
       # Send initialize request
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
       expect(response["Mcp-Session-Id"]).to eq(session_id)
@@ -190,11 +188,11 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
     it "creates new session if no session ID provided" do
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
       expect(response["Mcp-Session-Id"]).not_to be_nil
@@ -203,17 +201,17 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
     it "reuses existing session with same session ID" do
       session_id = "reuse-session-456"
-      
+
       # First request
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response1 = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response1.code).to eq("200")
-      
+
       # Second request with same session ID
       list_request = create_json_rpc_request("tools/list", {})
       response2 = make_request("POST", "/mcp", body: list_request, session_id: session_id)
@@ -224,15 +222,15 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
   describe "MCP Protocol Implementation" do
     let(:session_id) { "protocol-test-session" }
-    
+
     before do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
     end
@@ -240,10 +238,10 @@ RSpec.describe "HTTP Stream Transport Integration" do
     it "handles tools/list requests" do
       request = create_json_rpc_request("tools/list", {})
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
-      
+
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
-      
+
       # The HttpStream transport currently returns raw results, not JSON-RPC wrapped
       # This behavior needs to be documented and potentially fixed
       expect(data["tools"]).to be_an(Array)
@@ -252,13 +250,13 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
     it "handles tools/call requests" do
       request = create_json_rpc_request("tools/call", {
-        name: "echo",
-        arguments: { message: "test message" }
-      })
-      
+                                          name: "echo",
+                                          arguments: { message: "test message" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       data = parse_json_rpc_response(response)
       # HttpStream transport returns raw results - look for content array
       expect(data["content"]).to be_an(Array)
@@ -268,7 +266,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
     it "handles resources/list requests" do
       request = create_json_rpc_request("resources/list", {})
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
-      
+
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
       expect(data["resources"]).to be_an(Array)
@@ -276,12 +274,12 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
     it "handles resources/read requests" do
       request = create_json_rpc_request("resources/read", {
-        uri: "test://resource"
-      })
-      
+                                          uri: "test://resource"
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       data = parse_json_rpc_response(response)
       expect(data["contents"]).to be_an(Array)
       # Resource content may be JSON-encoded
@@ -292,7 +290,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
     it "handles prompts/list requests" do
       request = create_json_rpc_request("prompts/list", {})
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
-      
+
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
       expect(data["prompts"]).to be_an(Array)
@@ -300,18 +298,18 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
     it "handles prompts/get requests" do
       request = create_json_rpc_request("prompts/get", {
-        name: "test_prompt",
-        arguments: { context: "test context" }
-      })
-      
+                                          name: "test_prompt",
+                                          arguments: { context: "test context" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
-      
+
       # May fail if prompt handling is not implemented correctly
       if response.code == "200"
         data = parse_json_rpc_response(response)
         expect(data["messages"]).to be_an(Array)
       else
-        expect(["400", "500"]).to include(response.code)
+        expect(%w[400 500]).to include(response.code)
       end
     end
   end
@@ -319,36 +317,36 @@ RSpec.describe "HTTP Stream Transport Integration" do
   describe "Error Handling" do
     it "handles malformed JSON" do
       response = make_request("POST", "/mcp", body: "invalid json", session_id: "error-test")
-      expect(["400", "500"]).to include(response.code) # Server may return different error codes
+      expect(%w[400 500]).to include(response.code) # Server may return different error codes
     end
 
     it "handles unknown methods" do
       request = create_json_rpc_request("unknown/method", {})
       response = make_request("POST", "/mcp", body: request, session_id: "error-test")
-      
+
       # Server may return 400 for invalid requests before session initialization
-      expect(["200", "400"]).to include(response.code)
-      
+      expect(%w[200 400]).to include(response.code)
+
       if response.code == "200"
         data = parse_json_rpc_response(response)
-        expect(data["error"]["code"]).to eq(-32601) # Method not found
+        expect(data["error"]["code"]).to eq(-32_601) # Method not found
       end
     end
 
     it "handles invalid parameters" do
       request = create_json_rpc_request("tools/call", {
-        name: "echo"
-        # Missing required arguments
-      })
-      
+                                          name: "echo"
+                                          # Missing required arguments
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: "error-test")
-      
+
       # Server may return 400 for invalid requests before session initialization
-      expect(["200", "400"]).to include(response.code)
-      
+      expect(%w[200 400]).to include(response.code)
+
       if response.code == "200"
         data = parse_json_rpc_response(response)
-        expect(data["error"]["code"]).to eq(-32602) # Invalid params
+        expect(data["error"]["code"]).to eq(-32_602) # Invalid params
       end
     end
   end
@@ -357,41 +355,41 @@ RSpec.describe "HTTP Stream Transport Integration" do
     it "handles multiple simultaneous sessions" do
       sessions = []
       threads = []
-      
+
       # Create multiple sessions concurrently
       3.times do |i|
         session_id = "concurrent-session-#{i}"
         sessions << session_id
-        
+
         threads << Thread.new do
           # Initialize session
           init_request = create_json_rpc_request("initialize", {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: { name: "test-client-#{i}", version: "1.0.0" }
-          })
-          
+                                                   protocolVersion: "2024-11-05",
+                                                   capabilities: {},
+                                                   clientInfo: { name: "test-client-#{i}", version: "1.0.0" }
+                                                 })
+
           response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
           expect(response.code).to eq("200")
-          
+
           # Make a tool call
           call_request = create_json_rpc_request("tools/call", {
-            name: "echo",
-            arguments: { message: "from session #{i}" }
-          })
-          
+                                                   name: "echo",
+                                                   arguments: { message: "from session #{i}" }
+                                                 })
+
           response = make_request("POST", "/mcp", body: call_request, session_id: session_id)
           expect(response.code).to eq("200")
-          
+
           data = parse_json_rpc_response(response)
           expect(data["content"]).to be_an(Array)
           expect(data["content"].first["text"]).to eq("Echo: from session #{i}")
         end
       end
-      
+
       # Wait for all threads to complete
       threads.each(&:join)
-      
+
       # Verify all sessions are isolated
       expect(sessions.uniq.length).to eq(3)
     end
@@ -400,32 +398,32 @@ RSpec.describe "HTTP Stream Transport Integration" do
   describe "Session Cleanup" do
     it "supports explicit session termination" do
       session_id = "cleanup-test-session"
-      
+
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Terminate session
       response = make_request("DELETE", "/mcp", session_id: session_id)
-      expect(["200", "204"]).to include(response.code) # May return 204 No Content
-      
+      expect(%w[200 204]).to include(response.code) # May return 204 No Content
+
       # Verify session is gone - new request should create new session
       # First need to re-initialize the session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Now we can make other requests
       list_request = create_json_rpc_request("tools/list", {})
       response = make_request("POST", "/mcp", body: list_request, session_id: session_id)

@@ -158,7 +158,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         real_session_manager = real_transport.instance_variable_get(:@session_manager)
         allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
         allow(server).to receive(:handle_message).and_return({ jsonrpc: "2.0", id: 1, result: "ok" })
-        
+
         rack_env = {
           "REQUEST_METHOD" => "POST",
           "HTTP_MCP_SESSION_ID" => "test-session",
@@ -177,10 +177,10 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         # Use real transport but mock its session manager and stream handler
         real_session_manager = real_transport.instance_variable_get(:@session_manager)
         real_stream_handler = real_transport.instance_variable_get(:@stream_handler)
-        
+
         allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
         allow(real_stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
-        
+
         rack_env = {
           "REQUEST_METHOD" => "GET",
           "HTTP_MCP_SESSION_ID" => "test-session",
