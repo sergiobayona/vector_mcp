@@ -116,8 +116,8 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
 
       request_context = session.context.request_context
       expect(request_context.http_transport?).to be false
-      expect(request_context.has_headers?).to be false
-      expect(request_context.has_params?).to be false
+      expect(request_context.headers?).to be false
+      expect(request_context.params?).to be false
       expect(request_context.metadata("transport_type")).to eq("stdio")
     end
 

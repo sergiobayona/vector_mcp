@@ -393,7 +393,7 @@ module StreamingTestHelpers
     end
 
     # Validate event ordering
-    def validate_event_sequence(events, expected_count)
+    def event_sequence_valid?(events, expected_count)
       return false if events.size != expected_count
 
       events.each_with_index do |event, index|

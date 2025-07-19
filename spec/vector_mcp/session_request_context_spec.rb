@@ -47,7 +47,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
     end
   end
 
-  describe "#set_request_context" do
+  describe "#request_context=" do
     let(:session) { described_class.new(server, transport) }
 
     it "sets context with RequestContext object" do
@@ -56,7 +56,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         params: { "format" => "json" }
       )
 
-      result = session.set_request_context(context)
+      result = session.request_context = context
 
       expect(result).to eq(context)
       expect(session.request_context).to eq(context)
@@ -70,7 +70,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         path: "/status"
       }
 
-      result = session.set_request_context(context_hash)
+      result = session.request_context = context_hash
 
       expect(result).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.header("User-Agent")).to eq("TestClient")
@@ -81,7 +81,7 @@ RSpec.describe VectorMCP::Session, "request context integration" do
 
     it "raises error for invalid context type" do
       expect do
-        session.set_request_context("invalid")
+        session.request_context = "invalid"
       end.to raise_error(ArgumentError, /Request context must be a RequestContext or Hash/)
     end
   end
@@ -136,25 +136,25 @@ RSpec.describe VectorMCP::Session, "request context integration" do
       )
     end
 
-    describe "#has_request_headers?" do
+    describe "#request_headers?" do
       it "returns true when headers are present" do
-        expect(session.has_request_headers?).to be true
+        expect(session.request_headers?).to be true
       end
 
       it "returns false when headers are empty" do
         empty_session = described_class.new(server, transport)
-        expect(empty_session.has_request_headers?).to be false
+        expect(empty_session.request_headers?).to be false
       end
     end
 
-    describe "#has_request_params?" do
+    describe "#request_params?" do
       it "returns true when params are present" do
-        expect(session.has_request_params?).to be true
+        expect(session.request_params?).to be true
       end
 
       it "returns false when params are empty" do
         empty_session = described_class.new(server, transport)
-        expect(empty_session.has_request_params?).to be false
+        expect(empty_session.request_params?).to be false
       end
     end
 

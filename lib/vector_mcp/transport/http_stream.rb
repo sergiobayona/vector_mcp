@@ -41,6 +41,7 @@ module VectorMCP
     # @attr_reader host [String] The hostname or IP address the server will bind to
     # @attr_reader port [Integer] The port number the server will listen on
     # @attr_reader path_prefix [String] The base URL path for MCP endpoints
+    # rubocop:disable Metrics/ClassLength
     class HttpStream
       attr_reader :logger, :server, :host, :port, :path_prefix
 
@@ -666,5 +667,6 @@ module VectorMCP
         @session_manager.get_session(session_ids.first)
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

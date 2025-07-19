@@ -95,7 +95,7 @@ module VectorMCP
     #   Can be a RequestContext object or a hash of attributes.
     # @return [RequestContext] The newly set request context.
     # @raise [ArgumentError] If the context is not a RequestContext or Hash.
-    def set_request_context(context)
+    def request_context=(context)
       @request_context = case context
                          when RequestContext
                            context
@@ -130,15 +130,15 @@ module VectorMCP
     # Convenience method to check if the session has request headers.
     #
     # @return [Boolean] True if the request context has headers, false otherwise.
-    def has_request_headers?
-      @request_context.has_headers?
+    def request_headers?
+      @request_context.headers?
     end
 
     # Convenience method to check if the session has request parameters.
     #
     # @return [Boolean] True if the request context has parameters, false otherwise.
-    def has_request_params?
-      @request_context.has_params?
+    def request_params?
+      @request_context.params?
     end
 
     # Convenience method to get a request header value.

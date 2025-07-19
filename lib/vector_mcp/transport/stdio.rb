@@ -122,7 +122,7 @@ module VectorMCP
       # @param method [String] The method name of the notification.
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [Boolean] True if the notification was sent successfully.
-      def send_notification_to_session(_session_id, method, params = nil)
+      def notification_sent_to_session?(_session_id, method, params = nil)
         send_notification(method, params)
         true
       end
@@ -227,10 +227,10 @@ module VectorMCP
       # Gets the global session for this stdio transport.
       # @api private
       # @return [VectorMCP::Session] The current session.
-      def get_session
+      def session
         # Try session manager first, fallback to old method for backward compatibility
         if @session_manager
-          session_wrapper = @session_manager.get_global_session
+          session_wrapper = @session_manager.global_session
           return session_wrapper.context if session_wrapper
         end
 
@@ -250,11 +250,11 @@ module VectorMCP
       # @param message [Hash] The parsed message.
       # @return [void]
       def handle_server_message(message)
-        session = get_session
-        session_id = session.id
+        current_session = session
+        session_id = current_session.id
 
         begin
-          result = @server.handle_message(message, session, session_id)
+          result = @server.handle_message(message, current_session, session_id)
           send_response(message["id"], result) if message["id"] && result
         rescue VectorMCP::ProtocolError => e
           handle_protocol_error(e, message)
@@ -269,7 +269,7 @@ module VectorMCP
       # @api private
       # @return [VectorMCP::Session] The session.
       def create_session
-        get_session
+        session
       end
 
       # Launches the input reading loop in a new thread.

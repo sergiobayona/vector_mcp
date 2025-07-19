@@ -65,27 +65,27 @@ RSpec.describe VectorMCP::RequestContext do
     end
   end
 
-  describe "#has_headers?" do
+  describe "#headers?" do
     it "returns true when headers are present" do
       context = described_class.new(headers: { "X-API-Key" => "test" })
-      expect(context.has_headers?).to be true
+      expect(context.headers?).to be true
     end
 
     it "returns false when headers are empty" do
       context = described_class.new(headers: {})
-      expect(context.has_headers?).to be false
+      expect(context.headers?).to be false
     end
   end
 
-  describe "#has_params?" do
+  describe "#params?" do
     it "returns true when params are present" do
       context = described_class.new(params: { "filter" => "active" })
-      expect(context.has_params?).to be true
+      expect(context.params?).to be true
     end
 
     it "returns false when params are empty" do
       context = described_class.new(params: {})
-      expect(context.has_params?).to be false
+      expect(context.params?).to be false
     end
   end
 

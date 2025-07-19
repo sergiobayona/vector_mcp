@@ -45,14 +45,14 @@ module VectorMCP
     # Check if the request context has any headers.
     #
     # @return [Boolean] True if headers are present, false otherwise
-    def has_headers?
+    def headers?
       !@headers.empty?
     end
 
     # Check if the request context has any parameters.
     #
     # @return [Boolean] True if parameters are present, false otherwise
-    def has_params?
+    def params?
       !@params.empty?
     end
 

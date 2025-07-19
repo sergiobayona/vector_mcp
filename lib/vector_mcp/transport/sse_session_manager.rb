@@ -28,7 +28,7 @@ module VectorMCP
       # SSE uses a single session shared across all client connections.
       #
       # @return [Session] The shared session
-      def get_shared_session
+      def shared_session
         @shared_session.touch!
         @shared_session
       end
@@ -40,7 +40,7 @@ module VectorMCP
       # @return [void]
       def register_client(client_id, client_connection)
         @clients[client_id] = client_connection
-        update_session_metadata(@shared_session.id, clients_count: @clients.size)
+        session_metadata_updated?(@shared_session.id, clients_count: @clients.size)
         logger.debug { "Client registered: #{client_id}" }
       end
 
@@ -48,11 +48,11 @@ module VectorMCP
       #
       # @param client_id [String] The client connection ID
       # @return [Boolean] True if client was found and removed
-      def unregister_client(client_id)
+      def client_unregistered?(client_id)
         client = @clients.delete(client_id)
         return false unless client
 
-        update_session_metadata(@shared_session.id, clients_count: @clients.size)
+        session_metadata_updated?(@shared_session.id, clients_count: @clients.size)
         logger.debug { "Client unregistered: #{client_id}" }
         true
       end

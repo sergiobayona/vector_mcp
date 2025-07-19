@@ -104,7 +104,7 @@ module VectorMCP
       #
       # @param session_id [String] The session ID to terminate
       # @return [Boolean] True if session was found and terminated
-      def terminate_session(session_id)
+      def session_terminated?(session_id)
         session = @sessions.delete(session_id)
         return false unless session
 
@@ -130,7 +130,7 @@ module VectorMCP
       # Checks if any sessions exist.
       #
       # @return [Boolean] True if at least one session exists
-      def has_sessions?
+      def sessions?
         !@sessions.empty?
       end
 
@@ -153,7 +153,7 @@ module VectorMCP
       # @param session_id [String] The session ID
       # @param metadata [Hash] Metadata to merge
       # @return [Boolean] True if session was found and updated
-      def update_session_metadata(session_id, metadata)
+      def session_metadata_updated?(session_id, metadata)
         session = @sessions[session_id]
         return false unless session
 
@@ -247,7 +247,7 @@ module VectorMCP
       # @param session [Session] The target session
       # @param message [Hash] The message to send
       # @return [Boolean] True if message was sent successfully
-      def send_message_to_session(_session, _message)
+      def message_sent_to_session?(_session, _message)
         false # Override in subclasses
       end
 

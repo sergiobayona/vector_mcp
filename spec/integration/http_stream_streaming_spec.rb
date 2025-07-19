@@ -8,6 +8,114 @@ require "timeout"
 require "socket"
 require "vector_mcp/transport/http_stream"
 
+# Mock client that can respond to sampling requests
+class MockStreamingClient
+  def initialize(session_id, base_url)
+    @session_id = session_id
+    @base_url = base_url
+    @responses = {}
+    @running = false
+  end
+
+  def start_streaming
+    @running = true
+    @stream_thread = Thread.new { handle_stream }
+  end
+
+  def stop_streaming
+    @running = false
+    @stream_thread&.join(1)
+    @stream_thread&.kill if @stream_thread&.alive?
+  end
+
+  def set_response_for_method(method, response)
+    @responses[method] = response
+  end
+
+  private
+
+  def handle_stream
+    request = create_sse_request
+    http = Net::HTTP.new(URI(@base_url).host, URI(@base_url).port)
+
+    http.request(request) do |response|
+      response.read_body { |chunk| process_stream_chunk(chunk) }
+    end
+  end
+
+  def create_sse_request
+    uri = URI("#{@base_url}/mcp")
+    request = Net::HTTP::Get.new(uri)
+    request["Mcp-Session-Id"] = @session_id
+    request["Accept"] = "text/event-stream"
+    request["Cache-Control"] = "no-cache"
+    request
+  end
+
+  def process_stream_chunk(chunk)
+    return unless @running
+
+    chunk.split("\n\n").each { |event_data| process_sse_event(event_data) }
+  end
+
+  def process_sse_event(event_data)
+    return if event_data.strip.empty?
+
+    data = extract_sse_data(event_data.split("\n"))
+    return unless data
+
+    handle_parsed_message(data)
+  end
+
+  def extract_sse_data(event_lines)
+    data = nil
+    event_lines.each do |line|
+      data = line[6..] if line.start_with?("data: ")
+    end
+    data
+  end
+
+  def handle_parsed_message(data)
+    message = JSON.parse(data)
+    handle_sampling_request(message) if message["method"] == "sampling/createMessage"
+  rescue JSON::ParserError
+    # Ignore malformed JSON
+  end
+
+  def handle_sampling_request(message)
+    method = message["method"]
+    request_id = message["id"]
+
+    # Create a mock response
+    response = {
+      jsonrpc: "2.0",
+      id: request_id,
+      result: {
+        role: "assistant",
+        content: {
+          type: "text",
+          text: @responses[method] || "Mock response from streaming client"
+        }
+      }
+    }
+
+    # Send response back to server
+    send_response(response)
+  end
+
+  def send_response(response)
+    uri = URI("#{@base_url}/mcp")
+    http = Net::HTTP.new(uri.host, uri.port)
+
+    request = Net::HTTP::Post.new(uri)
+    request["Mcp-Session-Id"] = @session_id
+    request["Content-Type"] = "application/json"
+    request.body = response.to_json
+
+    http.request(request)
+  end
+end
+
 RSpec.describe "HTTP Stream Transport - Streaming Features" do
   # Find an available port for testing
   def find_available_port
@@ -202,111 +310,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
 
     # Start the streaming request
     http.request(request)
-  end
-
-  # Mock client that can respond to sampling requests
-  class MockStreamingClient
-    def initialize(session_id, base_url)
-      @session_id = session_id
-      @base_url = base_url
-      @responses = {}
-      @running = false
-    end
-
-    def start_streaming
-      @running = true
-      @stream_thread = Thread.new { handle_stream }
-    end
-
-    def stop_streaming
-      @running = false
-      @stream_thread&.join(1)
-      @stream_thread&.kill if @stream_thread&.alive?
-    end
-
-    def set_response_for_method(method, response)
-      @responses[method] = response
-    end
-
-    private
-
-    def handle_stream
-      uri = URI("#{@base_url}/mcp")
-      http = Net::HTTP.new(uri.host, uri.port)
-
-      request = Net::HTTP::Get.new(uri)
-      request["Mcp-Session-Id"] = @session_id
-      request["Accept"] = "text/event-stream"
-      request["Cache-Control"] = "no-cache"
-
-      http.request(request) do |response|
-        response.read_body do |chunk|
-          break unless @running
-
-          # Parse SSE events
-          chunk.split("\n\n").each do |event_data|
-            next if event_data.strip.empty?
-
-            event_lines = event_data.split("\n")
-            event_type = nil
-            data = nil
-
-            event_lines.each do |line|
-              if line.start_with?("event: ")
-                event_type = line[7..]
-              elsif line.start_with?("data: ")
-                data = line[6..]
-              end
-            end
-
-            next unless data
-
-            begin
-              message = JSON.parse(data)
-              handle_sampling_request(message) if message["method"] == "sampling/createMessage"
-            rescue JSON::ParserError
-              # Ignore malformed JSON
-            end
-          end
-        end
-      end
-    rescue StandardError
-      # Stream ended or error occurred
-    end
-
-    def handle_sampling_request(message)
-      method = message["method"]
-      request_id = message["id"]
-
-      # Create a mock response
-      response = {
-        jsonrpc: "2.0",
-        id: request_id,
-        result: {
-          model: "mock-model",
-          role: "assistant",
-          content: {
-            type: "text",
-            text: @responses[method] || "Mock response from streaming client"
-          }
-        }
-      }
-
-      # Send response back to server
-      send_response(response)
-    end
-
-    def send_response(response)
-      uri = URI("#{@base_url}/mcp")
-      http = Net::HTTP.new(uri.host, uri.port)
-
-      request = Net::HTTP::Post.new(uri)
-      request["Mcp-Session-Id"] = @session_id
-      request["Content-Type"] = "application/json"
-      request.body = response.to_json
-
-      http.request(request)
-    end
   end
 
   describe "Server-Initiated Requests (Sampling)" do

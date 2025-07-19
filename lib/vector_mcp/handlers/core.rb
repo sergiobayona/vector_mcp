@@ -12,6 +12,7 @@ module VectorMCP
     # All public methods are designed to be called by the server's message dispatching logic.
     #
     # @see VectorMCP::Server#setup_default_handlers
+    # rubocop:disable Metrics/ModuleLength
     module Core
       # --- Request Handlers ---
 
@@ -595,5 +596,6 @@ module VectorMCP
                            :find_resource!, :validate_resource_security!, :execute_resource_handler,
                            :process_resource_content, :handle_resource_error
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end

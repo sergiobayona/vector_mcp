@@ -82,7 +82,7 @@ module VectorMCP
               # Update existing session context if rack_env is provided
               if rack_env
                 request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-                session.context.set_request_context(request_context)
+                session.context.request_context = request_context
               end
               return session
             end

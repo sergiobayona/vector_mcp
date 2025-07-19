@@ -26,33 +26,33 @@ module VectorMCP
       # Stdio uses a single global session for the entire transport lifetime.
       #
       # @return [Session] The global session
-      def get_global_session
+      def global_session
         @global_session&.touch!
         @global_session
       end
 
       # Gets or creates the global session for stdio transport.
-      # This is an alias for get_global_session for stdio transport.
+      # This is an alias for global_session for stdio transport.
       #
       # @return [Session] The global session
-      def get_or_create_global_session
-        get_global_session
+      def global_session_or_create
+        global_session
       end
 
       # Override: Gets session by ID, but always returns the global session for stdio.
       #
       # @param session_id [String] The session ID (ignored for stdio)
       # @return [Session] The global session
-      def get_session(_session_id = nil)
-        get_global_session
+      def session(_session_id = nil)
+        global_session
       end
 
       # Override: Always returns the global session for stdio.
       #
       # @param session_id [String, nil] The session ID (ignored)
       # @return [Session] The global session
-      def get_or_create_session(_session_id = nil)
-        get_global_session
+      def session_or_create(_session_id = nil)
+        global_session
       end
 
       # Override: Cannot create additional sessions in stdio transport.
@@ -61,14 +61,14 @@ module VectorMCP
       # @return [Session] The global session
       def create_session(_session_id = nil)
         # For stdio, always return the existing global session
-        get_global_session
+        global_session
       end
 
       # Override: Cannot terminate the global session while transport is running.
       #
       # @param session_id [String] The session ID (ignored)
       # @return [Boolean] Always false (session cannot be terminated individually)
-      def terminate_session(_session_id)
+      def session_terminated?(_session_id)
         # For stdio, the session is only terminated when the transport shuts down
         false
       end
@@ -90,14 +90,14 @@ module VectorMCP
       # Override: Always returns true for the single session.
       #
       # @return [Boolean] Always true
-      def has_sessions?
+      def sessions?
         true
       end
 
       # Gets all sessions for stdio transport (just the one global session).
       #
       # @return [Array<Session>] Array containing the global session
-      def get_all_sessions
+      def all_sessions
         [@global_session].compact
       end
 
@@ -119,7 +119,7 @@ module VectorMCP
       end
 
       # Override: Sends messages via the transport's notification mechanism.
-      def send_message_to_session(_session, message)
+      def message_sent_to_session?(_session, message)
         # For stdio, we send notifications directly via the transport
         @transport.send_notification(message["method"], message["params"])
         true
@@ -127,7 +127,7 @@ module VectorMCP
 
       # Override: Stdio broadcasts to the single session (same as regular send).
       def broadcast_message(message)
-        send_message_to_session(@global_session, message) ? 1 : 0
+        message_sent_to_session?(@global_session, message) ? 1 : 0
       end
 
       private

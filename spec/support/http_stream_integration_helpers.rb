@@ -30,7 +30,10 @@ module HttpStreamIntegrationHelpers
   end
 
   # Helper method to make HTTP requests with session ID
-  def make_http_request(method, base_url, path, body: nil, headers: {}, session_id: nil)
+  def make_http_request(method, base_url, path, options = {})
+    body = options[:body]
+    headers = options[:headers] || {}
+    session_id = options[:session_id]
     uri = URI("#{base_url}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)
 
@@ -75,7 +78,7 @@ module HttpStreamIntegrationHelpers
                                              clientInfo: client_info
                                            })
 
-    response = make_http_request("POST", base_url, "/mcp", body: init_request, session_id: session_id)
+    response = make_http_request("POST", base_url, "/mcp", { body: init_request, session_id: session_id })
     expect(response.code).to eq("200")
 
     data = parse_json_rpc_response(response)
@@ -97,9 +100,10 @@ module HttpStreamIntegrationHelpers
       "Cache-Control" => "no-cache"
     }
 
-    make_http_request("GET", base_url, "/mcp",
-                      headers: default_headers.merge(headers),
-                      session_id: session_id)
+    make_http_request("GET", base_url, "/mcp", {
+                        headers: default_headers.merge(headers),
+                        session_id: session_id
+                      })
   end
 
   # Helper method to call a tool
@@ -109,45 +113,51 @@ module HttpStreamIntegrationHelpers
                                         arguments: arguments
                                       })
 
-    response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
-
-    # Debug: Print response if not successful
-    if response.code != "200"
-      puts "Tool call failed with status #{response.code}"
-      puts "Response body: #{response.body}"
-    end
+    response = make_http_request("POST", base_url, "/mcp", { body: request, session_id: session_id })
+    handle_response_debug(response)
 
     json_response = parse_json_rpc_response(response)
-
-    # Return error response if present
     return json_response["error"] if json_response["error"]
 
-    # Otherwise expect success
     expect(response.code).to eq("200")
-
-    # Extract the tool result from the JSON-RPC response
-    if json_response["result"] && json_response["result"]["content"]
-      content = json_response["result"]["content"]
-      if content.is_a?(Array) && content.first && content.first["text"]
-        # Try to parse the tool result as JSON
-        begin
-          JSON.parse(content.first["text"])
-        rescue JSON::ParserError
-          # If it's not JSON, return the text as-is
-          content.first["text"]
-        end
-      else
-        json_response["result"]
-      end
-    else
-      json_response
-    end
+    extract_tool_result(json_response)
   end
+
+  private
+
+  # Helper to debug failed responses
+  def handle_response_debug(response)
+    return unless response.code != "200"
+
+    puts "Tool call failed with status #{response.code}"
+    puts "Response body: #{response.body}"
+  end
+
+  # Extract the tool result from the JSON-RPC response
+  def extract_tool_result(json_response)
+    result = json_response["result"]
+    return json_response unless result&.dig("content")
+
+    content = result["content"]
+    return result unless content.is_a?(Array) && content.first&.dig("text")
+
+    text_content = content.first["text"]
+    parse_json_content(text_content)
+  end
+
+  # Try to parse content as JSON, fallback to raw text
+  def parse_json_content(text_content)
+    JSON.parse(text_content)
+  rescue JSON::ParserError
+    text_content
+  end
+
+  public
 
   # Helper method to list tools
   def list_tools(base_url, session_id)
     request = create_json_rpc_request("tools/list", {})
-    response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
+    response = make_http_request("POST", base_url, "/mcp", { body: request, session_id: session_id })
     expect(response.code).to eq("200")
 
     parse_json_rpc_response(response)
@@ -156,7 +166,7 @@ module HttpStreamIntegrationHelpers
   # Helper method to read a resource
   def read_resource(base_url, session_id, uri)
     request = create_json_rpc_request("resources/read", { uri: uri })
-    response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
+    response = make_http_request("POST", base_url, "/mcp", { body: request, session_id: session_id })
     expect(response.code).to eq("200")
 
     parse_json_rpc_response(response)
@@ -169,7 +179,7 @@ module HttpStreamIntegrationHelpers
                                         arguments: arguments
                                       })
 
-    response = make_http_request("POST", base_url, "/mcp", body: request, session_id: session_id)
+    response = make_http_request("POST", base_url, "/mcp", { body: request, session_id: session_id })
     expect(response.code).to eq("200")
 
     parse_json_rpc_response(response)
@@ -177,7 +187,7 @@ module HttpStreamIntegrationHelpers
 
   # Helper method to terminate session
   def terminate_session(base_url, session_id)
-    response = make_http_request("DELETE", base_url, "/mcp", session_id: session_id)
+    response = make_http_request("DELETE", base_url, "/mcp", { session_id: session_id })
     expect(response.code).to eq("200")
     response
   end
