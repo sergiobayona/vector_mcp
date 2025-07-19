@@ -192,7 +192,7 @@ module VectorMCP
         @sessions.each_value do |session|
           next unless can_send_message_to_session?(session)
 
-          count += 1 if send_message_to_session(session, message)
+          count += 1 if message_sent_to_session?(session, message)
         end
 
         logger.debug { "Message broadcasted to #{count} recipients" }

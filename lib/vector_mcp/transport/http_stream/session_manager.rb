@@ -145,7 +145,7 @@ module VectorMCP
         end
 
         # Override: Sends a message to a session via the stream handler.
-        def send_message_to_session(session, message)
+        def message_sent_to_session?(session, message)
           @transport.stream_handler.send_message_to_session(session, message)
         end
 

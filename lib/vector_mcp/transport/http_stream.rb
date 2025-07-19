@@ -396,7 +396,7 @@ module VectorMCP
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
-        success = @session_manager.terminate_session(session_id)
+        success = @session_manager.session_terminated?(session_id)
         if success
           [204, {}, []]
         else

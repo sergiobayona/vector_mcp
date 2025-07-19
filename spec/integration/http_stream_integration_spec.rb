@@ -242,10 +242,9 @@ RSpec.describe "HTTP Stream Transport Integration" do
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
 
-      # The HttpStream transport currently returns raw results, not JSON-RPC wrapped
-      # This behavior needs to be documented and potentially fixed
-      expect(data["tools"]).to be_an(Array)
-      expect(data["tools"]).not_to be_empty
+      # HttpStream transport returns JSON-RPC wrapped results
+      expect(data["result"]["tools"]).to be_an(Array)
+      expect(data["result"]["tools"]).not_to be_empty
     end
 
     it "handles tools/call requests" do
@@ -258,9 +257,9 @@ RSpec.describe "HTTP Stream Transport Integration" do
       expect(response.code).to eq("200")
 
       data = parse_json_rpc_response(response)
-      # HttpStream transport returns raw results - look for content array
-      expect(data["content"]).to be_an(Array)
-      expect(data["content"].first["text"]).to eq("Echo: test message")
+      # HttpStream transport returns JSON-RPC wrapped results
+      expect(data["result"]["content"]).to be_an(Array)
+      expect(data["result"]["content"].first["text"]).to eq("Echo: test message")
     end
 
     it "handles resources/list requests" do
@@ -269,7 +268,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
-      expect(data["resources"]).to be_an(Array)
+      expect(data["result"]["resources"]).to be_an(Array)
     end
 
     it "handles resources/read requests" do
@@ -281,9 +280,9 @@ RSpec.describe "HTTP Stream Transport Integration" do
       expect(response.code).to eq("200")
 
       data = parse_json_rpc_response(response)
-      expect(data["contents"]).to be_an(Array)
+      expect(data["result"]["contents"]).to be_an(Array)
       # Resource content may be JSON-encoded
-      content_text = data["contents"].first["text"]
+      content_text = data["result"]["contents"].first["text"]
       expect(content_text).to include("test resource content")
     end
 
@@ -293,7 +292,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
-      expect(data["prompts"]).to be_an(Array)
+      expect(data["result"]["prompts"]).to be_an(Array)
     end
 
     it "handles prompts/get requests" do
@@ -307,7 +306,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
       # May fail if prompt handling is not implemented correctly
       if response.code == "200"
         data = parse_json_rpc_response(response)
-        expect(data["messages"]).to be_an(Array)
+        expect(data["result"]["messages"]).to be_an(Array)
       else
         expect(%w[400 500]).to include(response.code)
       end
@@ -382,8 +381,8 @@ RSpec.describe "HTTP Stream Transport Integration" do
           expect(response.code).to eq("200")
 
           data = parse_json_rpc_response(response)
-          expect(data["content"]).to be_an(Array)
-          expect(data["content"].first["text"]).to eq("Echo: from session #{i}")
+          expect(data["result"]["content"]).to be_an(Array)
+          expect(data["result"]["content"].first["text"]).to eq("Echo: from session #{i}")
         end
       end
 
