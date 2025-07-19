@@ -330,9 +330,7 @@ module VectorMCP
         return not_found_response unless path == @path_prefix
 
         # Validate origin for security (MCP specification requirement)
-        unless valid_origin?(env)
-          return forbidden_response("Origin not allowed")
-        end
+        return forbidden_response("Origin not allowed") unless valid_origin?(env)
 
         case method
         when "POST"

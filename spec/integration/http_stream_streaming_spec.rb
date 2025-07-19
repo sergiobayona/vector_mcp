@@ -40,7 +40,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       description: "Tool that interacts with client via sampling",
       input_schema: {
         type: "object",
-        properties: { 
+        properties: {
           question: { type: "string" },
           follow_up: { type: "boolean", default: false }
         },
@@ -49,39 +49,39 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     ) do |args, session|
       # Use sampling to ask the client
       result = session.sample({
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: args["question"]
-            }
-          }
-        ],
-        system_prompt: "You are a helpful assistant. Give a brief response.",
-        max_tokens: 100
-      })
-      
+                                messages: [
+                                  {
+                                    role: "user",
+                                    content: {
+                                      type: "text",
+                                      text: args["question"]
+                                    }
+                                  }
+                                ],
+                                system_prompt: "You are a helpful assistant. Give a brief response.",
+                                max_tokens: 100
+                              })
+
       response = { initial_response: result.content }
-      
+
       if args["follow_up"]
         # Ask a follow-up question
         follow_up_result = session.sample({
-          messages: [
-            {
-              role: "user",
-              content: {
-                type: "text",
-                text: "Can you elaborate on that?"
-              }
-            }
-          ],
-          system_prompt: "You are a helpful assistant. Give a brief response.",
-          max_tokens: 100
-        })
+                                            messages: [
+                                              {
+                                                role: "user",
+                                                content: {
+                                                  type: "text",
+                                                  text: "Can you elaborate on that?"
+                                                }
+                                              }
+                                            ],
+                                            system_prompt: "You are a helpful assistant. Give a brief response.",
+                                            max_tokens: 100
+                                          })
         response[:follow_up_response] = follow_up_result.content
       end
-      
+
       response
     end
 
@@ -97,19 +97,19 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     ) do |args, session|
       # Sample from the current session
       result = session.sample({
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: "Echo back: #{args["message"]}"
-            }
-          }
-        ],
-        system_prompt: "You are a helpful assistant. Echo back the exact message.",
-        max_tokens: 50
-      })
-      
+                                messages: [
+                                  {
+                                    role: "user",
+                                    content: {
+                                      type: "text",
+                                      text: "Echo back: #{args["message"]}"
+                                    }
+                                  }
+                                ],
+                                system_prompt: "You are a helpful assistant. Echo back the exact message.",
+                                max_tokens: 50
+                              })
+
       {
         session_id: session.id,
         original_message: args["message"],
@@ -140,12 +140,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   def wait_for_server_start
     Timeout.timeout(10) do
       loop do
-        begin
-          Net::HTTP.get_response(URI("#{base_url}/health"))
-          break
-        rescue Errno::ECONNREFUSED
-          sleep(0.1)
-        end
+        Net::HTTP.get_response(URI("#{base_url}/health"))
+        break
+      rescue Errno::ECONNREFUSED
+        sleep(0.1)
       end
     end
   rescue Timeout::Error
@@ -156,11 +154,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   def make_request(method, path, body: nil, headers: {}, session_id: nil)
     uri = URI("#{base_url}#{path}")
     http = Net::HTTP.new(uri.host, uri.port)
-    
+
     # Set timeouts to prevent hanging
     http.read_timeout = 5
     http.open_timeout = 5
-    
+
     request = case method.upcase
               when "GET"
                 Net::HTTP::Get.new(uri)
@@ -171,12 +169,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
               else
                 raise "Unsupported HTTP method: #{method}"
               end
-    
+
     headers.each { |k, v| request[k] = v }
     request["Mcp-Session-Id"] = session_id if session_id
     request["Content-Type"] = "application/json" if body
     request.body = body.to_json if body
-    
+
     http.request(request)
   end
 
@@ -196,12 +194,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   def establish_streaming_connection(session_id)
     uri = URI(stream_endpoint)
     http = Net::HTTP.new(uri.host, uri.port)
-    
+
     request = Net::HTTP::Get.new(uri)
     request["Mcp-Session-Id"] = session_id
     request["Accept"] = "text/event-stream"
     request["Cache-Control"] = "no-cache"
-    
+
     # Start the streaming request
     http.request(request)
   end
@@ -235,41 +233,39 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     def handle_stream
       uri = URI("#{@base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Accept"] = "text/event-stream"
       request["Cache-Control"] = "no-cache"
-      
+
       http.request(request) do |response|
         response.read_body do |chunk|
           break unless @running
-          
+
           # Parse SSE events
           chunk.split("\n\n").each do |event_data|
             next if event_data.strip.empty?
-            
+
             event_lines = event_data.split("\n")
             event_type = nil
             data = nil
-            
+
             event_lines.each do |line|
               if line.start_with?("event: ")
-                event_type = line[7..-1]
+                event_type = line[7..]
               elsif line.start_with?("data: ")
-                data = line[6..-1]
+                data = line[6..]
               end
             end
-            
-            if data
-              begin
-                message = JSON.parse(data)
-                if message["method"] == "sampling/createMessage"
-                  handle_sampling_request(message)
-                end
-              rescue JSON::ParserError
-                # Ignore malformed JSON
-              end
+
+            next unless data
+
+            begin
+              message = JSON.parse(data)
+              handle_sampling_request(message) if message["method"] == "sampling/createMessage"
+            rescue JSON::ParserError
+              # Ignore malformed JSON
             end
           end
         end
@@ -281,7 +277,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     def handle_sampling_request(message)
       method = message["method"]
       request_id = message["id"]
-      
+
       # Create a mock response
       response = {
         jsonrpc: "2.0",
@@ -295,7 +291,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
           }
         }
       }
-      
+
       # Send response back to server
       send_response(response)
     end
@@ -303,12 +299,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     def send_response(response)
       uri = URI("#{@base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       request = Net::HTTP::Post.new(uri)
       request["Mcp-Session-Id"] = @session_id
       request["Content-Type"] = "application/json"
       request.body = response.to_json
-      
+
       http.request(request)
     end
   end
@@ -320,18 +316,18 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     before do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: { sampling: {} },
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: { sampling: {} },
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Set up mock client responses
       mock_client.set_response_for_method("sampling/createMessage", "This is a mock response to your question")
       mock_client.start_streaming
-      
+
       # Give streaming connection time to establish
       sleep(0.5)
     end
@@ -344,16 +340,16 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # This test is complex because it requires a real streaming client
       # For now, we'll test the basic mechanism
       request = create_json_rpc_request("tools/call", {
-        name: "interactive_tool",
-        arguments: { question: "What is the capital of France?" }
-      })
-      
+                                          name: "interactive_tool",
+                                          arguments: { question: "What is the capital of France?" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
-      
+
       # The response should either succeed (if streaming works) or fail with a specific error
       expect(response.code).to eq("200")
       data = parse_json_rpc_response(response)
-      
+
       # If sampling works, we should get a result
       # If no streaming connection, we should get an error about no streaming session
       if data["result"]
@@ -361,7 +357,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
         expect(data["result"]["isError"]).to be false
         expect(data["result"]["content"]).to be_an(Array)
         expect(data["result"]["content"].first["text"]).to include("initial_response")
-        
+
         # Parse the JSON content to verify the structure
         tool_response = JSON.parse(data["result"]["content"].first["text"])
         expect(tool_response["initial_response"]).not_to be_nil
@@ -377,22 +373,22 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
 
     it "handles session-specific sampling" do
       request = create_json_rpc_request("tools/call", {
-        name: "session_sampler",
-        arguments: { message: "test message for session" }
-      })
-      
+                                          name: "session_sampler",
+                                          arguments: { message: "test message for session" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       data = parse_json_rpc_response(response)
-      
+
       # Should either succeed or fail with specific error
       if data["result"]
         # The tool should have executed successfully and returned content
         expect(data["result"]["isError"]).to be false
         expect(data["result"]["content"]).to be_an(Array)
         expect(data["result"]["content"].first["text"]).to include("session_id")
-        
+
         # Parse the JSON content to verify the structure
         tool_response = JSON.parse(data["result"]["content"].first["text"])
         expect(tool_response["session_id"]).to eq(session_id)
@@ -409,11 +405,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     before do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
     end
@@ -422,21 +418,21 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # Try to establish streaming connection with very short timeout
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       # Set very short timeout just to check if connection is accepted
       http.read_timeout = 1
       http.open_timeout = 1
-      
+
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id
       request["Accept"] = "text/event-stream"
       request["Cache-Control"] = "no-cache"
-      
+
       # Connection should be established (timeout is expected for streaming)
-      expect {
+      expect do
         http.request(request)
-      }.to raise_error(Net::ReadTimeout)
-      
+      end.to raise_error(Net::ReadTimeout)
+
       # The connection being accepted and then timing out indicates streaming works
       # This is expected behavior for SSE connections
     end
@@ -445,38 +441,38 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # Test that connection with Last-Event-ID header is accepted
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      
+
       # Set very short timeout just to check if connection is accepted
       http.read_timeout = 1
       http.open_timeout = 1
-      
+
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id
       request["Accept"] = "text/event-stream"
       request["Cache-Control"] = "no-cache"
       request["Last-Event-ID"] = "some-event-id"
-      
+
       # Connection should be established (timeout is expected for streaming)
-      expect {
+      expect do
         http.request(request)
-      }.to raise_error(Net::ReadTimeout)
-      
+      end.to raise_error(Net::ReadTimeout)
+
       # The connection being accepted and then timing out indicates resumable streaming works
     end
 
     it "maintains event history for resumability" do
       # This test verifies that the event store maintains events
       # The actual resumability testing would require parsing SSE streams
-      
+
       # Make a tool call that might generate events
       request = create_json_rpc_request("tools/call", {
-        name: "interactive_tool",
-        arguments: { question: "Generate some events" }
-      })
-      
+                                          name: "interactive_tool",
+                                          arguments: { question: "Generate some events" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # The event store should be functioning (tested in unit tests)
       # Here we just verify the mechanism doesn't break
     end
@@ -488,19 +484,19 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     it "supports streaming connection establishment" do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Establish streaming connection
       response = make_request("GET", "/mcp", session_id: session_id, headers: {
-        "Accept" => "text/event-stream"
-      })
-      
+                                "Accept" => "text/event-stream"
+                              })
+
       expect(response.code).to eq("200")
       expect(response["Content-Type"]).to include("text/event-stream")
     end
@@ -508,18 +504,18 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     it "supports explicit session termination" do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Terminate session
       response = make_request("DELETE", "/mcp", session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       # Verify session is terminated
       list_request = create_json_rpc_request("tools/list", {})
       response = make_request("POST", "/mcp", body: list_request, session_id: session_id)
@@ -530,11 +526,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     it "handles streaming connection without active session" do
       # Try to establish streaming connection without initializing session
       response = make_request("GET", "/mcp", session_id: "non-existent-session", headers: {
-        "Accept" => "text/event-stream"
-      })
-      
+                                "Accept" => "text/event-stream"
+                              })
+
       # Should either create session or handle gracefully
-      expect(response.code).to be_in(["200", "400", "404"])
+      expect(response.code).to be_in(%w[200 400 404])
     end
   end
 
@@ -544,11 +540,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     before do
       # Initialize session
       init_request = create_json_rpc_request("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      })
-      
+                                               protocolVersion: "2024-11-05",
+                                               capabilities: {},
+                                               clientInfo: { name: "test-client", version: "1.0.0" }
+                                             })
+
       response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
       expect(response.code).to eq("200")
     end
@@ -556,13 +552,13 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     it "handles sampling timeout gracefully" do
       # Call tool that would use sampling but with no streaming client
       request = create_json_rpc_request("tools/call", {
-        name: "interactive_tool",
-        arguments: { question: "This should timeout" }
-      })
-      
+                                          name: "interactive_tool",
+                                          arguments: { question: "This should timeout" }
+                                        })
+
       response = make_request("POST", "/mcp", body: request, session_id: session_id)
       expect(response.code).to eq("200")
-      
+
       data = parse_json_rpc_response(response)
       expect(data["error"]).to be_present
       expect(data["error"]["message"]).to include("No streaming session available")
@@ -571,11 +567,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     it "handles invalid streaming requests" do
       # Try to make streaming request with invalid headers
       response = make_request("GET", "/mcp", session_id: session_id, headers: {
-        "Accept" => "application/json" # Wrong content type
-      })
-      
+                                "Accept" => "application/json" # Wrong content type
+                              })
+
       # Should handle gracefully
-      expect(response.code).to be_in(["200", "400"])
+      expect(response.code).to be_in(%w[200 400])
     end
   end
 end

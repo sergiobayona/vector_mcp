@@ -439,7 +439,7 @@ module VectorMCP
             "Using deprecated instance_variable_get for session context. " \
             "Transport should populate request_context. Session ID: #{session.id}"
           )
-          
+
           {
             headers: session.instance_variable_get(:@request_headers) || {},
             params: session.instance_variable_get(:@request_params) || {},
@@ -510,7 +510,7 @@ module VectorMCP
       end
 
       # Execute tool handler with proper arity handling
-      def self.execute_tool_handler(tool, arguments, security_result, session)
+      def self.execute_tool_handler(tool, arguments, _security_result, session)
         if [1, -1].include?(tool.handler.arity)
           tool.handler.call(arguments)
         else
