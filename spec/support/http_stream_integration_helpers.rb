@@ -408,6 +408,7 @@ module HttpStreamIntegrationHelpers
         jsonrpc: "2.0",
         id: request_id,
         result: {
+          model: "mock-model",
           role: "assistant",
           content: {
             type: "text",
