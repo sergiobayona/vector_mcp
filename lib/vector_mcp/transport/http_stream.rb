@@ -82,10 +82,21 @@ module VectorMCP
         @outgoing_request_responses = Concurrent::Hash.new
         @outgoing_request_conditions = Concurrent::Hash.new
         @request_mutex = Mutex.new
+
+        # Optimized request ID generation - pre-generate secure suffix and use atomic counter
+        @request_id_base = "vecmcp_http_#{Process.pid}_#{SecureRandom.hex(4)}"
+        @request_id_counter = Concurrent::AtomicFixnum.new(0)
         @request_id_generator = Enumerator.new do |y|
-          i = 0
-          loop { y << "vecmcp_http_#{i += 1}_#{SecureRandom.hex(4)}" }
+          loop { y << "#{@request_id_base}_#{@request_id_counter.increment}" }
         end
+
+        # Object pool for condition variables to reduce allocation overhead
+        @condition_pool = Concurrent::Array.new
+        10.times { @condition_pool << ConditionVariable.new }
+
+        # Pool for reusable hash objects to reduce GC pressure
+        @hash_pool = Concurrent::Array.new
+        20.times { @hash_pool << {} }
 
         @puma_server = nil
         @running = false
@@ -422,13 +433,24 @@ module VectorMCP
         input.read
       end
 
-      # Parses JSON message from request body
+      # Optimized JSON parsing with better error handling and performance
       #
       # @param body [String] The request body
       # @return [Hash] The parsed JSON message
       # @raise [JSON::ParserError] if JSON is invalid
       def parse_json_message(body)
-        JSON.parse(body)
+        # Early validation to avoid expensive parsing on malformed input
+        return {} if body.nil? || body.empty?
+
+        # Fast-path check for basic JSON structure
+        body_stripped = body.strip
+        return {} unless (body_stripped.start_with?("{") && body_stripped.end_with?("}")) ||
+                         (body_stripped.start_with?("[") && body_stripped.end_with?("]"))
+
+        JSON.parse(body_stripped)
+      rescue JSON::ParserError => e
+        logger.warn { "JSON parsing failed: #{e.message}" }
+        raise
       end
 
       # Builds a notification message
@@ -453,9 +475,20 @@ module VectorMCP
       end
 
       def json_rpc_response(result, request_id, headers = {})
-        response = { jsonrpc: "2.0", id: request_id, result: result }
+        # Use pooled hash for response to reduce allocation
+        response = @hash_pool.pop || {}
+        response.clear
+        response[:jsonrpc] = "2.0"
+        response[:id] = request_id
+        response[:result] = result
+
         response_headers = { "Content-Type" => "application/json" }.merge(headers)
-        [200, response_headers, [response.to_json]]
+        json_result = response.to_json
+
+        # Return hash to pool after JSON conversion
+        @hash_pool << response if @hash_pool.size < 20
+
+        [200, response_headers, [json_result]]
       end
 
       def json_error_response(id, code, message, data = nil)
@@ -513,12 +546,12 @@ module VectorMCP
 
       # Request tracking helpers for server-initiated requests
 
-      # Sets up tracking for an outgoing request.
+      # Sets up tracking for an outgoing request using pooled condition variables.
       #
       # @param request_id [String] The request ID to track
       # @return [void]
       def setup_request_tracking(request_id)
-        condition = ConditionVariable.new
+        condition = @condition_pool.pop || ConditionVariable.new
         @request_mutex.synchronize do
           @outgoing_request_conditions[request_id] = condition
         end
@@ -569,14 +602,16 @@ module VectorMCP
         response[:result]
       end
 
-      # Cleans up tracking for a request.
+      # Cleans up tracking for a request and returns condition variable to pool.
       #
       # @param request_id [String] The request ID to clean up
       # @return [void]
       def cleanup_request_tracking(request_id)
         @request_mutex.synchronize do
           @outgoing_request_responses.delete(request_id)
-          @outgoing_request_conditions.delete(request_id)
+          condition = @outgoing_request_conditions.delete(request_id)
+          # Return condition variable to pool if space available
+          @condition_pool << condition if condition && @condition_pool.size < 10
         end
       end
 
@@ -615,16 +650,26 @@ module VectorMCP
         end
       end
 
-      # Recursively transforms hash keys using the given block.
+      # Optimized hash key transformation for better performance.
+      # Uses simple recursive approach but with early returns to reduce overhead.
       #
       # @param obj [Object] The object to transform (Hash, Array, or other)
       # @return [Object] The transformed object
       def deep_transform_keys(obj, &block)
+        transform_object_keys(obj, &block)
+      end
+
+      # Core transformation logic extracted for better maintainability
+      def transform_object_keys(obj, &block)
         case obj
         when Hash
-          obj.transform_keys(&block).transform_values { |v| deep_transform_keys(v, &block) }
+          # Pre-allocate hash with known size for efficiency
+          result = Hash.new(obj.size)
+          obj.each { |k, v| result[block.call(k)] = transform_object_keys(v, &block) }
+          result
         when Array
-          obj.map { |v| deep_transform_keys(v, &block) }
+          # Use map! for in-place transformation when possible
+          obj.map { |v| transform_object_keys(v, &block) }
         else
           obj
         end

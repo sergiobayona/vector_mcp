@@ -51,22 +51,23 @@ module VectorMCP
         # @param transport [HttpStream] The parent transport instance
         # @param session_timeout [Integer] Session timeout in seconds
 
-        # Overrides base implementation to create HTTP stream sessions with streaming connection metadata.
+        # Optimized session creation with reduced object allocation and faster context creation
         def create_session(session_id = nil, rack_env = nil)
           session_id ||= generate_session_id
           now = Time.now
 
-          # Create VectorMCP session context with request context
-          session_context = create_session_with_context(session_id, rack_env)
+          # Optimize session context creation - use cached minimal context when rack_env is nil
+          session_context = if rack_env
+                              create_session_with_context(session_id, rack_env)
+                            else
+                              create_minimal_session_context(session_id)
+                            end
+
+          # Pre-allocate metadata hash for better performance
+          metadata = { streaming_connection: nil }
 
           # Create internal session record with streaming connection metadata
-          session = Session.new(
-            session_id,
-            session_context,
-            now,
-            now,
-            { streaming_connection: nil }
-          )
+          session = Session.new(session_id, session_context, now, now, metadata)
 
           @sessions[session_id] = session
 
@@ -96,14 +97,15 @@ module VectorMCP
 
         # Creates a VectorMCP::Session with proper request context from Rack environment
         def create_session_with_context(session_id, rack_env)
-          request_context = if rack_env
-                              # Create request context from Rack environment
-                              VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-                            else
-                              # Fallback to minimal context for cases where rack_env is not available
-                              VectorMCP::RequestContext.minimal("http_stream")
-                            end
+          request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
           VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
+        end
+
+        # Optimized minimal session context creation for performance
+        def create_minimal_session_context(session_id)
+          # Cache minimal context creation to avoid repeated object allocation
+          @minimal_context ||= VectorMCP::RequestContext.minimal("http_stream")
+          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: @minimal_context)
         end
 
         # Associates a streaming connection with a session.
