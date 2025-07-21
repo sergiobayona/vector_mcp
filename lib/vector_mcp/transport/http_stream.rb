@@ -72,7 +72,7 @@ module VectorMCP
         initialize_object_pools
         initialize_server_state
 
-        logger.info { "HttpStream transport initialized: #{@host}:#{@port}#{@path_prefix}" }
+        logger.debug { "HttpStream transport initialized: #{@host}:#{@port}#{@path_prefix}" }
       end
 
       # Starts the HTTP Stream transport.
@@ -81,8 +81,6 @@ module VectorMCP
       # @return [void]
       # @raise [StandardError] if there's a fatal error during server startup
       def run
-        logger.info { "Starting HttpStream transport server on #{@host}:#{@port}#{@path_prefix}" }
-
         start_puma_server
       rescue StandardError => e
         handle_fatal_error(e)
@@ -255,7 +253,7 @@ module VectorMCP
         @running = true
         setup_signal_handlers
 
-        logger.info { "HttpStream server starting on #{@host}:#{@port}" }
+        logger.info { "HttpStream server listening on #{@host}:#{@port}#{@path_prefix}" }
         @puma_server.run.join
       rescue StandardError => e
         logger.error { "Error starting Puma server: #{e.message}" }
