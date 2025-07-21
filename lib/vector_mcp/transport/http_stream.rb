@@ -66,40 +66,11 @@ module VectorMCP
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
-        @host = options[:host] || DEFAULT_HOST
-        @port = options[:port] || DEFAULT_PORT
-        @path_prefix = normalize_path_prefix(options[:path_prefix] || DEFAULT_PATH_PREFIX)
-        @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
-        @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
-        @allowed_origins = options[:allowed_origins] || ["*"]
-
-        # Initialize components
-        @session_manager = HttpStream::SessionManager.new(self, @session_timeout)
-        @event_store = HttpStream::EventStore.new(@event_retention)
-        @stream_handler = HttpStream::StreamHandler.new(self)
-
-        # Initialize request tracking for server-initiated requests
-        @outgoing_request_responses = Concurrent::Hash.new
-        @outgoing_request_conditions = Concurrent::Hash.new
-        @request_mutex = Mutex.new
-
-        # Optimized request ID generation - pre-generate secure suffix and use atomic counter
-        @request_id_base = "vecmcp_http_#{Process.pid}_#{SecureRandom.hex(4)}"
-        @request_id_counter = Concurrent::AtomicFixnum.new(0)
-        @request_id_generator = Enumerator.new do |y|
-          loop { y << "#{@request_id_base}_#{@request_id_counter.increment}" }
-        end
-
-        # Object pool for condition variables to reduce allocation overhead
-        @condition_pool = Concurrent::Array.new
-        10.times { @condition_pool << ConditionVariable.new }
-
-        # Pool for reusable hash objects to reduce GC pressure
-        @hash_pool = Concurrent::Array.new
-        20.times { @hash_pool << {} }
-
-        @puma_server = nil
-        @running = false
+        initialize_configuration(options)
+        initialize_components
+        initialize_request_tracking
+        initialize_object_pools
+        initialize_server_state
 
         logger.info { "HttpStream transport initialized: #{@host}:#{@port}#{@path_prefix}" }
       end
@@ -673,6 +644,54 @@ module VectorMCP
         else
           obj
         end
+      end
+
+      # Initialize configuration options from the provided options hash
+      def initialize_configuration(options)
+        @host = options[:host] || DEFAULT_HOST
+        @port = options[:port] || DEFAULT_PORT
+        @path_prefix = normalize_path_prefix(options[:path_prefix] || DEFAULT_PATH_PREFIX)
+        @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
+        @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
+        @allowed_origins = options[:allowed_origins] || ["*"]
+      end
+
+      # Initialize core HTTP stream components
+      def initialize_components
+        @session_manager = HttpStream::SessionManager.new(self, @session_timeout)
+        @event_store = HttpStream::EventStore.new(@event_retention)
+        @stream_handler = HttpStream::StreamHandler.new(self)
+      end
+
+      # Initialize request tracking for server-initiated requests
+      def initialize_request_tracking
+        @outgoing_request_responses = Concurrent::Hash.new
+        @outgoing_request_conditions = Concurrent::Hash.new
+        @request_mutex = Mutex.new
+
+        # Optimized request ID generation - pre-generate secure suffix and use atomic counter
+        @request_id_base = "vecmcp_http_#{Process.pid}_#{SecureRandom.hex(4)}"
+        @request_id_counter = Concurrent::AtomicFixnum.new(0)
+        @request_id_generator = Enumerator.new do |y|
+          loop { y << "#{@request_id_base}_#{@request_id_counter.increment}" }
+        end
+      end
+
+      # Initialize object pools for performance optimization
+      def initialize_object_pools
+        # Object pool for condition variables to reduce allocation overhead
+        @condition_pool = Concurrent::Array.new
+        10.times { @condition_pool << ConditionVariable.new }
+
+        # Pool for reusable hash objects to reduce GC pressure
+        @hash_pool = Concurrent::Array.new
+        20.times { @hash_pool << {} }
+      end
+
+      # Initialize server state variables
+      def initialize_server_state
+        @puma_server = nil
+        @running = false
       end
 
       # Cleans up all pending requests during shutdown.
