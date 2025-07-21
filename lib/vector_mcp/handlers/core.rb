@@ -12,7 +12,6 @@ module VectorMCP
     # All public methods are designed to be called by the server's message dispatching logic.
     #
     # @see VectorMCP::Server#setup_default_handlers
-    # rubocop:disable Metrics/ModuleLength
     module Core
       # --- Request Handlers ---
 
@@ -23,8 +22,6 @@ module VectorMCP
       # @param _server [VectorMCP::Server] The server instance (ignored).
       # @return [Hash] An empty hash, as per MCP spec for ping.
       def self.ping(_params, _session, _server)
-        logger = VectorMCP.logger_for("handlers.core")
-        logger.debug("Handling ping request")
         {}
       end
 
@@ -596,6 +593,5 @@ module VectorMCP
                            :find_resource!, :validate_resource_security!, :execute_resource_handler,
                            :process_resource_content, :handle_resource_error
     end
-    # rubocop:enable Metrics/ModuleLength
   end
 end

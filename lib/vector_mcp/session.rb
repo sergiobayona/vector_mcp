@@ -193,7 +193,7 @@ module VectorMCP
 
       begin
         sampling_req_obj = VectorMCP::Sampling::Request.new(request_params)
-        @logger.info("[Session #{@id}] Sending sampling/createMessage request to client.")
+        @logger.debug("[Session #{@id}] Sending sampling/createMessage request to client.")
 
         result = send_sampling_request(sampling_req_obj, timeout)
 

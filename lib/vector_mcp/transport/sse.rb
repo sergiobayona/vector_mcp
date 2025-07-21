@@ -152,7 +152,7 @@ module VectorMCP
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [void]
       def broadcast_notification(method, params = nil)
-        logger.debug { "Broadcasting notification '#{method}' to #{@clients.size} client(s)" }
+        # Broadcasting notification to clients
         message = { jsonrpc: "2.0", method: method }
         message[:params] = params if params
 
@@ -286,7 +286,7 @@ module VectorMCP
 
         # Build message POST URL for this client
         message_post_url = build_post_url(session_id)
-        logger.debug("Client #{session_id} should POST messages to: #{message_post_url}")
+        # Client message POST URL configured
 
         # Set up SSE stream
         headers = sse_headers

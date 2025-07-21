@@ -21,10 +21,10 @@ module VectorMCP
         params = message["params"] || {}
 
         if id && method # Request
-          logger.info("[#{session_id}] Request [#{id}]: #{method} with params: #{params.inspect}")
+          logger.debug("[#{session_id}] Request [#{id}]: #{method} with params: #{params.inspect}")
           handle_request(id, method, params, session)
         elsif method # Notification
-          logger.info("[#{session_id}] Notification: #{method} with params: #{params.inspect}")
+          logger.debug("[#{session_id}] Notification: #{method} with params: #{params.inspect}")
           handle_notification(method, params, session)
           nil # Notifications do not have a return value to send back to client
         elsif id # Invalid: Has ID but no method

@@ -155,7 +155,7 @@ module VectorMCP
         request_payload[:params] = params if params
 
         setup_request_tracking(request_id)
-        logger.debug "[Stdio Transport] Sending request ID #{request_id}: #{method}"
+        # Sending request to client
         write_message(request_payload)
 
         response = wait_for_response(request_id, method, timeout)
@@ -304,7 +304,7 @@ module VectorMCP
       # @return [void]
       def handle_outgoing_response(message)
         request_id = message["id"]
-        logger.debug "[Stdio Transport] Received response for outgoing request ID #{request_id}"
+        # Received response for outgoing request
 
         @mutex.synchronize do
           # Store the response (convert keys to symbols for consistency)
@@ -315,7 +315,7 @@ module VectorMCP
           condition = @outgoing_request_conditions[request_id]
           if condition
             condition.signal
-            logger.debug "[Stdio Transport] Signaled condition for request ID #{request_id}"
+            # Signaled condition for request
           else
             logger.warn "[Stdio Transport] Received response for request ID #{request_id} but no thread is waiting"
           end
@@ -385,7 +385,7 @@ module VectorMCP
       # @return [void]
       def write_message(message)
         json_msg = message.to_json
-        logger.debug { "Sending stdio message: #{json_msg}" }
+        # Sending stdio message
 
         begin
           @output_mutex.synchronize do

@@ -34,7 +34,6 @@ module VectorMCP
       # @return [void]
       def clear_prompts_list_changed
         @prompts_list_changed = false
-        logger.debug("Prompts listChanged flag cleared.")
       end
 
       # Notifies connected clients that the list of available prompts has changed.
@@ -45,10 +44,10 @@ module VectorMCP
         notification_method = "notifications/prompts/list_changed"
         begin
           if transport.respond_to?(:broadcast_notification)
-            logger.info("Broadcasting prompts list changed notification.")
+            logger.debug("Broadcasting prompts list changed notification.")
             transport.broadcast_notification(notification_method)
           elsif transport.respond_to?(:send_notification)
-            logger.info("Sending prompts list changed notification (transport may broadcast or send to first client).")
+            logger.debug("Sending prompts list changed notification (transport may broadcast or send to first client).")
             transport.send_notification(notification_method)
           else
             logger.warn("Transport does not support sending notifications/prompts/list_changed.")
@@ -62,7 +61,6 @@ module VectorMCP
       # @return [void]
       def clear_roots_list_changed
         @roots_list_changed = false
-        logger.debug("Roots listChanged flag cleared.")
       end
 
       # Notifies connected clients that the list of available roots has changed.
@@ -73,10 +71,10 @@ module VectorMCP
         notification_method = "notifications/roots/list_changed"
         begin
           if transport.respond_to?(:broadcast_notification)
-            logger.info("Broadcasting roots list changed notification.")
+            logger.debug("Broadcasting roots list changed notification.")
             transport.broadcast_notification(notification_method)
           elsif transport.respond_to?(:send_notification)
-            logger.info("Sending roots list changed notification (transport may broadcast or send to first client).")
+            logger.debug("Sending roots list changed notification (transport may broadcast or send to first client).")
             transport.send_notification(notification_method)
           else
             logger.warn("Transport does not support sending notifications/roots/list_changed.")
@@ -90,7 +88,7 @@ module VectorMCP
       # @api private
       def subscribe_prompts(session)
         @prompt_subscribers << session unless @prompt_subscribers.include?(session)
-        logger.debug("Session subscribed to prompt list changes: #{session.object_id}")
+        # Session subscribed to prompt list changes
       end
 
       private

@@ -195,7 +195,7 @@ module VectorMCP
           count += 1 if message_sent_to_session?(session, message)
         end
 
-        logger.debug { "Message broadcasted to #{count} recipients" }
+        # Message broadcasted to recipients
         count
       end
 
@@ -298,7 +298,7 @@ module VectorMCP
 
         return unless expired_sessions.any?
 
-        logger.info { "Cleaned up expired sessions: #{expired_sessions.size}" }
+        logger.debug { "Cleaned up expired sessions: #{expired_sessions.size}" }
       end
 
       # Checks if a session matches the given criteria.

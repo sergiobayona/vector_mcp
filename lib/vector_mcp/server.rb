@@ -287,14 +287,14 @@ module VectorMCP
     #   server.use_middleware(LoggingMiddleware, :after_tool_call, conditions: { only_operations: ['important_tool'] })
     def use_middleware(middleware_class, hooks, priority: Middleware::Hook::DEFAULT_PRIORITY, conditions: {})
       @middleware_manager.register(middleware_class, hooks, priority: priority, conditions: conditions)
-      @logger.info("Registered middleware: #{middleware_class.name}")
+      @logger.debug("Registered middleware: #{middleware_class.name}")
     end
 
     # Remove all middleware hooks for a specific class
     # @param middleware_class [Class] Middleware class to remove
     def remove_middleware(middleware_class)
       @middleware_manager.unregister(middleware_class)
-      @logger.info("Removed middleware: #{middleware_class.name}")
+      @logger.debug("Removed middleware: #{middleware_class.name}")
     end
 
     # Get middleware statistics
@@ -306,7 +306,7 @@ module VectorMCP
     # Clear all middleware (useful for testing)
     def clear_middleware!
       @middleware_manager.clear!
-      @logger.info("Cleared all middleware")
+      @logger.debug("Cleared all middleware")
     end
 
     private

@@ -96,7 +96,7 @@ module VectorMCP
         path = env["PATH_INFO"]
         method = env["REQUEST_METHOD"]
 
-        logger.debug { "Processing #{method} #{path}" }
+        # Processing HTTP request
 
         response = route_request(path, method, env)
         log_request_completion(method, path, start_time, response[0])
@@ -188,7 +188,7 @@ module VectorMCP
         request_payload[:params] = params if params
 
         setup_request_tracking(request_id)
-        logger.debug { "Sending request ID #{request_id} to session #{session_id}: #{method}" }
+        # Sending request to session
 
         # Send request via existing streaming connection
         unless @stream_handler.send_message_to_session(session, request_payload)
@@ -500,7 +500,7 @@ module VectorMCP
       # Logging and error handling
       def log_request_completion(method, path, start_time, status)
         duration = Time.now - start_time
-        logger.info { "#{method} #{path} #{status} (#{(duration * 1000).round(2)}ms)" }
+        logger.debug { "#{method} #{path} #{status} (#{(duration * 1000).round(2)}ms)" }
       end
 
       def handle_request_error(method, path, error)
@@ -601,7 +601,7 @@ module VectorMCP
       # @return [void]
       def handle_outgoing_response(message)
         request_id = message["id"]
-        logger.debug { "Received response for outgoing request ID #{request_id}" }
+        # Received response for outgoing request
 
         @request_mutex.synchronize do
           # Store the response (convert keys to symbols for consistency)
@@ -612,7 +612,7 @@ module VectorMCP
           condition = @outgoing_request_conditions[request_id]
           if condition
             condition.signal
-            logger.debug { "Signaled condition for request ID #{request_id}" }
+            # Signaled condition for request
           else
             logger.warn { "Received response for request ID #{request_id} but no thread is waiting" }
           end
@@ -698,7 +698,7 @@ module VectorMCP
       def cleanup_all_pending_requests
         return if @outgoing_request_conditions.empty?
 
-        logger.info { "Cleaning up #{@outgoing_request_conditions.size} pending requests" }
+        logger.debug { "Cleaning up #{@outgoing_request_conditions.size} pending requests" }
 
         @request_mutex.synchronize do
           # Signal all waiting threads to wake up
