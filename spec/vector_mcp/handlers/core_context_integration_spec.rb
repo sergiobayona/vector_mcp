@@ -88,94 +88,37 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
     end
 
-    context "with legacy fallback interface" do
+    context "with invalid session interface" do
       let(:legacy_session) do
         # Create a session object that doesn't have request_context
         session = instance_double(VectorMCP::Session)
         allow(session).to receive(:respond_to?).with(:request_context).and_return(false)
-        allow(session).to receive(:respond_to?).with(:id).and_return(true)
-        allow(session).to receive(:id).and_return("legacy-session")
-        allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({
-                                                                                               "Authorization" => "Bearer legacy-token",
-                                                                                               "X-Legacy-Header" => "legacy-value"
-                                                                                             })
-        allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({
-                                                                                              "legacy_param" => "legacy_value"
-                                                                                            })
+        allow(session).to receive(:id).and_return("invalid-session")
         session
       end
 
-      it "falls back to instance_variable_get for legacy sessions" do
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
-
-        result = described_class.send(:extract_request_from_session, legacy_session)
-
-        expect(result).to be_a(Hash)
-        expect(result[:headers]).to eq({
-                                         "Authorization" => "Bearer legacy-token",
-                                         "X-Legacy-Header" => "legacy-value"
-                                       })
-        expect(result[:params]).to eq({
-                                        "legacy_param" => "legacy_value"
-                                      })
-        expect(result[:session_id]).to eq("legacy-session")
+      it "raises error for sessions without request_context" do
+        expect do
+          described_class.send(:extract_request_from_session, legacy_session)
+        end.to raise_error(VectorMCP::InternalError, /Session missing request_context/)
       end
 
-      it "logs deprecation warning for legacy interface" do
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
+      it "raises error for sessions with nil request_context" do
+        session_with_nil_context = instance_double(VectorMCP::Session)
+        allow(session_with_nil_context).to receive(:respond_to?).with(:request_context).and_return(true)
+        allow(session_with_nil_context).to receive(:request_context).and_return(nil)
+        allow(session_with_nil_context).to receive(:id).and_return("nil-context-session")
 
-        described_class.send(:extract_request_from_session, legacy_session)
-
-        expect(logger).to have_received(:warn).with(
-          /Using deprecated instance_variable_get for session context/
-        )
-      end
-
-      it "handles legacy session with nil instance variables" do
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
-        allow(legacy_session).to receive(:instance_variable_get).with(:@request_headers).and_return(nil)
-        allow(legacy_session).to receive(:instance_variable_get).with(:@request_params).and_return(nil)
-
-        result = described_class.send(:extract_request_from_session, legacy_session)
-
-        expect(result).to be_a(Hash)
-        expect(result[:headers]).to eq({})
-        expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("legacy-session")
-      end
-
-      it "handles legacy session without id method" do
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
-        allow(legacy_session).to receive(:respond_to?).with(:id).and_return(false)
-
-        result = described_class.send(:extract_request_from_session, legacy_session)
-
-        expect(result).to be_a(Hash)
-        expect(result[:session_id]).to eq("test-session")
+        expect do
+          described_class.send(:extract_request_from_session, session_with_nil_context)
+        end.to raise_error(VectorMCP::InternalError, /Session missing request_context/)
       end
     end
 
     context "with edge cases" do
-      it "handles session with request_context method but nil context" do
-        session_with_nil_context = VectorMCP::Session.new(server, transport, id: "nil-context-session")
-        allow(session_with_nil_context).to receive(:request_context).and_return(nil)
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
-
-        result = described_class.send(:extract_request_from_session, session_with_nil_context)
-
-        expect(result).to be_a(Hash)
-        expect(result[:headers]).to eq({})
-        expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("nil-context-session")
-        expect(logger).to have_received(:warn).with(
-          /Using deprecated instance_variable_get for session context/
-        )
-      end
-
-      it "handles session with request_context method but empty context" do
+      it "handles session with valid empty request context" do
+        # Normal session with empty but valid request context
         session_with_empty_context = VectorMCP::Session.new(server, transport, id: "empty-context-session")
-        allow(session_with_empty_context).to receive(:request_context).and_return(nil)
-        allow(VectorMCP).to receive(:logger_for).and_return(logger)
 
         result = described_class.send(:extract_request_from_session, session_with_empty_context)
 
@@ -183,9 +126,6 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
         expect(result[:session_id]).to eq("empty-context-session")
-        expect(logger).to have_received(:warn).with(
-          /Using deprecated instance_variable_get for session context/
-        )
       end
     end
   end

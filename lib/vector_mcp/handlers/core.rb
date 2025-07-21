@@ -424,26 +424,17 @@ module VectorMCP
       # @param session [VectorMCP::Session] The current session
       # @return [Hash] Request context for security middleware
       def self.extract_request_from_session(session)
-        # Use new public interface (preferred)
-        if session.respond_to?(:request_context) && session.request_context
-          {
-            headers: session.request_context.headers,
-            params: session.request_context.params,
-            session_id: session.id
-          }
-        else
-          # Legacy fallback with deprecation warning
-          VectorMCP.logger_for("handlers").warn(
-            "Using deprecated instance_variable_get for session context. " \
-            "Transport should populate request_context. Session ID: #{session.id}"
-          )
-
-          {
-            headers: session.instance_variable_get(:@request_headers) || {},
-            params: session.instance_variable_get(:@request_params) || {},
-            session_id: session.respond_to?(:id) ? session.id : "test-session"
-          }
+        # All sessions should have a request_context - this is enforced by Session initialization
+        unless session.respond_to?(:request_context) && session.request_context
+          raise VectorMCP::InternalError,
+                "Session missing request_context - transport layer integration error. Session ID: #{session.id}"
         end
+
+        {
+          headers: session.request_context.headers,
+          params: session.request_context.params,
+          session_id: session.id
+        }
       end
       private_class_method :extract_request_from_session
 
