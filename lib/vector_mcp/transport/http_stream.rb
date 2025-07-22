@@ -543,7 +543,8 @@ module VectorMCP
           end
         rescue Timeout::Error
           logger.warn { "Timeout waiting for response to request ID #{request_id} (#{method}) after #{timeout}s" }
-          cleanup_request_tracking(request_id)
+          # Use unsafe cleanup since we already hold the mutex
+          cleanup_request_tracking_unsafe(request_id)
           raise VectorMCP::SamplingTimeoutError, "Timeout waiting for client response to '#{method}' request (ID: #{request_id})"
         ensure
           @outgoing_request_conditions.delete(request_id)
@@ -568,6 +569,11 @@ module VectorMCP
           raise VectorMCP::SamplingError, "Client returned an error for '#{method}' request (ID: #{request_id}): [#{err[:code]}] #{err[:message]}"
         end
 
+        # Check if response has result key, if not treat as malformed
+        unless response.key?(:result)
+          raise VectorMCP::SamplingError, "Malformed response for '#{method}' request (ID: #{request_id}): missing 'result' field. Response: #{response.inspect}"
+        end
+
         response[:result]
       end
 
@@ -577,11 +583,21 @@ module VectorMCP
       # @return [void]
       def cleanup_request_tracking(request_id)
         @request_mutex.synchronize do
-          @outgoing_request_responses.delete(request_id)
-          condition = @outgoing_request_conditions.delete(request_id)
-          # Return condition variable to pool if space available
-          @condition_pool << condition if condition && @condition_pool.size < 10
+          cleanup_request_tracking_unsafe(request_id)
         end
+      end
+
+      # Internal cleanup method that assumes mutex is already held.
+      # This prevents recursive locking when called from within synchronized blocks.
+      #
+      # @param request_id [String] The request ID to clean up
+      # @return [void]
+      # @api private
+      def cleanup_request_tracking_unsafe(request_id)
+        @outgoing_request_responses.delete(request_id)
+        condition = @outgoing_request_conditions.delete(request_id)
+        # Return condition variable to pool if space available
+        @condition_pool << condition if condition && @condition_pool.size < 10
       end
 
       # Checks if a message is a response to an outgoing request.
@@ -592,7 +608,14 @@ module VectorMCP
         return false unless message["id"]
         return false if message["method"]
 
-        message.key?("result") || message.key?("error")
+        # Standard response with result or error
+        return true if message.key?("result") || message.key?("error")
+
+        # Handle malformed responses: if we have a pending request with this ID,
+        # treat it as a response (even if malformed) rather than letting it
+        # go through normal request processing
+        request_id = message["id"]
+        @outgoing_request_conditions.key?(request_id)
       end
 
       # Handles a response to an outgoing request.
@@ -634,7 +657,15 @@ module VectorMCP
         when Hash
           # Pre-allocate hash with known size for efficiency
           result = Hash.new(obj.size)
-          obj.each { |k, v| result[block.call(k)] = transform_object_keys(v, &block) }
+          obj.each do |k, v|
+            # Safe key transformation - only transform string keys to symbols
+            new_key = if block && (k.is_a?(String) || k.is_a?(Symbol))
+                        block.call(k)
+                      else
+                        k
+                      end
+            result[new_key] = transform_object_keys(v, &block)
+          end
           result
         when Array
           # Use map! for in-place transformation when possible
