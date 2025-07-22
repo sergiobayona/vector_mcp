@@ -714,11 +714,9 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
           # Make multiple server-initiated requests
           3.times do
-            begin
-              transport.send_request_to_session("test-session", "test/method", {})
-            rescue StandardError
-              # Ignore errors, we're just testing ID generation
-            end
+            transport.send_request_to_session("test-session", "test/method", {})
+          rescue StandardError
+            # Ignore errors, we're just testing ID generation
           end
 
           # All request IDs should be unique and follow format

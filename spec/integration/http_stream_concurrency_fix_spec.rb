@@ -122,14 +122,12 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
       threads = []
       3.times do |i|
         threads << Thread.new do
-          begin
-            result = call_tool(base_url, session_id, "concurrency_test_tool", {
-                                 message: "Concurrent request #{i}"
-                               })
-            results << result
-          rescue StandardError => e
-            errors << e
-          end
+          result = call_tool(base_url, session_id, "concurrency_test_tool", {
+                               message: "Concurrent request #{i}"
+                             })
+          results << result
+        rescue StandardError => e
+          errors << e
         end
       end
 
@@ -162,42 +160,36 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
 
       # Make concurrent requests from both sessions
       threads = []
-      
+
       threads << Thread.new do
-        begin
-          result = call_tool(base_url, session1_id, "concurrency_test_tool", {
-                               message: "From session 1"
-                             })
-          results << { session: session1_id, result: result }
-        rescue StandardError => e
-          errors << { session: session1_id, error: e }
-        end
+        result = call_tool(base_url, session1_id, "concurrency_test_tool", {
+                             message: "From session 1"
+                           })
+        results << { session: session1_id, result: result }
+      rescue StandardError => e
+        errors << { session: session1_id, error: e }
       end
 
       threads << Thread.new do
-        begin
-          result = call_tool(base_url, session2_id, "concurrency_test_tool", {
-                               message: "From session 2"
-                             })
-          results << { session: session2_id, result: result }
-        rescue StandardError => e
-          errors << { session: session2_id, error: e }
-        end
+        result = call_tool(base_url, session2_id, "concurrency_test_tool", {
+                             message: "From session 2"
+                           })
+        results << { session: session2_id, result: result }
+      rescue StandardError => e
+        errors << { session: session2_id, error: e }
       end
 
       threads.each(&:join)
 
-      client1.stop_streaming  
+      client1.stop_streaming
       client2.stop_streaming
 
       # Should handle two sessions without cross-contamination
       expect(results.length + errors.length).to eq(2)
-      
+
       # Check that any successful results have correct session IDs
       results.each do |result_data|
-        if result_data[:result] && result_data[:result]["session_id"]
-          expect(result_data[:result]["session_id"]).to eq(result_data[:session])
-        end
+        expect(result_data[:result]["session_id"]).to eq(result_data[:session]) if result_data[:result] && result_data[:result]["session_id"]
       end
     end
   end
@@ -206,7 +198,7 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
     it "generates unique request IDs under concurrent load" do
       # Test direct request ID generation without sampling to isolate the ID generation
       request_ids = Concurrent::Array.new
-      
+
       threads = []
       5.times do
         threads << Thread.new do

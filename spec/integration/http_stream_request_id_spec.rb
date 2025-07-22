@@ -142,10 +142,10 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
 
         # Extract base pattern (everything except the counter)
         bases = request_ids.map { |id| id.gsub(/_\d+\z/, "") }
-        
+
         # All should have the same base
         expect(bases.uniq.length).to eq(1)
-        
+
         # Base should follow expected format
         base = bases.first
         expect(base).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}\z/)
@@ -194,7 +194,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
 
         # Make concurrent requests from both sessions
         threads = []
-        
+
         threads << Thread.new do
           3.times do |i|
             call_tool(base_url, session1_id, "id_test_tool", {
@@ -256,9 +256,9 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         requests_per_thread = 25
         thread_count = 4
 
-        thread_count.times do |thread_num|
+        thread_count.times do |_thread_num|
           threads << Thread.new do
-            requests_per_thread.times do |req_num|
+            requests_per_thread.times do |_req_num|
               # Access the transport directly to test ID generation
               id = transport.send(:generate_request_id)
               request_ids << id
@@ -270,7 +270,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         threads.each(&:join)
 
         total_expected = requests_per_thread * thread_count
-        
+
         # Verify all request IDs are unique (no collisions)
         expect(request_ids.length).to eq(total_expected)
         expect(request_ids.to_a.uniq.length).to eq(total_expected)
@@ -279,7 +279,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         request_ids.each do |id|
           expect(id).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}_\d+\z/)
         end
-        
+
         # Verify counter incrementing works correctly under load
         counters = request_ids.map { |id| id.split("_").last.to_i }.sort
         expect(counters.first).to be >= 1
@@ -335,10 +335,10 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         # Verify counter continued incrementing
         all_ids = first_batch_ids + second_batch_ids
         counters = all_ids.map { |id| id.split("_").last.to_i }
-        
+
         expect(counters).to eq(counters.sort) # Should be in ascending order
         expect(counters.uniq.length).to eq(6) # All unique counters
-        
+
         # Verify no gaps in the sequence (consecutive incrementing)
         expect(counters.max - counters.min).to eq(5) # Range should be exactly 5 (6 numbers - 1)
       end
@@ -349,11 +349,11 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
     it "prevents fiber-related errors during ID generation" do
       # This test ensures we don't regress back to using Enumerator/Fiber
       # which caused the original "fiber called across threads" error
-      
-      expect {
+
+      expect do
         # Create a new transport instance
         new_transport = VectorMCP::Transport::HttpStream.new(server, port: find_available_port)
-        
+
         # Generate IDs from multiple threads simultaneously
         threads = []
         5.times do
@@ -363,17 +363,17 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
             end
           end
         end
-        
+
         threads.each(&:join)
-      }.not_to raise_error
+      end.not_to raise_error
     end
 
     it "ensures thread-safe counter operations" do
       # Verify that the AtomicFixnum counter works correctly under concurrent access
       new_transport = VectorMCP::Transport::HttpStream.new(server, port: find_available_port)
-      
+
       ids = Concurrent::Array.new
-      
+
       threads = []
       10.times do
         threads << Thread.new do
@@ -382,17 +382,17 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           end
         end
       end
-      
+
       threads.each(&:join)
-      
+
       # All 500 IDs should be unique
       expect(ids.length).to eq(500)
       expect(ids.to_a.uniq.length).to eq(500)
-      
+
       # Extract counters and verify they form a complete sequence
       counters = ids.map { |id| id.split("_").last.to_i }.sort
       expect(counters.first).to eq(1) # First counter value
-      expect(counters.last).to eq(500) # Last counter value  
+      expect(counters.last).to eq(500) # Last counter value
       expect(counters).to eq((1..500).to_a) # Complete sequence with no gaps
     end
   end

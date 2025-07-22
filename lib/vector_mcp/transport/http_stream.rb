@@ -573,7 +573,8 @@ module VectorMCP
 
         # Check if response has result key, if not treat as malformed
         unless response.key?(:result)
-          raise VectorMCP::SamplingError, "Malformed response for '#{method}' request (ID: #{request_id}): missing 'result' field. Response: #{response.inspect}"
+          raise VectorMCP::SamplingError,
+                "Malformed response for '#{method}' request (ID: #{request_id}): missing 'result' field. Response: #{response.inspect}"
         end
 
         response[:result]
@@ -624,7 +625,7 @@ module VectorMCP
       # @return [void]
       def handle_outgoing_response(message)
         request_id = message["id"]
-        
+
         ivar = nil
         @request_mutex.synchronize do
           ivar = @outgoing_request_ivars[request_id]
@@ -637,7 +638,7 @@ module VectorMCP
 
         # Convert keys to symbols for consistency and put response in IVar
         response_data = deep_transform_keys(message, &:to_sym)
-        
+
         # IVar handles thread-safe response delivery - no race conditions possible
         if ivar.try_set(response_data)
           logger.debug { "Response delivered to waiting thread for request ID #{request_id}" }
