@@ -216,7 +216,8 @@ module VectorMCP
         @puma_server.run.join # This blocks until server stops
         logger.info("Puma server stopped.")
       ensure
-        @session_manager.cleanup_all_sessions
+        # Only cleanup if session manager is enabled
+        @session_manager&.cleanup_all_sessions
         logger.info("SSE transport and resources shut down.")
       end
 
