@@ -108,6 +108,11 @@ module StreamingTestHelpers
       @connection_state == :connected
     end
 
+    # Clear method handlers
+    def clear_method_handlers
+      @response_handlers.clear
+    end
+
     # Get connection statistics
     def stats
       {

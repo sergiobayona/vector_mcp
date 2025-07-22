@@ -589,5 +589,146 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
       end
     end
+
+    describe "Request ID Generation" do
+      describe "#generate_request_id" do
+        it "generates unique IDs" do
+          id1 = transport.send(:generate_request_id)
+          id2 = transport.send(:generate_request_id)
+
+          expect(id1).to be_a(String)
+          expect(id2).to be_a(String)
+          expect(id1).not_to eq(id2)
+        end
+
+        it "generates IDs with correct format" do
+          id = transport.send(:generate_request_id)
+
+          # Format: vecmcp_http_{pid}_{random}_{counter}
+          expect(id).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}_\d+\z/)
+        end
+
+        it "includes process ID in the ID" do
+          id = transport.send(:generate_request_id)
+
+          expect(id).to include(Process.pid.to_s)
+        end
+
+        it "generates incrementing counter values" do
+          id1 = transport.send(:generate_request_id)
+          id2 = transport.send(:generate_request_id)
+          id3 = transport.send(:generate_request_id)
+
+          # Extract counter from each ID (last number after last underscore)
+          counter1 = id1.split("_").last.to_i
+          counter2 = id2.split("_").last.to_i
+          counter3 = id3.split("_").last.to_i
+
+          expect(counter2).to eq(counter1 + 1)
+          expect(counter3).to eq(counter2 + 1)
+        end
+
+        it "is thread-safe" do
+          ids = []
+          threads = []
+          mutex = Mutex.new
+
+          # Create multiple threads generating IDs concurrently
+          10.times do
+            threads << Thread.new do
+              local_ids = []
+              100.times do
+                local_ids << transport.send(:generate_request_id)
+              end
+              mutex.synchronize { ids.concat(local_ids) }
+            end
+          end
+
+          threads.each(&:join)
+
+          # All IDs should be unique (no collisions)
+          expect(ids.length).to eq(1000)
+          expect(ids.uniq.length).to eq(1000)
+        end
+
+        it "maintains state between calls" do
+          # Get the current base to verify consistency
+          first_id = transport.send(:generate_request_id)
+          base_pattern = first_id.gsub(/_\d+\z/, "")
+
+          5.times do
+            id = transport.send(:generate_request_id)
+            expect(id).to start_with(base_pattern)
+          end
+        end
+      end
+
+      describe "#initialize_request_id_generation" do
+        let(:new_transport) { described_class.new(mock_mcp_server) }
+
+        it "initializes request ID base with correct format" do
+          new_transport.send(:initialize_request_id_generation)
+
+          base = new_transport.instance_variable_get(:@request_id_base)
+          expect(base).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}\z/)
+        end
+
+        it "initializes request ID counter to zero" do
+          new_transport.send(:initialize_request_id_generation)
+
+          counter = new_transport.instance_variable_get(:@request_id_counter)
+          expect(counter).to be_a(Concurrent::AtomicFixnum)
+          expect(counter.value).to eq(0)
+        end
+
+        it "creates unique base for each transport instance" do
+          transport1 = described_class.new(mock_mcp_server)
+          transport2 = described_class.new(mock_mcp_server)
+
+          transport1.send(:initialize_request_id_generation)
+          transport2.send(:initialize_request_id_generation)
+
+          base1 = transport1.instance_variable_get(:@request_id_base)
+          base2 = transport2.instance_variable_get(:@request_id_base)
+
+          expect(base1).not_to eq(base2)
+        end
+      end
+
+      describe "ID Generation Integration" do
+        it "generates consistent IDs across server-initiated requests" do
+          # Mock session and streaming setup
+          allow(transport.session_manager).to receive(:get_session).and_return(mock_session)
+          allow(mock_session).to receive(:streaming?).and_return(true)
+          allow(transport.stream_handler).to receive(:send_message_to_session).and_return(true)
+
+          # Capture the request IDs used
+          request_ids = []
+          allow(transport).to receive(:setup_request_tracking) do |id|
+            request_ids << id
+          end
+
+          # Mock waiting for response to avoid actual timeout
+          allow(transport).to receive(:wait_for_response).and_return({ result: "test" })
+          allow(transport).to receive(:process_response).and_return("test")
+
+          # Make multiple server-initiated requests
+          3.times do
+            begin
+              transport.send_request_to_session("test-session", "test/method", {})
+            rescue StandardError
+              # Ignore errors, we're just testing ID generation
+            end
+          end
+
+          # All request IDs should be unique and follow format
+          expect(request_ids.length).to eq(3)
+          expect(request_ids.uniq.length).to eq(3)
+          request_ids.each do |id|
+            expect(id).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}_\d+\z/)
+          end
+        end
+      end
+    end
   end
 end

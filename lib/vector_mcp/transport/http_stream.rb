@@ -183,7 +183,7 @@ module VectorMCP
 
         raise ArgumentError, "Session must have streaming connection for server-initiated requests" unless session.streaming?
 
-        request_id = @request_id_generator.next
+        request_id = generate_request_id
         request_payload = { jsonrpc: "2.0", id: request_id, method: method }
         request_payload[:params] = params if params
 
@@ -520,9 +520,9 @@ module VectorMCP
       # @param request_id [String] The request ID to track
       # @return [void]
       def setup_request_tracking(request_id)
-        condition = @condition_pool.pop || ConditionVariable.new
         @request_mutex.synchronize do
-          @outgoing_request_conditions[request_id] = condition
+          # Create IVar for thread-safe request tracking (no race conditions)
+          @outgoing_request_ivars[request_id] = Concurrent::IVar.new
         end
       end
 
@@ -534,20 +534,22 @@ module VectorMCP
       # @return [Hash] The response data
       # @raise [VectorMCP::SamplingTimeoutError] if timeout occurs
       def wait_for_response(request_id, method, timeout)
-        condition = @outgoing_request_conditions[request_id]
-
+        ivar = nil
         @request_mutex.synchronize do
-          Timeout.timeout(timeout) do
-            condition.wait(@request_mutex) until @outgoing_request_responses.key?(request_id)
-            @outgoing_request_responses.delete(request_id)
-          end
-        rescue Timeout::Error
+          ivar = @outgoing_request_ivars[request_id]
+        end
+
+        return nil unless ivar
+
+        begin
+          # IVar handles timeout and thread safety automatically
+          response = ivar.value!(timeout)
+          logger.debug { "Received response for request ID #{request_id}" }
+          response
+        rescue Concurrent::TimeoutError
           logger.warn { "Timeout waiting for response to request ID #{request_id} (#{method}) after #{timeout}s" }
-          # Use unsafe cleanup since we already hold the mutex
-          cleanup_request_tracking_unsafe(request_id)
+          cleanup_request_tracking(request_id)
           raise VectorMCP::SamplingTimeoutError, "Timeout waiting for client response to '#{method}' request (ID: #{request_id})"
-        ensure
-          @outgoing_request_conditions.delete(request_id)
         end
       end
 
@@ -594,10 +596,8 @@ module VectorMCP
       # @return [void]
       # @api private
       def cleanup_request_tracking_unsafe(request_id)
-        @outgoing_request_responses.delete(request_id)
-        condition = @outgoing_request_conditions.delete(request_id)
-        # Return condition variable to pool if space available
-        @condition_pool << condition if condition && @condition_pool.size < 10
+        # Remove IVar for this request (no condition variable cleanup needed)
+        @outgoing_request_ivars.delete(request_id)
       end
 
       # Checks if a message is a response to an outgoing request.
@@ -615,7 +615,7 @@ module VectorMCP
         # treat it as a response (even if malformed) rather than letting it
         # go through normal request processing
         request_id = message["id"]
-        @outgoing_request_conditions.key?(request_id)
+        @outgoing_request_ivars.key?(request_id)
       end
 
       # Handles a response to an outgoing request.
@@ -624,21 +624,25 @@ module VectorMCP
       # @return [void]
       def handle_outgoing_response(message)
         request_id = message["id"]
-        # Received response for outgoing request
-
+        
+        ivar = nil
         @request_mutex.synchronize do
-          # Store the response (convert keys to symbols for consistency)
-          response_data = deep_transform_keys(message, &:to_sym)
-          @outgoing_request_responses[request_id] = response_data
+          ivar = @outgoing_request_ivars[request_id]
+        end
 
-          # Signal any thread waiting for this response
-          condition = @outgoing_request_conditions[request_id]
-          if condition
-            condition.signal
-            # Signaled condition for request
-          else
-            logger.warn { "Received response for request ID #{request_id} but no thread is waiting" }
-          end
+        unless ivar
+          logger.debug { "Received response for request ID #{request_id} but no thread is waiting (likely timed out)" }
+          return
+        end
+
+        # Convert keys to symbols for consistency and put response in IVar
+        response_data = deep_transform_keys(message, &:to_sym)
+        
+        # IVar handles thread-safe response delivery - no race conditions possible
+        if ivar.try_set(response_data)
+          logger.debug { "Response delivered to waiting thread for request ID #{request_id}" }
+        else
+          logger.debug { "IVar was already resolved for request ID #{request_id} (duplicate response)" }
         end
       end
 
@@ -692,26 +696,30 @@ module VectorMCP
         @stream_handler = HttpStream::StreamHandler.new(self)
       end
 
-      # Initialize request tracking for server-initiated requests
+      # Initialize request tracking system and ID generation for server-initiated requests
       def initialize_request_tracking
-        @outgoing_request_responses = Concurrent::Hash.new
-        @outgoing_request_conditions = Concurrent::Hash.new
+        # Use IVars for thread-safe request/response handling (eliminates condition variable races)
+        @outgoing_request_ivars = Concurrent::Hash.new
         @request_mutex = Mutex.new
+        initialize_request_id_generation
+      end
 
-        # Optimized request ID generation - pre-generate secure suffix and use atomic counter
+      # Initialize thread-safe request ID generation components
+      def initialize_request_id_generation
+        # Thread-safe request ID generation - avoid Fiber/Enumerator which can't cross threads
         @request_id_base = "vecmcp_http_#{Process.pid}_#{SecureRandom.hex(4)}"
         @request_id_counter = Concurrent::AtomicFixnum.new(0)
-        @request_id_generator = Enumerator.new do |y|
-          loop { y << "#{@request_id_base}_#{@request_id_counter.increment}" }
-        end
+      end
+
+      # Generate a unique, thread-safe request ID for server-initiated requests
+      #
+      # @return [String] A unique request ID in format: vecmcp_http_{pid}_{random}_{counter}
+      def generate_request_id
+        "#{@request_id_base}_#{@request_id_counter.increment}"
       end
 
       # Initialize object pools for performance optimization
       def initialize_object_pools
-        # Object pool for condition variables to reduce allocation overhead
-        @condition_pool = Concurrent::Array.new
-        10.times { @condition_pool << ConditionVariable.new }
-
         # Pool for reusable hash objects to reduce GC pressure
         @hash_pool = Concurrent::Array.new
         20.times { @hash_pool << {} }
@@ -727,15 +735,13 @@ module VectorMCP
       #
       # @return [void]
       def cleanup_all_pending_requests
-        return if @outgoing_request_conditions.empty?
+        return if @outgoing_request_ivars.empty?
 
-        logger.debug { "Cleaning up #{@outgoing_request_conditions.size} pending requests" }
+        logger.debug { "Cleaning up #{@outgoing_request_ivars.size} pending requests" }
 
         @request_mutex.synchronize do
-          # Signal all waiting threads to wake up
-          @outgoing_request_conditions.each_value(&:broadcast)
-          @outgoing_request_conditions.clear
-          @outgoing_request_responses.clear
+          # IVars will timeout naturally, just clear the tracking
+          @outgoing_request_ivars.clear
         end
       end
 

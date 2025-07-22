@@ -101,11 +101,11 @@ module VectorMCP
           VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: request_context)
         end
 
-        # Optimized minimal session context creation for performance
+        # Creates a minimal session context for each session (no caching to prevent contamination)
         def create_minimal_session_context(session_id)
-          # Cache minimal context creation to avoid repeated object allocation
-          @minimal_context ||= VectorMCP::RequestContext.minimal("http_stream")
-          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: @minimal_context)
+          # Create a new minimal context for each session to prevent cross-session contamination
+          minimal_context = VectorMCP::RequestContext.minimal("http_stream")
+          VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: minimal_context)
         end
 
         # Associates a streaming connection with a session.
