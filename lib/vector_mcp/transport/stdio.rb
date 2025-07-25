@@ -122,6 +122,18 @@ module VectorMCP
       # @param method [String] The method name of the notification.
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [Boolean] True if the notification was sent successfully.
+      def send_notification_to_session(_session_id, method, params = nil)
+        send_notification(method, params)
+        true
+      end
+
+      # Sends a JSON-RPC notification message to a specific session.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param _session_id [String] The session ID (ignored for stdio transport).
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the notification was sent successfully.
       def notification_sent_to_session?(_session_id, method, params = nil)
         send_notification(method, params)
         true

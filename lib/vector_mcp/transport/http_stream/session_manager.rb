@@ -108,6 +108,19 @@ module VectorMCP
           VectorMCP::Session.new(@transport.server, @transport, id: session_id, request_context: minimal_context)
         end
 
+        # Terminates a session by ID.
+        #
+        # @param session_id [String] The session ID to terminate
+        # @return [Boolean] True if session was found and terminated
+        def terminate_session(session_id)
+          session = @sessions.delete(session_id)
+          return false unless session
+
+          on_session_terminated(session)
+          logger.info { "Session terminated: #{session_id}" }
+          true
+        end
+
         # Associates a streaming connection with a session.
         #
         # @param session [Session] The session to associate with

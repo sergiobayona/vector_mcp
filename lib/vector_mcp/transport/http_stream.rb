@@ -72,7 +72,7 @@ module VectorMCP
         initialize_object_pools
         initialize_server_state
 
-        logger.debug { "HttpStream transport initialized: #{@host}:#{@port}#{@path_prefix}" }
+        logger.info { "HttpStream transport initialized: #{@host}:#{@port}#{@path_prefix}" }
       end
 
       # Starts the HTTP Stream transport.
@@ -376,7 +376,7 @@ module VectorMCP
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
-        success = @session_manager.session_terminated?(session_id)
+        success = @session_manager.terminate_session(session_id)
         if success
           [204, {}, []]
         else
@@ -409,12 +409,14 @@ module VectorMCP
       # @raise [JSON::ParserError] if JSON is invalid
       def parse_json_message(body)
         # Early validation to avoid expensive parsing on malformed input
-        return {} if body.nil? || body.empty?
+        raise JSON::ParserError, "Empty or nil body" if body.nil? || body.empty?
 
         # Fast-path check for basic JSON structure
         body_stripped = body.strip
-        return {} unless (body_stripped.start_with?("{") && body_stripped.end_with?("}")) ||
-                         (body_stripped.start_with?("[") && body_stripped.end_with?("]"))
+        unless (body_stripped.start_with?("{") && body_stripped.end_with?("}")) ||
+               (body_stripped.start_with?("[") && body_stripped.end_with?("]"))
+          raise JSON::ParserError, "Invalid JSON structure"
+        end
 
         JSON.parse(body_stripped)
       rescue JSON::ParserError => e
@@ -500,7 +502,7 @@ module VectorMCP
       # Logging and error handling
       def log_request_completion(method, path, start_time, status)
         duration = Time.now - start_time
-        logger.debug { "#{method} #{path} #{status} (#{(duration * 1000).round(2)}ms)" }
+        logger.info { "#{method} #{path} #{status} (#{(duration * 1000).round(2)}ms)" }
       end
 
       def handle_request_error(method, path, error)

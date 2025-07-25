@@ -363,7 +363,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
       session = session_manager.create_session("session-1")
       allow(session).to receive(:expired?).and_return(true)
 
-      expect(logger).to receive(:info)
+      expect(logger).to receive(:debug)
 
       session_manager.send(:cleanup_expired_sessions)
     end
