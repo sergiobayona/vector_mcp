@@ -51,7 +51,8 @@ module VectorMCP
       # @option options [String] :host ("localhost") The hostname or IP to bind to.
       # @option options [Integer] :port (8000) The port to listen on.
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints.
-      # @option options [Boolean] :enable_session_manager (false) Whether to enable the unified session manager.
+      # @option options [Boolean] :disable_session_manager (false) **DEPRECATED**: Whether to disable secure session isolation.
+      #   When false (default), each client gets isolated sessions. When true, all clients share a global session (security risk).
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
@@ -67,8 +68,15 @@ module VectorMCP
         @clients = Concurrent::Hash.new
         @session = nil # Global session for this transport instance, initialized in run
 
-        # Optionally initialize session manager with unified session management
-        @session_manager = options[:enable_session_manager] ? SseSessionManager.new(self) : nil
+        # Initialize session manager for secure multi-client session isolation (default behavior)
+        # Legacy shared session behavior can be enabled with disable_session_manager: true (deprecated)
+        if options[:disable_session_manager]
+          logger.warn("[DEPRECATED] SSE shared session mode is deprecated and poses security risks in multi-client scenarios. " \
+                      "Consider removing disable_session_manager: true to use secure per-client sessions.")
+          @session_manager = nil
+        else
+          @session_manager = SseSessionManager.new(self)
+        end
         @puma_server = nil
         @running = false
 
@@ -82,7 +90,8 @@ module VectorMCP
       # @raise [StandardError] if there's a fatal error during server startup.
       def run
         logger.info("Starting server with Puma SSE transport on #{@host}:#{@port}")
-        create_session unless @session_manager # Only create session if not using session manager
+        # Only create shared session if explicitly using legacy mode (deprecated)
+        create_session unless @session_manager
         start_puma_server
       rescue StandardError => e
         handle_fatal_error(e)
@@ -308,8 +317,8 @@ module VectorMCP
 
         # Get client connection and session
         if @session_manager
-          client_conn = @session_manager.all_clients[session_id]
-          shared_session = @session_manager.get_shared_session.context
+          client_conn = @session_manager.clients[session_id]
+          shared_session = @session_manager.shared_session
         else
           client_conn = @clients[session_id]
           shared_session = @session

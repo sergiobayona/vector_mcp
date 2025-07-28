@@ -28,7 +28,7 @@ RSpec.describe VectorMCP::Transport::SSE do
   end
 
   subject(:transport) { described_class.new(mock_mcp_server, options) }
-  let(:options) { { path_prefix: "/test_mcp" } }
+  let(:options) { { path_prefix: "/test_mcp", disable_session_manager: true } }
 
   # Helper to access the Rack app built by the transport
   let(:app) { transport.build_rack_app(mock_session) }
