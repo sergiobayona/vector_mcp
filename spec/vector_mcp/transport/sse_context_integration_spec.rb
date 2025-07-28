@@ -214,7 +214,7 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
 
     it "handles session creation with concurrent access" do
       # Simulate concurrent session creation
-      sessions = []
+      sessions = Concurrent::Array.new
       threads = []
 
       5.times do |i|
@@ -234,12 +234,21 @@ RSpec.describe VectorMCP::Transport::SseSessionManager, "context integration" do
       session_ids = sessions.map(&:id)
       expect(session_ids.uniq.length).to eq(5)
 
-      # Verify each session has correct context
-      sessions.each_with_index do |session, i|
+      # Verify each session has correct context - check that all expected thread IDs are present
+      actual_thread_ids = sessions.map do |session|
+        session.context.request_context.header("X-Thread-Id")
+      end.sort
+
+      expected_thread_ids = (0..4).map { |i| "thread-#{i}" }.sort
+
+      expect(actual_thread_ids).to eq(expected_thread_ids)
+
+      # Verify common context properties for all sessions
+      sessions.each do |session|
         context = session.context.request_context
         expect(context.method).to eq("GET")
         expect(context.path).to eq("/concurrent")
-        expect(context.header("X-Thread-Id")).to eq("thread-#{i}")
+        expect(context.header("X-Thread-Id")).to match(/^thread-\d+$/)
       end
     end
   end
