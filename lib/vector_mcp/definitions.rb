@@ -244,7 +244,7 @@ module VectorMCP
 
         # Validate and canonicalize path for security
         raw_path = parsed_uri.path
-        
+
         # Canonicalize the path to resolve any relative components (., .., etc.)
         # This prevents path traversal attacks and normalizes the path
         begin
@@ -252,12 +252,12 @@ module VectorMCP
         rescue ArgumentError => e
           raise ArgumentError, "Invalid path format: #{raw_path} (#{e.message})"
         end
-        
+
         # Security check: Verify the canonical path exists and is a directory
         raise ArgumentError, "Root directory does not exist: #{canonical_path}" unless File.exist?(canonical_path)
         raise ArgumentError, "Root path is not a directory: #{canonical_path}" unless File.directory?(canonical_path)
         raise ArgumentError, "Root directory is not readable: #{canonical_path}" unless File.readable?(canonical_path)
-        
+
         # Additional security: Check if the canonical path differs significantly from raw path
         # This can indicate potential path traversal attempts
         if raw_path != canonical_path && raw_path.include?("..")
@@ -266,7 +266,7 @@ module VectorMCP
           warn "[SECURITY] Path canonicalized from '#{raw_path}' to '#{canonical_path}'. " \
                "This may indicate a path traversal attempt."
         end
-        
+
         # Update the URI to use the canonical path for consistency
         self.uri = "file://#{canonical_path}"
 
