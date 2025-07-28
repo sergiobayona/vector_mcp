@@ -237,6 +237,8 @@ module VectorMCP
     # @return [Hash] Normalized headers with proper casing.
     def extract_headers_from_rack_env(env)
       headers = {}
+      return headers if env.nil?
+
       env.each do |key, value|
         next unless key.start_with?("HTTP_")
 
@@ -262,7 +264,7 @@ module VectorMCP
     # @return [Hash] Normalized parameters as key-value pairs.
     def extract_params_from_rack_env(env)
       params = {}
-      params = URI.decode_www_form(env["QUERY_STRING"]).to_h if env["QUERY_STRING"]
+      params = URI.decode_www_form(env["QUERY_STRING"]).to_h if env && env["QUERY_STRING"]
       params
     end
 

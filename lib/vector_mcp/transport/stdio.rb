@@ -122,10 +122,12 @@ module VectorMCP
       # @param method [String] The method name of the notification.
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [Boolean] True if the notification was sent successfully.
+      # rubocop:disable Naming/PredicateMethod
       def send_notification_to_session(_session_id, method, params = nil)
         send_notification(method, params)
         true
       end
+      # rubocop:enable Naming/PredicateMethod
 
       # Sends a JSON-RPC notification message to a specific session.
       # For stdio transport, this behaves the same as send_notification since there's only one session.

@@ -70,9 +70,10 @@ RSpec.describe VectorMCP::Session, "request context integration" do
         path: "/status"
       }
 
-      result = session.request_context = context_hash
+      session.request_context = context_hash
 
-      expect(result).to be_a(VectorMCP::RequestContext)
+      # Verify the RequestContext was created and stored correctly
+      expect(session.request_context).to be_a(VectorMCP::RequestContext)
       expect(session.request_context.header("User-Agent")).to eq("TestClient")
       expect(session.request_context.param("version")).to eq("1.0")
       expect(session.request_context.method).to eq("GET")

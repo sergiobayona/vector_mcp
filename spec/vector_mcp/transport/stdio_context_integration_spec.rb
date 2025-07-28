@@ -12,7 +12,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
   describe "session creation with request context" do
     describe "create_global_session" do
       it "creates session with minimal context for stdio transport" do
-        session = session_manager.get_global_session
+        session = session_manager.current_global_session
 
         expect(session.id).to eq(VectorMCP::Transport::StdioSessionManager::GLOBAL_SESSION_ID)
         expect(session.context).to be_a(VectorMCP::Session)
@@ -28,7 +28,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
 
       it "creates session with proper server and transport references" do
-        session = session_manager.get_global_session
+        session = session_manager.current_global_session
 
         vector_session = session.context
         expect(vector_session.id).to eq(VectorMCP::Transport::StdioSessionManager::GLOBAL_SESSION_ID)
@@ -37,7 +37,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
 
       it "creates session with immutable context" do
-        session = session_manager.get_global_session
+        session = session_manager.current_global_session
 
         request_context = session.context.request_context
         expect(request_context.headers).to be_frozen
@@ -46,9 +46,9 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
     end
 
-    describe "get_or_create_global_session" do
+    describe "global_session_or_create_current" do
       it "creates global session on first call" do
-        session = session_manager.get_or_create_global_session
+        session = session_manager.global_session_or_create_current
 
         expect(session.id).to eq(VectorMCP::Transport::StdioSessionManager::GLOBAL_SESSION_ID)
         expect(session.context).to be_a(VectorMCP::Session)
@@ -59,8 +59,8 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
 
       it "returns same session on subsequent calls" do
-        first_session = session_manager.get_or_create_global_session
-        second_session = session_manager.get_or_create_global_session
+        first_session = session_manager.global_session_or_create_current
+        second_session = session_manager.global_session_or_create_current
 
         expect(first_session).to eq(second_session)
         expect(first_session.id).to eq(second_session.id)
@@ -68,8 +68,8 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
 
       it "maintains context across multiple calls" do
-        session1 = session_manager.get_or_create_global_session
-        session2 = session_manager.get_or_create_global_session
+        session1 = session_manager.global_session_or_create_current
+        session2 = session_manager.global_session_or_create_current
 
         context1 = session1.context.request_context
         context2 = session2.context.request_context
@@ -83,7 +83,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
 
     describe "session lifecycle" do
       it "maintains context through session operations" do
-        session = session_manager.get_global_session
+        session = session_manager.current_global_session
         original_context = session.context.request_context
 
         # Touch session (simulate activity)
@@ -96,7 +96,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       end
 
       it "allows session data modification without affecting context" do
-        session = session_manager.get_global_session
+        session = session_manager.current_global_session
         original_context = session.context.request_context
 
         # Modify session data
@@ -112,7 +112,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
 
   describe "stdio-specific context features" do
     it "provides context suitable for command-line usage" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
 
       request_context = session.context.request_context
       expect(request_context.http_transport?).to be false
@@ -122,7 +122,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
     end
 
     it "supports context updates for stdio-specific operations" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
 
       # Update context with stdio-specific metadata
       session.context.update_request_context(
@@ -142,8 +142,8 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
     end
 
     it "maintains consistent session ID across operations" do
-      session1 = session_manager.get_global_session
-      session2 = session_manager.get_or_create_global_session
+      session1 = session_manager.current_global_session
+      session2 = session_manager.global_session_or_create_current
 
       expect(session1.id).to eq(VectorMCP::Transport::StdioSessionManager::GLOBAL_SESSION_ID)
       expect(session2.id).to eq(VectorMCP::Transport::StdioSessionManager::GLOBAL_SESSION_ID)
@@ -153,7 +153,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
 
   describe "context consistency and validation" do
     it "creates context with proper VectorMCP::RequestContext structure" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
 
       request_context = session.context.request_context
       expect(request_context).to respond_to(:headers)
@@ -168,7 +168,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
     end
 
     it "provides consistent context hash representation" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
 
       context_hash = session.context.request_context.to_h
       expected_hash = {
@@ -183,7 +183,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
     end
 
     it "supports context serialization and debugging" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
 
       request_context = session.context.request_context
 
@@ -207,7 +207,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
       allow(server).to receive(:logger).and_raise(StandardError, "Server error")
 
       expect do
-        session_manager.get_global_session
+        session_manager.current_global_session
       end.to raise_error(StandardError, "Server error")
     end
 
@@ -218,7 +218,7 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
 
       5.times do
         threads << Thread.new do
-          sessions << session_manager.get_or_create_global_session
+          sessions << session_manager.global_session_or_create_current
         end
       end
 
@@ -237,12 +237,12 @@ RSpec.describe VectorMCP::Transport::StdioSessionManager, "context integration" 
     end
 
     it "preserves context through session manager operations" do
-      session = session_manager.get_global_session
+      session = session_manager.current_global_session
       original_context = session.context.request_context
 
       # Perform various session manager operations
       retrieved_session = session_manager.get_session(session.id)
-      all_sessions = session_manager.get_all_sessions
+      all_sessions = session_manager.current_all_sessions
 
       # Verify context is preserved
       expect(retrieved_session.context.request_context).to eq(original_context)

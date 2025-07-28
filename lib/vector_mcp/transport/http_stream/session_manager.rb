@@ -112,6 +112,7 @@ module VectorMCP
         #
         # @param session_id [String] The session ID to terminate
         # @return [Boolean] True if session was found and terminated
+        # rubocop:disable Naming/PredicateMethod
         def terminate_session(session_id)
           session = @sessions.delete(session_id)
           return false unless session
@@ -120,6 +121,7 @@ module VectorMCP
           logger.info { "Session terminated: #{session_id}" }
           true
         end
+        # rubocop:enable Naming/PredicateMethod
 
         # Associates a streaming connection with a session.
         #

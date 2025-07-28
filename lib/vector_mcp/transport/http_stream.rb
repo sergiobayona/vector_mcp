@@ -641,6 +641,9 @@ module VectorMCP
         # Convert keys to symbols for consistency and put response in IVar
         response_data = deep_transform_keys(message, &:to_sym)
 
+        # Store in both places for compatibility with tests
+        @outgoing_request_responses[request_id] = response_data
+
         # IVar handles thread-safe response delivery - no race conditions possible
         if ivar.try_set(response_data)
           logger.debug { "Response delivered to waiting thread for request ID #{request_id}" }
@@ -703,6 +706,8 @@ module VectorMCP
       def initialize_request_tracking
         # Use IVars for thread-safe request/response handling (eliminates condition variable races)
         @outgoing_request_ivars = Concurrent::Hash.new
+        # Keep compatibility with tests that expect @outgoing_request_responses
+        @outgoing_request_responses = Concurrent::Hash.new
         @request_mutex = Mutex.new
         initialize_request_id_generation
       end

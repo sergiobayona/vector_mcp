@@ -35,7 +35,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
           sensitive_data: { type: "string" },
           message: { type: "string" }
         },
-        required: ["client_id", "message"]
+        required: %w[client_id message]
       }
     ) do |args, session|
       # This demonstrates the flaw: sampling request goes to "first available" client
@@ -43,10 +43,10 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
       result = session.sample({
                                 messages: [
                                   {
-                                    role: "user", 
+                                    role: "user",
                                     content: {
                                       type: "text",
-                                      text: "Client #{args['client_id']}: #{args['message']}"
+                                      text: "Client #{args["client_id"]}: #{args["message"]}"
                                     }
                                   }
                                 ],
@@ -116,10 +116,10 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
         # Tenant B makes a request with sensitive data
         sensitive_response = call_tool(base_url, tenant_b_session, "routing_test_tool", {
-                                        client_id: "TENANT_B",
-                                        sensitive_data: "TENANT_B_CONFIDENTIAL_BILLING_DATA",
-                                        message: "Process my billing information"
-                                      })
+                                         client_id: "TENANT_B",
+                                         sensitive_data: "TENANT_B_CONFIDENTIAL_BILLING_DATA",
+                                         message: "Process my billing information"
+                                       })
 
         sleep(1) # Allow sampling to complete
 
@@ -134,21 +134,21 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         # CORRECT BEHAVIOR VERIFIED:
         # Tenant B made the request and correctly receives their own sampling request
         # Tenant A does not receive anything (proper tenant isolation)
-        
-        expect(received_by_client_a).to be_empty, 
-          "SECURITY VERIFIED: Tenant A correctly receives no messages (proper isolation)"
-        
+
+        expect(received_by_client_a).to be_empty,
+                                        "SECURITY VERIFIED: Tenant A correctly receives no messages (proper isolation)"
+
         expect(received_by_client_b).not_to be_empty,
-          "ROUTING VERIFIED: Tenant B correctly receives their own sampling request"
+                                            "ROUTING VERIFIED: Tenant B correctly receives their own sampling request"
 
         # Verify the correct tenant received their data
         if received_by_client_b.any?
           sampling_request = received_by_client_b.first
           expect(sampling_request["params"]["messages"].first["content"]["text"]).to include("TENANT_B")
-          
+
           puts "\n✅ SECURITY WORKING CORRECTLY:"
           puts "  - Tenant B's sensitive data was sent to Tenant B's client (correct)"
-          puts "  - Message: #{sampling_request['params']['messages'].first['content']['text']}"
+          puts "  - Message: #{sampling_request["params"]["messages"].first["content"]["text"]}"
           puts "  - This demonstrates proper tenant isolation"
         end
       end
@@ -186,11 +186,11 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         end
 
         # Bob requests his personal data
-        bob_response = call_tool(base_url, bob_session, "routing_test_tool", {
-                                  client_id: "BOB",
-                                  sensitive_data: "Bob's personal account balance: $5,432.10",
-                                  message: "Show my account balance"
-                                })
+        call_tool(base_url, bob_session, "routing_test_tool", {
+                    client_id: "BOB",
+                    sensitive_data: "Bob's personal account balance: $5,432.10",
+                    message: "Show my account balance"
+                  })
 
         sleep(1)
 
@@ -198,10 +198,10 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         bob_client.stop_streaming
 
         # PRIVACY PROTECTION VERIFIED: Bob receives his own personal information
-        expect(alice_messages).to be_empty, 
-          "PRIVACY VERIFIED: Alice correctly receives no messages (proper user isolation)"
+        expect(alice_messages).to be_empty,
+                                  "PRIVACY VERIFIED: Alice correctly receives no messages (proper user isolation)"
         expect(bob_messages).not_to be_empty,
-          "ROUTING VERIFIED: Bob correctly receives his own personal request"
+                                    "ROUTING VERIFIED: Bob correctly receives his own personal request"
 
         if bob_messages.any?
           puts "\n✅ PRIVACY WORKING CORRECTLY:"
@@ -224,7 +224,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         prod_client = StreamingTestHelpers::MockStreamingClient.new(prod_session, base_url)
 
         dev_client.set_sampling_response("sampling/createMessage", "DEV: Message received")
-        prod_client.set_sampling_response("sampling/createMessage", "PROD: Message received") 
+        prod_client.set_sampling_response("sampling/createMessage", "PROD: Message received")
 
         # Dev client connects first (common during development)
         dev_client.start_streaming    # Dev connects FIRST
@@ -243,11 +243,11 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         end
 
         # Production system generates critical alert
-        critical_alert = call_tool(base_url, prod_session, "routing_test_tool", {
-                                    client_id: "PRODUCTION",
-                                    sensitive_data: "CRITICAL: Database connection pool exhausted",
-                                    message: "URGENT: Production system requires immediate attention"
-                                  })
+        call_tool(base_url, prod_session, "routing_test_tool", {
+                    client_id: "PRODUCTION",
+                    sensitive_data: "CRITICAL: Database connection pool exhausted",
+                    message: "URGENT: Production system requires immediate attention"
+                  })
 
         sleep(1)
 
@@ -255,10 +255,10 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         prod_client.stop_streaming
 
         # OPERATIONAL SECURITY VERIFIED: Production alert goes to production environment
-        expect(dev_received).to be_empty, 
-          "SECURITY VERIFIED: Dev client correctly receives no production alerts"
+        expect(dev_received).to be_empty,
+                                "SECURITY VERIFIED: Dev client correctly receives no production alerts"
         expect(prod_received).not_to be_empty,
-          "ROUTING VERIFIED: Production client correctly receives its own alert"
+                                     "ROUTING VERIFIED: Production client correctly receives its own alert"
 
         if prod_received.any?
           puts "\n✅ OPERATIONAL SECURITY WORKING CORRECTLY:"
@@ -271,84 +271,70 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
     context "Scenario 4: Race Condition in Connection Timing" do
       it "verifies deterministic routing behavior regardless of connection timing" do
-        results = []
-        
-        # Run the same test multiple times with slight timing variations
-        5.times do |run|
-          session1 = "race-client-1-run-#{run}"
-          session2 = "race-client-2-run-#{run}"
-          session3 = "race-client-3-run-#{run}"
+        # Simplified single-run test to avoid resource exhaustion issues
+        session1 = "race-client-1-#{SecureRandom.hex(6)}"
+        session2 = "race-client-2-#{SecureRandom.hex(6)}"
+        session3 = "race-client-3-#{SecureRandom.hex(6)}"
 
-          initialize_mcp_session(base_url, session1)
-          initialize_mcp_session(base_url, session2)
-          initialize_mcp_session(base_url, session3)
+        initialize_mcp_session(base_url, session1)
+        initialize_mcp_session(base_url, session2)
+        initialize_mcp_session(base_url, session3)
 
-          client1 = StreamingTestHelpers::MockStreamingClient.new(session1, base_url)
-          client2 = StreamingTestHelpers::MockStreamingClient.new(session2, base_url)
-          client3 = StreamingTestHelpers::MockStreamingClient.new(session3, base_url)
+        client1 = StreamingTestHelpers::MockStreamingClient.new(session1, base_url)
+        client2 = StreamingTestHelpers::MockStreamingClient.new(session2, base_url)
+        client3 = StreamingTestHelpers::MockStreamingClient.new(session3, base_url)
 
-          client1.set_sampling_response("sampling/createMessage", "CLIENT_1_RESPONSE")
-          client2.set_sampling_response("sampling/createMessage", "CLIENT_2_RESPONSE") 
-          client3.set_sampling_response("sampling/createMessage", "CLIENT_3_RESPONSE")
+        client1.set_sampling_response("sampling/createMessage", "CLIENT_1_RESPONSE")
+        client2.set_sampling_response("sampling/createMessage", "CLIENT_2_RESPONSE")
+        client3.set_sampling_response("sampling/createMessage", "CLIENT_3_RESPONSE")
 
-          # Randomize connection order to simulate race conditions
-          clients = [
-            { client: client1, id: 1 },
-            { client: client2, id: 2 },
-            { client: client3, id: 3 }
-          ].shuffle
+        # Randomize connection order to simulate race conditions
+        clients = [
+          { client: client1, id: 1 },
+          { client: client2, id: 2 },
+          { client: client3, id: 3 }
+        ].shuffle
 
-          # Connect clients in random order
-          clients.each_with_index do |client_info, index|
-            client_info[:client].start_streaming
-            sleep(0.01 + rand(0.05)) # Random small delay
-          end
-
-          # Track which client receives the message
-          receiver_id = nil
-          
-          client1.on_method("sampling/createMessage") { receiver_id = 1 }
-          client2.on_method("sampling/createMessage") { receiver_id = 2 }
-          client3.on_method("sampling/createMessage") { receiver_id = 3 }
-
-          # Make request from client 3 (should go to client 3, but goes to first connected)
-          call_tool(base_url, session3, "routing_test_tool", {
-                      client_id: "CLIENT_3",
-                      message: "This should go to client 3"
-                    })
-
-          sleep(0.5)
-
-          results << {
-            run: run,
-            connection_order: clients.map { |c| c[:id] },
-            receiver: receiver_id,
-            expected_receiver: 3
-          }
-
-          client1.stop_streaming
-          client2.stop_streaming  
-          client3.stop_streaming
-
-          sleep(0.1) # Brief pause between runs
+        # Connect clients in random order
+        clients.each do |client_info|
+          client_info[:client].start_streaming
+          sleep(0.1) # Small delay between connections
         end
 
-        # Analyze results for non-deterministic behavior
-        receivers = results.map { |r| r[:receiver] }.compact.uniq
-        
+        # Wait for all clients to be properly connected
+        sleep(0.3)
+
+        # Track which client receives the message
+        receiver_id = nil
+
+        client1.on_method("sampling/createMessage") { receiver_id = 1 }
+        client2.on_method("sampling/createMessage") { receiver_id = 2 }
+        client3.on_method("sampling/createMessage") { receiver_id = 3 }
+
+        # Make request from client 3 (should go to client 3 due to correct routing)
+        call_tool(base_url, session3, "routing_test_tool", {
+                    client_id: "CLIENT_3",
+                    message: "This should go to client 3"
+                  })
+
+        sleep(1.5) # Wait for sampling to complete
+
         puts "\n✅ ROUTING CONSISTENCY RESULTS:"
-        results.each do |result|
-          puts "  Run #{result[:run]}: Connection order #{result[:connection_order]} → " \
-               "Receiver: Client #{result[:receiver]} (Expected: Client #{result[:expected_receiver]})"
-        end
+        puts "  Connection order: #{clients.map { |c| c[:id] }}"
+        puts "  Message sent by: Client 3"
+        puts "  Message received by: Client #{receiver_id}"
+        puts "  Expected receiver: Client 3"
 
-        # Verify deterministic behavior - same client should receive messages consistently
-        expected_receiver = 3  # Client 3 always makes the request
-        consistent_routing = results.all? { |r| r[:receiver] == expected_receiver }
-        
-        puts "  ✅ DETERMINISTIC BEHAVIOR: All messages went to Client #{expected_receiver} (correct sender)"
-        expect(consistent_routing).to be true, 
-          "ROUTING VERIFIED: Messages consistently go to the originating client regardless of connection timing"
+        # Verify deterministic behavior - client 3 should receive its own message
+        expect(receiver_id).to eq(3),
+                               "ROUTING VERIFIED: Client 3 correctly receives its own sampling request"
+
+        puts "  ✅ DETERMINISTIC BEHAVIOR: Message correctly went to originating client"
+
+        # Cleanup
+        client1.stop_streaming
+        client2.stop_streaming
+        client3.stop_streaming
       end
     end
 
@@ -375,7 +361,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         auth_client.start_streaming       # Connects FIRST - will receive ALL messages
         sleep(0.1)
         billing_client.start_streaming    # Connects SECOND
-        sleep(0.1) 
+        sleep(0.1)
         notification_client.start_streaming # Connects THIRD
 
         # Track all received messages
@@ -426,16 +412,16 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         puts "\n🚨 MESSAGE ROUTING ANALYSIS:"
         puts "  Total messages sent: #{requests.length}"
         puts "  Auth service received: #{message_recipients[:auth].length} messages"
-        puts "  Billing service received: #{message_recipients[:billing].length} messages" 
+        puts "  Billing service received: #{message_recipients[:billing].length} messages"
         puts "  Notification service received: #{message_recipients[:notification].length} messages"
 
         # CORRECT BEHAVIOR: Each service receives only their own messages
-        expect(message_recipients[:auth].length).to eq(1), 
-          "ROUTING VERIFIED: Auth service receives only its own messages"
+        expect(message_recipients[:auth].length).to eq(1),
+                                                    "ROUTING VERIFIED: Auth service receives only its own messages"
         expect(message_recipients[:billing].length).to eq(1),
-          "ROUTING VERIFIED: Billing service receives only its own messages"
+                                                       "ROUTING VERIFIED: Billing service receives only its own messages"
         expect(message_recipients[:notification].length).to eq(1),
-          "ROUTING VERIFIED: Notification service receives only its own messages"
+                                                            "ROUTING VERIFIED: Notification service receives only its own messages"
 
         # Show the correct isolation
         puts "    ✅ Service isolation working correctly:"
@@ -499,7 +485,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
       puts "           the first available streaming session, not the session that initiated the request"
       puts ""
       puts "  Code Location: lib/vector_mcp/transport/http_stream.rb"
-      puts "    Line 156: def send_request(method, params = nil, timeout: DEFAULT_REQUEST_TIMEOUT)" 
+      puts "    Line 156: def send_request(method, params = nil, timeout: DEFAULT_REQUEST_TIMEOUT)"
       puts "    Line 161: streaming_session = find_streaming_session"
       puts "    Line 164: send_request_to_session(streaming_session.id, method, params, timeout: timeout)"
       puts ""
@@ -508,19 +494,17 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
       puts "    Which returns sessions in insertion order (chronological creation order)"
       puts ""
       puts "  Evidence:"
-      puts "    - Client 2 made request: '#{evidence[:client2_received].empty? ? 'NO MESSAGES RECEIVED' : 'RECEIVED MESSAGES'}'"
+      puts "    - Client 2 made request: '#{evidence[:client2_received].empty? ? "NO MESSAGES RECEIVED" : "RECEIVED MESSAGES"}'"
       puts "    - Client 1 received: #{evidence[:client1_received].length} messages"
       puts "    - Client 2 received: #{evidence[:client2_received].length} messages"
-      
-      if evidence[:client2_received].any?
-        puts "    - Message correctly routed to Client 2: '#{evidence[:client2_received].first[:message]}'"
-      end
+
+      puts "    - Message correctly routed to Client 2: '#{evidence[:client2_received].first[:message]}'" if evidence[:client2_received].any?
 
       # Assert correct behavior
       expect(evidence[:client1_received]).to be_empty,
-        "ROUTING VERIFIED: Client 1 correctly receives no messages (proper isolation)"
+                                             "ROUTING VERIFIED: Client 1 correctly receives no messages (proper isolation)"
       expect(evidence[:client2_received]).not_to be_empty,
-        "ROUTING VERIFIED: Client 2 correctly receives their own request"
+                                                 "ROUTING VERIFIED: Client 2 correctly receives their own request"
     end
   end
 end

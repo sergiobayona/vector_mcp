@@ -113,6 +113,9 @@ module VectorMCP
     # @param transport_type [String] The transport type identifier
     # @return [RequestContext] A request context populated from the Rack environment
     def self.from_rack_env(rack_env, transport_type)
+      # Handle nil rack_env by returning a minimal context
+      return minimal(transport_type) if rack_env.nil?
+
       new(
         headers: VectorMCP::Util.extract_headers_from_rack_env(rack_env),
         params: VectorMCP::Util.extract_params_from_rack_env(rack_env),

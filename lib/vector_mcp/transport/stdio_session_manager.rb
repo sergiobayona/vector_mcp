@@ -104,21 +104,21 @@ module VectorMCP
       # Alias for global_session for compatibility with tests.
       #
       # @return [Session] The global session
-      def get_global_session
+      def current_global_session
         global_session
       end
 
       # Alias for global_session_or_create for compatibility with tests.
       #
       # @return [Session] The global session
-      def get_or_create_global_session
+      def global_session_or_create_current
         global_session_or_create
       end
 
       # Alias for all_sessions for compatibility with tests.
       #
       # @return [Array<Session>] Array containing the global session
-      def get_all_sessions
+      def current_all_sessions
         all_sessions
       end
 
