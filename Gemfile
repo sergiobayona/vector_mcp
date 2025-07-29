@@ -12,6 +12,7 @@ group :development, :test do
   gem "rake", "~> 13.0"
   gem "redcarpet", "~> 3.5"
   gem "rspec", "~> 3.12"
+  gem "async-rspec", "~> 1.0"
   gem "rubocop", "~> 1.21"
   gem "rubocop-rake", "~> 0.6"
   gem "ruby-lsp"

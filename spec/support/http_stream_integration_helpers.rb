@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "net/http"
+require "async"
+require "async/http"
 require "json"
 require "uri"
 require "timeout"
@@ -19,7 +20,12 @@ module HttpStreamIntegrationHelpers
   def wait_for_server_start(base_url, timeout: 10)
     Timeout.timeout(timeout) do
       loop do
-        Net::HTTP.get_response(URI("#{base_url}/"))
+        Async do
+          internet = Async::HTTP::Internet.new
+          internet.get("#{base_url}/")
+        ensure
+          internet&.close
+        end.wait
         break
       rescue Errno::ECONNREFUSED
         sleep(0.1)
@@ -34,26 +40,47 @@ module HttpStreamIntegrationHelpers
     body = options[:body]
     headers = options[:headers] || {}
     session_id = options[:session_id]
-    uri = URI("#{base_url}#{path}")
-    http = Net::HTTP.new(uri.host, uri.port)
+    url = "#{base_url}#{path}"
 
-    request = case method.upcase
-              when "GET"
-                Net::HTTP::Get.new(uri)
-              when "POST"
-                Net::HTTP::Post.new(uri)
-              when "DELETE"
-                Net::HTTP::Delete.new(uri)
-              else
-                raise "Unsupported HTTP method: #{method}"
-              end
+    # Set up headers
+    request_headers = headers.dup
+    request_headers["Mcp-Session-Id"] = session_id if session_id
+    request_headers["Content-Type"] = "application/json" if body
 
-    headers.each { |k, v| request[k] = v }
-    request["Mcp-Session-Id"] = session_id if session_id
-    request["Content-Type"] = "application/json" if body
-    request.body = body.to_json if body
+    Async do
+      internet = Async::HTTP::Internet.new
 
-    http.request(request)
+      response = case method.upcase
+                 when "GET"
+                   internet.get(url, headers: request_headers)
+                 when "POST"
+                   internet.post(url, headers: request_headers, body: body ? body.to_json : nil)
+                 when "DELETE"
+                   internet.delete(url, headers: request_headers)
+                 else
+                   raise "Unsupported HTTP method: #{method}"
+                 end
+
+      # Create a Net::HTTP-compatible response object for backward compatibility
+      MockHttpResponse.new(response.status.to_s, response.read, response.headers)
+    ensure
+      internet&.close
+    end.wait
+  end
+
+  # Mock response class for backward compatibility with Net::HTTP
+  class MockHttpResponse
+    attr_reader :code, :body, :headers
+
+    def initialize(code, body, headers)
+      @code = code
+      @body = body
+      @headers = headers
+    end
+
+    def [](header_name)
+      @headers[header_name.downcase]
+    end
   end
 
   # Helper method to parse JSON-RPC response
@@ -355,26 +382,28 @@ module HttpStreamIntegrationHelpers
     private
 
     def handle_stream
-      uri = URI("#{@base_url}/mcp")
-      http = Net::HTTP.new(uri.host, uri.port)
+      Async do
+        internet = Async::HTTP::Internet.new
+        
+        headers = {
+          "Mcp-Session-Id" => @session_id,
+          "Accept" => "text/event-stream",
+          "Cache-Control" => "no-cache"
+        }
 
-      request = Net::HTTP::Get.new(uri)
-      request["Mcp-Session-Id"] = @session_id
-      request["Accept"] = "text/event-stream"
-      request["Cache-Control"] = "no-cache"
-
-      http.request(request) do |response|
-        response.read_body do |chunk|
-          break unless @running
-
+        response = internet.get("#{@base_url}/mcp", headers: headers)
+        
+        while @running && (chunk = response.read)
           # Parse SSE events
           parse_sse_events(chunk) do |message|
             handle_sampling_request(message) if message["method"] == "sampling/createMessage"
           end
         end
-      end
-    rescue StandardError
-      # Stream ended or error occurred
+      rescue StandardError
+        # Stream ended or error occurred
+      ensure
+        internet&.close
+      end.wait
     end
 
     def parse_sse_events(chunk)
@@ -422,15 +451,18 @@ module HttpStreamIntegrationHelpers
     end
 
     def send_response(response)
-      uri = URI("#{@base_url}/mcp")
-      http = Net::HTTP.new(uri.host, uri.port)
+      Async do
+        internet = Async::HTTP::Internet.new
+        
+        headers = {
+          "Mcp-Session-Id" => @session_id,
+          "Content-Type" => "application/json"
+        }
 
-      request = Net::HTTP::Post.new(uri)
-      request["Mcp-Session-Id"] = @session_id
-      request["Content-Type"] = "application/json"
-      request.body = response.to_json
-
-      http.request(request)
+        internet.post("#{@base_url}/mcp", headers: headers, body: response.to_json)
+      ensure
+        internet&.close
+      end.wait
     end
   end
 end
