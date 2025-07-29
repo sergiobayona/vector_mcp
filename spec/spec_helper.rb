@@ -17,6 +17,14 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  # Load support files
+  Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
+
+  # Include integration helpers in integration tests
+  config.include HttpStreamIntegrationHelpers, type: :integration
+  config.include StreamingTestHelpers, type: :integration
+  config.include StreamingTestHelpers::StreamingTestUtils, type: :integration
 end
 
 SimpleCov.start do

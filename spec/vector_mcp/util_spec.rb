@@ -432,4 +432,236 @@ RSpec.describe VectorMCP::Util do
       expect(result[3][:type]).to eq("image")  # Binary data converted
     end
   end
+
+  describe ".extract_headers_from_rack_env" do
+    context "with typical Rack environment" do
+      let(:rack_env) do
+        {
+          "HTTP_X_API_KEY" => "test-key-123",
+          "HTTP_USER_AGENT" => "Test Agent",
+          "HTTP_CONTENT_TYPE" => "application/json",
+          "HTTP_AUTHORIZATION" => "Bearer token123",
+          "CONTENT_TYPE" => "application/json",
+          "REQUEST_METHOD" => "POST",
+          "PATH_INFO" => "/api/test"
+        }
+      end
+
+      it "extracts HTTP_ prefixed headers with proper casing" do
+        result = described_class.extract_headers_from_rack_env(rack_env)
+
+        expect(result).to include(
+          "X-API-Key" => "test-key-123",
+          "User-Agent" => "Test Agent",
+          "Content-Type" => "application/json"
+        )
+      end
+
+      it "handles API keyword specially (keeps in all caps)" do
+        env = { "HTTP_X_API_KEY" => "test-key" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["X-API-Key"]).to eq("test-key")
+      end
+
+      it "adds Authorization header from HTTP_AUTHORIZATION" do
+        env = { "HTTP_AUTHORIZATION" => "Bearer token123" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["Authorization"]).to eq("Bearer token123")
+      end
+
+      it "adds Content-Type header from CONTENT_TYPE" do
+        env = { "CONTENT_TYPE" => "application/json" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["Content-Type"]).to eq("application/json")
+      end
+
+      it "prioritizes HTTP_AUTHORIZATION over CONTENT_TYPE variants" do
+        env = {
+          "HTTP_AUTHORIZATION" => "Bearer token123",
+          "CONTENT_TYPE" => "application/json"
+        }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["Authorization"]).to eq("Bearer token123")
+        expect(result["Content-Type"]).to eq("application/json")
+      end
+    end
+
+    context "with complex header names" do
+      let(:rack_env) do
+        {
+          "HTTP_X_CUSTOM_HEADER" => "value1",
+          "HTTP_X_API_TOKEN" => "value2",
+          "HTTP_ACCEPT_ENCODING" => "gzip",
+          "HTTP_CACHE_CONTROL" => "no-cache"
+        }
+      end
+
+      it "converts multi-word headers correctly" do
+        result = described_class.extract_headers_from_rack_env(rack_env)
+
+        expect(result).to include(
+          "X-Custom-Header" => "value1",
+          "X-API-Token" => "value2",
+          "Accept-Encoding" => "gzip",
+          "Cache-Control" => "no-cache"
+        )
+      end
+
+      it "handles single word headers" do
+        env = { "HTTP_HOST" => "example.com" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["Host"]).to eq("example.com")
+      end
+    end
+
+    context "with edge cases" do
+      it "handles empty environment" do
+        result = described_class.extract_headers_from_rack_env({})
+        expect(result).to eq({})
+      end
+
+      it "ignores non-HTTP_ prefixed keys" do
+        env = {
+          "REQUEST_METHOD" => "GET",
+          "PATH_INFO" => "/test",
+          "HTTP_X_TEST" => "value"
+        }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result).to eq({ "X-Test" => "value" })
+      end
+
+      it "handles nil values" do
+        env = { "HTTP_X_TEST" => nil }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["X-Test"]).to be_nil
+      end
+
+      it "handles empty string values" do
+        env = { "HTTP_X_TEST" => "" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["X-Test"]).to eq("")
+      end
+    end
+
+    context "with special Authorization scenarios" do
+      it "handles missing HTTP_AUTHORIZATION" do
+        env = { "HTTP_X_TEST" => "value" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result).not_to have_key("Authorization")
+      end
+
+      it "handles missing CONTENT_TYPE" do
+        env = { "HTTP_X_TEST" => "value" }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result).not_to have_key("Content-Type")
+      end
+
+      it "handles both HTTP_AUTHORIZATION and CONTENT_TYPE present" do
+        env = {
+          "HTTP_AUTHORIZATION" => "Bearer token",
+          "CONTENT_TYPE" => "application/json"
+        }
+        result = described_class.extract_headers_from_rack_env(env)
+        expect(result["Authorization"]).to eq("Bearer token")
+        expect(result["Content-Type"]).to eq("application/json")
+      end
+    end
+  end
+
+  describe ".extract_params_from_rack_env" do
+    context "with query string present" do
+      it "parses simple query parameters" do
+        env = { "QUERY_STRING" => "key=value&foo=bar" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "key" => "value", "foo" => "bar" })
+      end
+
+      it "handles URL-encoded parameters" do
+        env = { "QUERY_STRING" => "message=Hello%20World&special=%21%40%23" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "message" => "Hello World", "special" => "!@#" })
+      end
+
+      it "handles parameters with empty values" do
+        env = { "QUERY_STRING" => "key1=&key2=value&key3=" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "key1" => "", "key2" => "value", "key3" => "" })
+      end
+
+      it "handles parameters with no values" do
+        env = { "QUERY_STRING" => "flag1&flag2&key=value" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "flag1" => "", "flag2" => "", "key" => "value" })
+      end
+
+      it "handles single parameter" do
+        env = { "QUERY_STRING" => "api_key=test123" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "api_key" => "test123" })
+      end
+
+      it "handles duplicate parameter names (last value wins)" do
+        env = { "QUERY_STRING" => "key=first&key=second&key=third" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({ "key" => "third" })
+      end
+    end
+
+    context "with edge cases" do
+      it "handles empty query string" do
+        env = { "QUERY_STRING" => "" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({})
+      end
+
+      it "handles missing query string" do
+        env = {}
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({})
+      end
+
+      it "handles nil query string" do
+        env = { "QUERY_STRING" => nil }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({})
+      end
+
+      it "handles malformed query string gracefully" do
+        env = { "QUERY_STRING" => "key=value&invalid&another=test" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to include("key" => "value", "another" => "test")
+      end
+    end
+
+    context "with complex query strings" do
+      it "handles mixed parameter types" do
+        env = { "QUERY_STRING" => "string=hello&number=123&boolean=true&empty=" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({
+                               "string" => "hello",
+                               "number" => "123",
+                               "boolean" => "true",
+                               "empty" => ""
+                             })
+      end
+
+      it "handles special characters in parameter names" do
+        env = { "QUERY_STRING" => "param_with_underscore=value&param-with-dash=value2" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({
+                               "param_with_underscore" => "value",
+                               "param-with-dash" => "value2"
+                             })
+      end
+
+      it "handles API key parameter formats" do
+        env = { "QUERY_STRING" => "api_key=secret123&apikey=secret456" }
+        result = described_class.extract_params_from_rack_env(env)
+        expect(result).to eq({
+                               "api_key" => "secret123",
+                               "apikey" => "secret456"
+                             })
+      end
+    end
+  end
 end

@@ -242,17 +242,33 @@ module VectorMCP
         # Currently, only file:// scheme is supported per MCP spec
         raise ArgumentError, "Only file:// URIs are supported for roots, got: #{parsed_uri.scheme}://" unless parsed_uri.scheme == "file"
 
-        # Validate path exists and is a directory
-        path = parsed_uri.path
-        raise ArgumentError, "Root directory does not exist: #{path}" unless File.exist?(path)
+        # Validate and canonicalize path for security
+        raw_path = parsed_uri.path
 
-        raise ArgumentError, "Root path is not a directory: #{path}" unless File.directory?(path)
+        # Canonicalize the path to resolve any relative components (., .., etc.)
+        # This prevents path traversal attacks and normalizes the path
+        begin
+          canonical_path = File.expand_path(raw_path)
+        rescue ArgumentError => e
+          raise ArgumentError, "Invalid path format: #{raw_path} (#{e.message})"
+        end
 
-        # Security check: ensure we can read the directory
+        # Security check: Verify the canonical path exists and is a directory
+        raise ArgumentError, "Root directory does not exist: #{canonical_path}" unless File.exist?(canonical_path)
+        raise ArgumentError, "Root path is not a directory: #{canonical_path}" unless File.directory?(canonical_path)
+        raise ArgumentError, "Root directory is not readable: #{canonical_path}" unless File.readable?(canonical_path)
 
-        raise ArgumentError, "Root directory is not readable: #{path}" unless File.readable?(path)
-        # Validate against path traversal attempts in the URI itself
-        raise ArgumentError, "Root path contains unsafe traversal patterns: #{path}" if path.include?("..") || path.include?("./")
+        # Additional security: Check if the canonical path differs significantly from raw path
+        # This can indicate potential path traversal attempts
+        if raw_path != canonical_path && raw_path.include?("..")
+          # Log the canonicalization for security monitoring
+          # Note: This is informational - the canonical path is what we'll actually use
+          warn "[SECURITY] Path canonicalized from '#{raw_path}' to '#{canonical_path}'. " \
+               "This may indicate a path traversal attempt."
+        end
+
+        # Update the URI to use the canonical path for consistency
+        self.uri = "file://#{canonical_path}"
 
         true
       end

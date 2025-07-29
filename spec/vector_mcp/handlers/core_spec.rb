@@ -4,8 +4,10 @@ require "spec_helper"
 require "vector_mcp/handlers/core"
 
 RSpec.describe VectorMCP::Handlers::Core do
-  let(:logger) { instance_double(Logger, debug: nil, info: nil, error: nil) }
-  let(:session) { double("session") }
+  let(:logger) { instance_double(Logger, debug: nil, info: nil, warn: nil, error: nil) }
+  let(:mock_server_instance) { double("server_instance", logger: logger) }
+  let(:mock_transport) { double("transport") }
+  let(:session) { VectorMCP::Session.new(mock_server_instance, mock_transport, id: "test-session-id") }
   let(:security_middleware) { double("security_middleware") }
   let(:middleware_manager) { double("middleware_manager") }
   let(:server) do
@@ -39,7 +41,6 @@ RSpec.describe VectorMCP::Handlers::Core do
     it "returns an empty hash" do
       result = described_class.ping({}, session, server)
       expect(result).to eq({})
-      expect(logger).to have_received(:debug).with("Handling ping request")
     end
   end
 

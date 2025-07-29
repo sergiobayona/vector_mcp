@@ -4,6 +4,7 @@
 require "json"
 require_relative "../errors"
 require_relative "../util"
+require_relative "stdio_session_manager"
 require "securerandom" # For generating unique request IDs
 require "timeout"      # For request timeouts
 
@@ -20,6 +21,8 @@ module VectorMCP
       attr_reader :server
       # @return [Logger] The logger instance, shared with the server.
       attr_reader :logger
+      # @return [StdioSessionManager] The session manager for this transport.
+      attr_reader :session_manager
 
       # Timeout for waiting for a response to a server-initiated request (in seconds)
       DEFAULT_REQUEST_TIMEOUT = 30 # Configurable if needed
@@ -27,9 +30,12 @@ module VectorMCP
       # Initializes a new Stdio transport.
       #
       # @param server [VectorMCP::Server] The server instance that will handle messages.
-      def initialize(server)
+      # @param options [Hash] Optional configuration options.
+      # @option options [Boolean] :enable_session_manager (false) Whether to enable the unified session manager.
+      def initialize(server, options = {})
         @server = server
         @logger = server.logger
+        @session_manager = options[:enable_session_manager] ? StdioSessionManager.new(self) : nil
         @input_mutex = Mutex.new
         @output_mutex = Mutex.new
         @running = false
@@ -109,6 +115,43 @@ module VectorMCP
         write_message(notification)
       end
 
+      # Sends a JSON-RPC notification message to a specific session.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param _session_id [String] The session ID (ignored for stdio transport).
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the notification was sent successfully.
+      # rubocop:disable Naming/PredicateMethod
+      def send_notification_to_session(_session_id, method, params = nil)
+        send_notification(method, params)
+        true
+      end
+      # rubocop:enable Naming/PredicateMethod
+
+      # Sends a JSON-RPC notification message to a specific session.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param _session_id [String] The session ID (ignored for stdio transport).
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the notification was sent successfully.
+      def notification_sent_to_session?(_session_id, method, params = nil)
+        send_notification(method, params)
+        true
+      end
+
+      # Broadcasts a JSON-RPC notification message to all sessions.
+      # For stdio transport, this behaves the same as send_notification since there's only one session.
+      #
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Integer] Number of sessions the notification was sent to (always 1 for stdio).
+      def broadcast_notification(method, params = nil)
+        send_notification(method, params)
+        1
+      end
+
       # Sends a server-initiated JSON-RPC request to the client and waits for a response.
       # This is a blocking call.
       #
@@ -126,7 +169,7 @@ module VectorMCP
         request_payload[:params] = params if params
 
         setup_request_tracking(request_id)
-        logger.debug "[Stdio Transport] Sending request ID #{request_id}: #{method}"
+        # Sending request to client
         write_message(request_payload)
 
         response = wait_for_response(request_id, method, timeout)
@@ -184,7 +227,6 @@ module VectorMCP
 
         return handle_outgoing_response(message) if outgoing_response?(message)
 
-        ensure_session_exists
         handle_server_message(message)
       end
 
@@ -196,7 +238,21 @@ module VectorMCP
         message["id"] && !message["method"] && (message.key?("result") || message.key?("error"))
       end
 
-      # Ensures a global session exists for this stdio transport.
+      # Gets the global session for this stdio transport.
+      # @api private
+      # @return [VectorMCP::Session] The current session.
+      def session
+        # Try session manager first, fallback to old method for backward compatibility
+        if @session_manager
+          session_wrapper = @session_manager.global_session
+          return session_wrapper.context if session_wrapper
+        end
+
+        # Fallback to old session creation for backward compatibility
+        ensure_session_exists
+      end
+
+      # Ensures a global session exists for this stdio transport (legacy method).
       # @api private
       # @return [VectorMCP::Session] The current session.
       def ensure_session_exists
@@ -208,11 +264,11 @@ module VectorMCP
       # @param message [Hash] The parsed message.
       # @return [void]
       def handle_server_message(message)
-        session = ensure_session_exists
-        session_id = session.id
+        current_session = session
+        session_id = current_session.id
 
         begin
-          result = @server.handle_message(message, session, session_id)
+          result = @server.handle_message(message, current_session, session_id)
           send_response(message["id"], result) if message["id"] && result
         rescue VectorMCP::ProtocolError => e
           handle_protocol_error(e, message)
@@ -223,11 +279,11 @@ module VectorMCP
 
       # --- Run helpers (private) ---
 
-      # Creates a new session for the stdio connection.
+      # Gets the session for the stdio connection.
       # @api private
-      # @return [VectorMCP::Session] The newly created session.
+      # @return [VectorMCP::Session] The session.
       def create_session
-        VectorMCP::Session.new(@server, self)
+        session
       end
 
       # Launches the input reading loop in a new thread.
@@ -250,6 +306,7 @@ module VectorMCP
       def shutdown_transport
         @running = false
         @input_thread&.kill if @input_thread&.alive?
+        @session_manager&.cleanup_all_sessions
         logger.info("Stdio transport shut down")
       end
 
@@ -261,7 +318,7 @@ module VectorMCP
       # @return [void]
       def handle_outgoing_response(message)
         request_id = message["id"]
-        logger.debug "[Stdio Transport] Received response for outgoing request ID #{request_id}"
+        # Received response for outgoing request
 
         @mutex.synchronize do
           # Store the response (convert keys to symbols for consistency)
@@ -272,7 +329,7 @@ module VectorMCP
           condition = @outgoing_request_conditions[request_id]
           if condition
             condition.signal
-            logger.debug "[Stdio Transport] Signaled condition for request ID #{request_id}"
+            # Signaled condition for request
           else
             logger.warn "[Stdio Transport] Received response for request ID #{request_id} but no thread is waiting"
           end
@@ -342,7 +399,7 @@ module VectorMCP
       # @return [void]
       def write_message(message)
         json_msg = message.to_json
-        logger.debug { "Sending stdio message: #{json_msg}" }
+        # Sending stdio message
 
         begin
           @output_mutex.synchronize do

@@ -19,12 +19,22 @@ module VectorMCP
       #     - 'data' [String] (Optional) Base64 image data if type is "image".
       #     - 'mimeType' [String] (Optional) Mime type if type is "image".
       def initialize(result_hash)
+        # Handle malformed or nil result_hash
+        raise ArgumentError, "Sampling result must be a Hash, got #{result_hash.class}: #{result_hash.inspect}" unless result_hash.is_a?(Hash)
+
         @raw_result = result_hash.transform_keys { |k| k.to_s.gsub(/(.)([A-Z])/, '\1_\2').downcase.to_sym }
 
         @model = @raw_result[:model]
         @stop_reason = @raw_result[:stop_reason]
         @role = @raw_result[:role]
-        @content = (@raw_result[:content] || {}).transform_keys(&:to_sym)
+
+        # Safe content processing for malformed responses
+        content_raw = @raw_result[:content]
+        @content = if content_raw.is_a?(Hash)
+                     content_raw.transform_keys(&:to_sym)
+                   else
+                     {}
+                   end
 
         validate!
       end

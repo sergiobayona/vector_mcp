@@ -66,7 +66,7 @@ Fix unsafe auto-correctable offenses (review changes carefully):
 Ensure auto-corrections didn't break anything:
 
 ```bash
-!bundle exec rake
+!bundle exec rspec
 ```
 
 If tests fail, investigate and fix issues before continuing.

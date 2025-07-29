@@ -16,13 +16,7 @@ module VectorMCP
       # @param hook_type [String] Type of hook being executed
       # @param context [VectorMCP::Middleware::Context] Execution context
       def call(hook_type, context)
-        @logger.debug("Executing middleware hook") do
-          {
-            middleware: self.class.name,
-            hook_type: hook_type,
-            operation: context.operation_name
-          }
-        end
+        # Generic middleware hook execution
       end
 
       # Tool operation hooks

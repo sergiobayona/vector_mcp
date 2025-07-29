@@ -53,9 +53,7 @@ RSpec.describe "Authentication Integration" do
     end
 
     it "rejects tool access without valid API key" do
-      # Mock session with no authentication headers
-      allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({})
-      allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({})
+      # Session has default empty request context (no authentication headers)
 
       expect do
         server.handle_message({
@@ -71,11 +69,11 @@ RSpec.describe "Authentication Integration" do
     end
 
     it "allows tool access with valid API key" do
-      # Mock session with valid API key
-      allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({
-                                                                                             "X-API-Key" => "valid-key-123"
-                                                                                           })
-      allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({})
+      # Set session request context with valid API key
+      session.request_context = {
+        headers: { "X-API-Key" => "valid-key-123" },
+        params: {}
+      }
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -92,11 +90,11 @@ RSpec.describe "Authentication Integration" do
     end
 
     it "rejects tool access with invalid API key" do
-      # Mock session with invalid API key
-      allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({
-                                                                                             "X-API-Key" => "invalid-key"
-                                                                                           })
-      allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({})
+      # Set session request context with invalid API key
+      session.request_context = {
+        headers: { "X-API-Key" => "invalid-key" },
+        params: {}
+      }
 
       expect do
         server.handle_message({
@@ -133,11 +131,11 @@ RSpec.describe "Authentication Integration" do
     end
 
     it "allows access with authorized user" do
-      # Mock session with admin API key
-      allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({
-                                                                                             "X-API-Key" => "admin-key"
-                                                                                           })
-      allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({})
+      # Set session request context with admin API key
+      session.request_context = {
+        headers: { "X-API-Key" => "admin-key" },
+        params: {}
+      }
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -154,11 +152,11 @@ RSpec.describe "Authentication Integration" do
     end
 
     it "denies access to unauthorized user" do
-      # Mock session with user API key (not admin)
-      allow(session).to receive(:instance_variable_get).with(:@request_headers).and_return({
-                                                                                             "X-API-Key" => "user-key"
-                                                                                           })
-      allow(session).to receive(:instance_variable_get).with(:@request_params).and_return({})
+      # Set session request context with user API key (not admin)
+      session.request_context = {
+        headers: { "X-API-Key" => "user-key" },
+        params: {}
+      }
 
       expect do
         server.handle_message({

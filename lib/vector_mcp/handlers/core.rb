@@ -22,8 +22,6 @@ module VectorMCP
       # @param _server [VectorMCP::Server] The server instance (ignored).
       # @return [Hash] An empty hash, as per MCP spec for ping.
       def self.ping(_params, _session, _server)
-        logger = VectorMCP.logger_for("handlers.core")
-        logger.debug("Handling ping request")
         {}
       end
 
@@ -65,7 +63,7 @@ module VectorMCP
           security_result = validate_tool_security!(session, tool, server)
           validate_input_arguments!(tool_name, tool, arguments)
 
-          result = execute_tool_handler(tool, arguments, security_result)
+          result = execute_tool_handler(tool, arguments, security_result, session)
           context.result = build_tool_result(result)
 
           context = server.middleware_manager.execute_hooks(:after_tool_call, context)
@@ -426,12 +424,16 @@ module VectorMCP
       # @param session [VectorMCP::Session] The current session
       # @return [Hash] Request context for security middleware
       def self.extract_request_from_session(session)
-        # Extract security context from session
-        # This will be enhanced as we integrate with transport layers
+        # All sessions should have a request_context - this is enforced by Session initialization
+        unless session.respond_to?(:request_context) && session.request_context
+          raise VectorMCP::InternalError,
+                "Session missing request_context - transport layer integration error. Session ID: #{session.id}"
+        end
+
         {
-          headers: session.instance_variable_get(:@request_headers) || {},
-          params: session.instance_variable_get(:@request_params) || {},
-          session_id: session.respond_to?(:id) ? session.id : "test-session"
+          headers: session.request_context.headers,
+          params: session.request_context.params,
+          session_id: session.id
         }
       end
       private_class_method :extract_request_from_session
@@ -497,11 +499,11 @@ module VectorMCP
       end
 
       # Execute tool handler with proper arity handling
-      def self.execute_tool_handler(tool, arguments, security_result)
+      def self.execute_tool_handler(tool, arguments, _security_result, session)
         if [1, -1].include?(tool.handler.arity)
           tool.handler.call(arguments)
         else
-          tool.handler.call(arguments, security_result[:session_context])
+          tool.handler.call(arguments, session)
         end
       end
 

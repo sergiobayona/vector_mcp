@@ -113,16 +113,10 @@ module VectorMCP
         @hooks[hook_type].to_a
       end
 
-      def initialize_execution_state(hook_type_str, hooks, context)
+      def initialize_execution_state(hook_type_str, hooks, _context)
         start_time = Time.now
 
-        @logger.debug("Executing middleware hooks") do
-          {
-            hook_type: hook_type_str,
-            hook_count: hooks.size,
-            operation: context.operation_name
-          }
-        end
+        # Executing middleware hooks
 
         {
           hook_type: hook_type_str,
@@ -157,13 +151,7 @@ module VectorMCP
                                hooks_total: execution_state[:total_hooks]
                              })
 
-        @logger.debug("Completed middleware execution") do
-          {
-            hook_type: execution_state[:hook_type],
-            execution_time: execution_time,
-            hooks_executed: execution_state[:executed_count]
-          }
-        end
+        # Completed middleware execution
       end
 
       def handle_critical_error(error, hook_type, context)

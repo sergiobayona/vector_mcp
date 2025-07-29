@@ -231,8 +231,46 @@ module VectorMCP
       content
     end
 
+    # Extracts HTTP headers from a Rack environment hash.
+    # Converts Rack's HTTP_* environment variables to proper HTTP header names.
+    # @param env [Hash] The Rack environment hash.
+    # @return [Hash] Normalized headers with proper casing.
+    def extract_headers_from_rack_env(env)
+      headers = {}
+      return headers if env.nil?
+
+      env.each do |key, value|
+        next unless key.start_with?("HTTP_")
+
+        # Convert HTTP_X_API_KEY to X-API-Key format
+        header_name = key[5..].split("_").map do |part|
+          case part.upcase
+          when "API" then "API" # Keep API in all caps
+          else part.capitalize
+          end
+        end.join("-")
+        headers[header_name] = value
+      end
+
+      # Add special headers
+      headers["Authorization"] = env["HTTP_AUTHORIZATION"] if env["HTTP_AUTHORIZATION"]
+      headers["Content-Type"] = env["CONTENT_TYPE"] if env["CONTENT_TYPE"]
+      headers
+    end
+
+    # Extracts query parameters from a Rack environment hash.
+    # Parses the QUERY_STRING into a hash of parameters.
+    # @param env [Hash] The Rack environment hash.
+    # @return [Hash] Normalized parameters as key-value pairs.
+    def extract_params_from_rack_env(env)
+      params = {}
+      params = URI.decode_www_form(env["QUERY_STRING"]).to_h if env && env["QUERY_STRING"]
+      params
+    end
+
     module_function :looks_like_image_file_path?, :binary_image_data?,
                     :file_path_to_image_content, :binary_image_to_content,
-                    :validate_and_enhance_image_content
+                    :validate_and_enhance_image_content, :extract_headers_from_rack_env,
+                    :extract_params_from_rack_env
   end
 end

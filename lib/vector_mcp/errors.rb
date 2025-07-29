@@ -28,8 +28,6 @@ module VectorMCP
     # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message, code: -32_600, details: nil, request_id: nil)
-      logger = VectorMCP.logger_for("errors")
-      logger.debug("Initializing ProtocolError with code: #{code}")
       @code = code
       @message = message
       @details = details # NOTE: `data` in JSON-RPC is often used for this purpose.
@@ -105,8 +103,7 @@ module VectorMCP
     # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Server error", code: -32_000, details: nil, request_id: nil)
-      logger = VectorMCP.logger_for("errors")
-      logger.debug("Initializing ServerError with code: #{code}")
+      # ServerError initialization
       unless (-32_099..-32_000).cover?(code)
         warn "Server error code #{code} is outside of the reserved range (-32099 to -32000). Using -32000 instead."
         code = -32_000
@@ -133,8 +130,7 @@ module VectorMCP
     # @param details [Hash, nil] Additional details for the error (optional).
     # @param request_id [String, Integer, nil] The ID of the originating request.
     def initialize(message = "Not Found", details: nil, request_id: nil)
-      logger = VectorMCP.logger_for("errors")
-      logger.debug("Initializing NotFoundError with code: -32001")
+      # NotFoundError initialization
       super(message, code: -32_001, details: details, request_id: request_id)
     end
   end

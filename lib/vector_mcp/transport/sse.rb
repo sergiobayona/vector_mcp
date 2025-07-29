@@ -9,6 +9,7 @@ require "concurrent-ruby"
 require_relative "../errors"
 require_relative "../util"
 require_relative "../session"
+require_relative "sse_session_manager"
 require_relative "sse/client_connection"
 require_relative "sse/stream_manager"
 require_relative "sse/message_handler"
@@ -41,7 +42,7 @@ module VectorMCP
     # @attr_reader port [Integer] The port number the server will listen on.
     # @attr_reader path_prefix [String] The base URL path for MCP endpoints (e.g., "/mcp").
     class SSE
-      attr_reader :logger, :server, :host, :port, :path_prefix
+      attr_reader :logger, :server, :host, :port, :path_prefix, :session_manager
 
       # Initializes a new SSE transport.
       #
@@ -50,6 +51,8 @@ module VectorMCP
       # @option options [String] :host ("localhost") The hostname or IP to bind to.
       # @option options [Integer] :port (8000) The port to listen on.
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints.
+      # @option options [Boolean] :disable_session_manager (false) **DEPRECATED**: Whether to disable secure session isolation.
+      #   When false (default), each client gets isolated sessions. When true, all clients share a global session (security risk).
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
@@ -61,9 +64,19 @@ module VectorMCP
         @sse_path = "#{@path_prefix}/sse"
         @message_path = "#{@path_prefix}/message"
 
-        # Thread-safe client storage using concurrent-ruby
+        # Thread-safe client storage using concurrent-ruby (legacy approach)
         @clients = Concurrent::Hash.new
         @session = nil # Global session for this transport instance, initialized in run
+
+        # Initialize session manager for secure multi-client session isolation (default behavior)
+        # Legacy shared session behavior can be enabled with disable_session_manager: true (deprecated)
+        if options[:disable_session_manager]
+          logger.warn("[DEPRECATED] SSE shared session mode is deprecated and poses security risks in multi-client scenarios. " \
+                      "Consider removing disable_session_manager: true to use secure per-client sessions.")
+          @session_manager = nil
+        else
+          @session_manager = SseSessionManager.new(self)
+        end
         @puma_server = nil
         @running = false
 
@@ -77,7 +90,8 @@ module VectorMCP
       # @raise [StandardError] if there's a fatal error during server startup.
       def run
         logger.info("Starting server with Puma SSE transport on #{@host}:#{@port}")
-        create_session
+        # Only create shared session if explicitly using legacy mode (deprecated)
+        create_session unless @session_manager
         start_puma_server
       rescue StandardError => e
         handle_fatal_error(e)
@@ -106,13 +120,32 @@ module VectorMCP
 
       # --- Public methods for Server to send notifications ---
 
+      # Sends a JSON-RPC notification to the first available client session.
+      # If no clients are connected, returns false.
+      #
+      # @param method [String] The method name of the notification.
+      # @param params [Hash, Array, nil] The parameters for the notification (optional).
+      # @return [Boolean] True if the message was sent successfully, false otherwise.
+      def send_notification(method, params = nil)
+        return false if @clients.empty?
+
+        # Send to first available client
+        first_client = @clients.values.first
+        return false unless first_client
+
+        message = { jsonrpc: "2.0", method: method }
+        message[:params] = params if params
+
+        StreamManager.enqueue_message(first_client, message)
+      end
+
       # Sends a JSON-RPC notification to a specific client session via its SSE stream.
       #
       # @param session_id [String] The ID of the client session to send the notification to.
       # @param method [String] The method name of the notification.
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [Boolean] True if the message was successfully enqueued, false otherwise (e.g., client not found).
-      def send_notification(session_id, method, params = nil)
+      def send_notification_to_session(session_id, method, params = nil)
         message = { jsonrpc: "2.0", method: method }
         message[:params] = params if params
 
@@ -128,7 +161,7 @@ module VectorMCP
       # @param params [Hash, Array, nil] The parameters for the notification (optional).
       # @return [void]
       def broadcast_notification(method, params = nil)
-        logger.debug { "Broadcasting notification '#{method}' to #{@clients.size} client(s)" }
+        # Broadcasting notification to clients
         message = { jsonrpc: "2.0", method: method }
         message[:params] = params if params
 
@@ -150,9 +183,24 @@ module VectorMCP
       # Stops the transport and cleans up resources
       def stop
         @running = false
-        cleanup_clients
+        if @session_manager
+          @session_manager.cleanup_all_sessions
+        else
+          cleanup_clients
+        end
         @puma_server&.stop
         logger.info("SSE transport stopped")
+      end
+
+      # Cleans up all client connections (legacy mode)
+      def cleanup_clients
+        logger.info("Cleaning up #{@clients.size} client connection(s)")
+        @clients.each_value do |client_conn|
+          client_conn.close if client_conn.respond_to?(:close)
+        rescue StandardError => e
+          logger.warn("Error closing client connection: #{e.message}")
+        end
+        @clients.clear
       end
 
       # --- Private methods ---
@@ -177,8 +225,8 @@ module VectorMCP
         @puma_server.run.join # This blocks until server stops
         logger.info("Puma server stopped.")
       ensure
-        cleanup_clients
-        @session = nil
+        # Only cleanup if session manager is enabled
+        @session_manager&.cleanup_all_sessions
         logger.info("SSE transport and resources shut down.")
       end
 
@@ -192,13 +240,6 @@ module VectorMCP
           logger.info("SIGTERM received, stopping server...")
           stop
         end
-      end
-
-      # Cleans up resources for all connected clients on server shutdown.
-      def cleanup_clients
-        logger.info("Cleaning up #{@clients.size} client connection(s)...")
-        @clients.each_value(&:close)
-        @clients.clear
       end
 
       # Handles fatal errors during server startup or main run loop.
@@ -245,11 +286,17 @@ module VectorMCP
 
         # Create client connection
         client_conn = ClientConnection.new(session_id, logger)
-        @clients[session_id] = client_conn
+
+        # Store client connection
+        if @session_manager
+          @session_manager.register_client(session_id, client_conn)
+        else
+          @clients[session_id] = client_conn
+        end
 
         # Build message POST URL for this client
         message_post_url = build_post_url(session_id)
-        logger.debug("Client #{session_id} should POST messages to: #{message_post_url}")
+        # Client message POST URL configured
 
         # Set up SSE stream
         headers = sse_headers
@@ -268,10 +315,18 @@ module VectorMCP
                                 "Missing session_id parameter")
         end
 
-        client_conn = @clients[session_id]
+        # Get client connection and session
+        if @session_manager
+          client_conn = @session_manager.clients[session_id]
+          shared_session = @session_manager.shared_session
+        else
+          client_conn = @clients[session_id]
+          shared_session = @session
+        end
+
         return error_response(nil, VectorMCP::NotFoundError.new("Invalid session_id").code, "Invalid session_id") unless client_conn
 
-        MessageHandler.new(@server, @session, logger).handle_post_message(env, client_conn)
+        MessageHandler.new(@server, shared_session, logger).handle_post_message(env, client_conn)
       end
 
       # Helper methods

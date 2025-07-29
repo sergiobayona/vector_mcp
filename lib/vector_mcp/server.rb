@@ -134,11 +134,12 @@ module VectorMCP
 
     # Runs the server using the specified transport mechanism.
     #
-    # @param transport [:stdio, :sse, VectorMCP::Transport::Base] The transport to use.
-    #   Can be a symbol (`:stdio`, `:sse`) or an initialized transport instance.
+    # @param transport [:stdio, :sse, :http_stream, VectorMCP::Transport::Base] The transport to use.
+    #   Can be a symbol (`:stdio`, `:sse`, `:http_stream`) or an initialized transport instance.
     #   If a symbol is provided, the method will instantiate the corresponding transport class.
-    #   If `:sse` is chosen, it uses Puma as the HTTP server.
-    # @param options [Hash] Transport-specific options (e.g., `:host`, `:port` for SSE).
+    #   If `:sse` is chosen, it uses Puma as the HTTP server (deprecated).
+    #   If `:http_stream` is chosen, it uses the MCP-compliant streamable HTTP transport.
+    # @param options [Hash] Transport-specific options (e.g., `:host`, `:port` for HTTP transports).
     #   These are passed to the transport's constructor if a symbol is provided for `transport`.
     # @return [void]
     # @raise [ArgumentError] if an unsupported transport symbol is given.
@@ -150,10 +151,19 @@ module VectorMCP
                          when :sse
                            begin
                              require_relative "transport/sse"
+                             logger.warn("SSE transport is deprecated. Please use :http_stream instead.")
                              VectorMCP::Transport::SSE.new(self, **options)
                            rescue LoadError => e
                              logger.fatal("SSE transport requires additional dependencies.")
                              raise NotImplementedError, "SSE transport dependencies not available: #{e.message}"
+                           end
+                         when :http_stream
+                           begin
+                             require_relative "transport/http_stream"
+                             VectorMCP::Transport::HttpStream.new(self, **options)
+                           rescue LoadError => e
+                             logger.fatal("HttpStream transport requires additional dependencies.")
+                             raise NotImplementedError, "HttpStream transport dependencies not available: #{e.message}"
                            end
                          when VectorMCP::Transport::Base # Allow passing an initialized transport instance
                            transport.server = self if transport.respond_to?(:server=) && transport.server.nil? # Ensure server is set
@@ -277,14 +287,14 @@ module VectorMCP
     #   server.use_middleware(LoggingMiddleware, :after_tool_call, conditions: { only_operations: ['important_tool'] })
     def use_middleware(middleware_class, hooks, priority: Middleware::Hook::DEFAULT_PRIORITY, conditions: {})
       @middleware_manager.register(middleware_class, hooks, priority: priority, conditions: conditions)
-      @logger.info("Registered middleware: #{middleware_class.name}")
+      @logger.debug("Registered middleware: #{middleware_class.name}")
     end
 
     # Remove all middleware hooks for a specific class
     # @param middleware_class [Class] Middleware class to remove
     def remove_middleware(middleware_class)
       @middleware_manager.unregister(middleware_class)
-      @logger.info("Removed middleware: #{middleware_class.name}")
+      @logger.debug("Removed middleware: #{middleware_class.name}")
     end
 
     # Get middleware statistics
@@ -296,7 +306,7 @@ module VectorMCP
     # Clear all middleware (useful for testing)
     def clear_middleware!
       @middleware_manager.clear!
-      @logger.info("Cleared all middleware")
+      @logger.debug("Cleared all middleware")
     end
 
     private
