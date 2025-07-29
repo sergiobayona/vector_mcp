@@ -1,3 +1,57 @@
+## [0.3.3] – 2025-07-29
+
+### Fixed
+
+* **Critical Security Fix - SSE Transport Session Isolation**: Fixed default behavior where SSE transport shared session state across all clients
+  - **BREAKING CHANGE**: SSE transport now defaults to secure session isolation mode
+  - Session manager is now enabled by default to prevent race conditions and data leakage
+  - Legacy shared session mode available via `disable_session_manager: true` option (deprecated with warning)
+  - Enhanced security tests to prevent regression of this critical vulnerability
+
+* **Critical Security Fix - Path Traversal Vulnerability**: Replaced naive path traversal validation with robust canonicalization
+  - **Path Validation Enhancement**: Now uses `File.expand_path` for proper path canonicalization
+  - **Attack Prevention**: Eliminates false positives from simple string-based `.` checks
+  - **Security Monitoring**: Added warnings for potential path traversal attempts
+  - **Bypass Protection**: Prevents sophisticated path traversal attacks through encoding or complex patterns
+
+* **Session Compatibility**: Fixed session object type detection across different transports
+  - **Transport Compatibility**: Added automatic detection between `BaseSessionManager::Session` and `VectorMCP::Session` types
+  - **Method Resolution**: Fixed `undefined method 'initialized?'` and `'initialize!'` errors
+  - **Transport Layer**: Enhanced stdio, SSE, and HTTP stream transports for consistent session handling
+
+* **Race Condition Fix**: Resolved concurrent session creation test failures in SSE transport
+  - **Thread Safety**: Implemented `Concurrent::Array` for thread-safe session tracking
+  - **Test Stability**: Enhanced test reliability for concurrent operations
+
+* **Code Quality**: Fixed RuboCop style and linting violations
+  - **Naming Conventions**: Updated method names to follow Ruby conventions (removed `get_` prefixes)
+  - **Style Compliance**: Fixed line length violations and predicate method naming
+  - **Consistency**: Applied consistent coding standards across the codebase
+
+### Security
+
+* **Defense in Depth**: Major security improvements addressing critical vulnerabilities
+  - **Multi-Client Security**: Eliminated shared state vulnerabilities in SSE transport
+  - **Path Security**: Comprehensive path traversal protection using canonical path resolution
+  - **Session Isolation**: Proper session boundary enforcement across all transport types
+
+* **Backward Compatibility**: Security fixes maintain API compatibility while improving defaults
+  - **Opt-in Legacy Mode**: Deprecated insecure modes available for gradual migration
+  - **Migration Path**: Clear deprecation warnings guide users to secure configurations
+
+### Testing
+
+* **Enhanced Security Test Coverage**: Comprehensive test suites for critical security fixes
+  - **Path Traversal Tests**: 20+ test cases covering legitimate paths, attack vectors, and edge cases
+  - **SSE Security Tests**: Verification of default secure behavior and session isolation
+  - **Integration Tests**: Cross-transport compatibility and session handling validation
+
+### Technical Details
+
+* **Session Architecture**: Improved session management layer for better transport compatibility
+* **Security Monitoring**: Enhanced logging and warning systems for security events
+* **Error Handling**: Better error messages and debugging information for session-related issues
+
 ## [0.3.2] – 2025-07-02
 
 ### Added
