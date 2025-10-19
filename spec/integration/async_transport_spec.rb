@@ -68,7 +68,7 @@ RSpec.describe "Async HTTP Client Integration", type: :integration do
     end
 
     # Wait for server to start
-    wait_for_server_start
+    wait_for_server_start(base_url)
   end
 
   after(:each) do
@@ -77,20 +77,6 @@ RSpec.describe "Async HTTP Client Integration", type: :integration do
     @server_thread&.join(2) # Wait up to 2 seconds for graceful shutdown
     @server_thread&.kill if @server_thread&.alive? # Force kill if still alive
     @server_thread = nil
-  end
-
-  # Helper method to wait for server to start
-  def wait_for_server_start
-    Timeout.timeout(10) do
-      loop do
-        Net::HTTP.get_response(URI("#{base_url}/"))
-        break
-      rescue Errno::ECONNREFUSED
-        sleep(0.1)
-      end
-    end
-  rescue Timeout::Error
-    raise "Server failed to start within 10 seconds"
   end
 
   # Helper method to make HTTP requests with session ID

@@ -330,26 +330,24 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def handle_post_request(env)
-        Async do
-          session_id = extract_session_id(env)
-          session = @session_manager.get_or_create_session(session_id, env)
+        session_id = extract_session_id(env)
+        session = @session_manager.get_or_create_session(session_id, env)
 
-          request_body = read_request_body(env)
-          message = parse_json_message(request_body)
+        request_body = read_request_body(env)
+        message = parse_json_message(request_body)
 
-          # Check if this is a response to a server-initiated request
-          if outgoing_response?(message)
-            handle_outgoing_response(message)
-            # For responses, return 202 Accepted with no body
-            return [202, { "Mcp-Session-Id" => session.id }, []]
-          end
+        # Check if this is a response to a server-initiated request
+        if outgoing_response?(message)
+          handle_outgoing_response(message)
+          # For responses, return 202 Accepted with no body
+          return [202, { "Mcp-Session-Id" => session.id }, []]
+        end
 
-          result = @server.handle_message(message, session.context, session.id)
+        result = @server.handle_message(message, session.context, session.id)
 
-          # Set session ID header in response
-          headers = { "Mcp-Session-Id" => session.id }
-          json_rpc_response(result, message["id"], headers)
-        end.wait
+        # Set session ID header in response
+        headers = { "Mcp-Session-Id" => session.id }
+        json_rpc_response(result, message["id"], headers)
       rescue VectorMCP::ProtocolError => e
         json_error_response(e.request_id, e.code, e.message, e.details)
       rescue JSON::ParserError => e

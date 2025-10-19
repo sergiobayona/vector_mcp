@@ -22,7 +22,8 @@ module HttpStreamIntegrationHelpers
       loop do
         Async do
           internet = Async::HTTP::Internet.new
-          internet.get("#{base_url}/")
+          response = internet.get("#{base_url}/")
+          response.read
         ensure
           internet&.close
         end.wait
