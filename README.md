@@ -12,7 +12,7 @@ VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-sid
 
 - **🛡️ Security-First**: Built-in input validation and schema checking prevent injection attacks
 - **⚡ Production-Ready**: Robust error handling, comprehensive test suite, and proven reliability  
-- **🔌 Multiple Transports**: stdio for CLI tools, SSE for web applications
+- **🔌 Multiple Transports**: stdio for CLI tools, HTTP streaming for web applications
 - **📦 Zero Configuration**: Works out of the box with sensible defaults
 - **🔄 Fully Compatible**: Implements the complete MCP specification
 
@@ -55,15 +55,23 @@ Perfect for desktop applications and process-based integrations:
 server.run  # Default: stdio transport
 ```
 
-### Web Applications (HTTP + SSE)
+### Web Applications (HTTP Streaming) **[Recommended]**
 
-Ideal for web apps and browser-based clients:
+Ideal for web apps and browser-based clients with full MCP specification compliance:
 
 ```ruby
-server.run(transport: :sse, port: 8080)
+server.run(transport: :http_stream, port: 8080)
 ```
 
-Connect via Server-Sent Events at `http://localhost:8080/sse`
+Connect via HTTP streaming at `http://localhost:8080/mcp` with resumable connections and session management.
+
+### Legacy SSE Transport **[Deprecated]**
+
+⚠️ **Note**: SSE transport is deprecated as of MCP specification 2024-11-05. Use HTTP streaming instead.
+
+```ruby
+server.run(transport: :sse, port: 8080)  # Deprecated
+```
 
 ## Core Features
 
@@ -209,7 +217,8 @@ end
 Security works seamlessly across all transport layers:
 
 - **Stdio**: Header simulation for desktop applications
-- **SSE**: Full HTTP header and query parameter support
+- **HTTP Streaming**: Full HTTP header support with session management
+- **SSE (Deprecated)**: Full HTTP header and query parameter support
 - **Request Pipeline**: Automatic authentication and authorization checking
 
 **👉 [Complete Security Guide →](./security/README.md)**
@@ -387,8 +396,30 @@ Add to your Claude Desktop configuration:
 
 ### Web Applications
 
+**HTTP Streaming (Recommended):**
 ```javascript
-// Connect to SSE endpoint
+// Send MCP requests directly
+fetch('http://localhost:8080/mcp', {
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'Mcp-Session-Id': 'your-session-id'
+  },
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'greet', arguments: { name: 'World' } }
+  })
+});
+
+// Optional: Connect to streaming for server-initiated messages
+const eventSource = new EventSource('http://localhost:8080/mcp?session_id=your-session-id');
+```
+
+**Legacy SSE (Deprecated):**
+```javascript
+// Connect to SSE endpoint (deprecated)
 const eventSource = new EventSource('http://localhost:8080/sse');
 
 eventSource.addEventListener('endpoint', (event) => {
@@ -406,6 +437,7 @@ eventSource.addEventListener('endpoint', (event) => {
     })
   });
 });
+```
 ```
 
 ## Why Choose VectorMCP?

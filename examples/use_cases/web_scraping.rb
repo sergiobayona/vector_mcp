@@ -11,7 +11,7 @@
 # - Extract specific data patterns (prices, contacts, etc.)
 # - Generate reports from scraped content
 
-require_relative "../../../lib/vector_mcp"
+require_relative "../../lib/vector_mcp"
 require "async"
 require "async/http"
 require "uri"
