@@ -68,7 +68,7 @@ module VectorMCP
           begin
             # Store event for resumability
             event_data = message.to_json
-            event_id = @transport.event_store.store_event(event_data, "message")
+            event_id = @transport.event_store.store_event(session.id, event_data, "message")
 
             # Send via SSE
             sse_event = format_sse_event(event_data, "message", event_id)
@@ -172,11 +172,11 @@ module VectorMCP
             }
           }
 
-          event_id = @transport.event_store.store_event(connection_event.to_json, "connection")
+          event_id = @transport.event_store.store_event(session.id, connection_event.to_json, "connection")
           yielder << format_sse_event(connection_event.to_json, "connection", event_id)
 
           # Replay missed events if resuming
-          replay_events(yielder, last_event_id) if last_event_id
+          replay_events(session, yielder, last_event_id) if last_event_id
 
           # Send periodic keep-alive events
           keep_alive_loop(session, yielder)
@@ -184,11 +184,12 @@ module VectorMCP
 
         # Replays events after a specific event ID.
         #
+        # @param session [SessionManager::Session] The session
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String] The last event ID received by client
         # @return [void]
-        def replay_events(yielder, last_event_id)
-          missed_events = @transport.event_store.get_events_after(last_event_id)
+        def replay_events(session, yielder, last_event_id)
+          missed_events = @transport.event_store.get_events_after(session.id, last_event_id)
 
           logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
 
@@ -226,7 +227,7 @@ module VectorMCP
             }
 
             begin
-              event_id = @transport.event_store.store_event(heartbeat_event.to_json, "heartbeat")
+              event_id = @transport.event_store.store_event(session.id, heartbeat_event.to_json, "heartbeat")
               yielder << format_sse_event(heartbeat_event.to_json, "heartbeat", event_id)
             rescue StandardError
               logger.debug("Heartbeat failed for #{session.id}, connection likely closed")

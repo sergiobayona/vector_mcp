@@ -450,8 +450,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         event_store = transport.event_store
 
         # Store some test events
-        event_id1 = event_store.store_event("test data 1", "test_event")
-        event_id2 = event_store.store_event("test data 2", "test_event")
+        event_id1 = event_store.store_event(session_id, "test data 1", "test_event")
+        event_id2 = event_store.store_event(session_id, "test data 2", "test_event")
 
         expect(event_store.event_count).to eq(2)
         expect(event_store.event_exists?(event_id1)).to be true
@@ -463,7 +463,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
         event_ids = []
         10.times do |i|
-          event_ids << event_store.store_event("test data #{i}")
+          event_ids << event_store.store_event(session_id, "test data #{i}")
         end
 
         expect(event_ids.uniq.length).to eq(10)
@@ -472,8 +472,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "retrieves events by ID" do
         event_store = transport.event_store
 
-        event_id = event_store.store_event("test data", "test_event")
-        events = event_store.get_events_after(nil)
+        event_id = event_store.store_event(session_id, "test data", "test_event")
+        events = event_store.get_events_after(session_id, nil)
 
         expect(events.length).to eq(1)
         expect(events.first.id).to eq(event_id)
@@ -488,7 +488,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         # Store more events than buffer size
         event_ids = []
         5.times do |i|
-          event_ids << small_event_store.store_event("data #{i}")
+          event_ids << small_event_store.store_event(session_id, "data #{i}")
         end
 
         # Should only keep last 3 events
@@ -517,7 +517,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
         # Generate some events
         event_store = transport.event_store
-        event_id = event_store.store_event("test event", "test")
+        event_id = event_store.store_event(session_id, "test event", "test")
 
         # Stop and restart with Last-Event-ID
         mock_client.stop_streaming
@@ -535,12 +535,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         event_store = transport.event_store
 
         # Store several events
-        event_id1 = event_store.store_event("event 1", "test")
-        event_id2 = event_store.store_event("event 2", "test")
-        event_id3 = event_store.store_event("event 3", "test")
+        event_id1 = event_store.store_event(session_id, "event 1", "test")
+        event_id2 = event_store.store_event(session_id, "event 2", "test")
+        event_id3 = event_store.store_event(session_id, "event 3", "test")
 
         # Get events after event 1
-        events = event_store.get_events_after(event_id1)
+        events = event_store.get_events_after(session_id, event_id1)
 
         expect(events.length).to eq(2)
         expect(events[0].id).to eq(event_id2)
@@ -569,7 +569,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         event_count = 1000
 
         event_count.times do |i|
-          event_store.store_event("event #{i}", "performance_test")
+          event_store.store_event("performance-session", "event #{i}", "performance_test")
         end
 
         end_time = Time.now
@@ -591,7 +591,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         10.times do |i|
           threads << Thread.new do
             10.times do |j|
-              event_id = event_store.store_event("thread #{i} event #{j}")
+              event_id = event_store.store_event("performance-session-#{i}", "thread #{i} event #{j}")
               event_ids << event_id
             end
           end
