@@ -130,8 +130,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
       before do
         # Mock session manager to return a session
-        allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
-        allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_session).and_return(mock_session)
+        allow(transport.session_manager).to receive(:create_session).and_return(mock_session)
         allow(transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
       end
 
@@ -172,8 +172,17 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(response_data["error"]["message"]).to eq("Method not found: unknown_method")
         end
 
+        it "returns 404 when session ID does not exist" do
+          allow(transport.session_manager).to receive(:get_session).and_return(nil)
+
+          post "/mcp", json_request.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+          expect(last_response.status).to eq(404)
+          expect(last_response.body).to eq("Not Found")
+        end
+
         it "creates session when no session ID provided" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(nil, anything).and_return(mock_session)
+          expect(transport.session_manager).to receive(:create_session).with(nil, kind_of(Hash)).and_return(mock_session)
 
           post "/mcp", json_request.to_json, "CONTENT_TYPE" => "application/json"
 
@@ -191,7 +200,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
 
         it "returns 404 for non-existent sessions" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(nil)
+          allow(transport.session_manager).to receive(:get_session).and_return(nil)
 
           get "/mcp", {}, valid_headers
 
@@ -265,7 +274,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           let(:app) { restricted_app }
 
           before do
-            allow(restricted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+            allow(restricted_transport.session_manager).to receive(:get_session).and_return(mock_session)
+            allow(restricted_transport.session_manager).to receive(:create_session).and_return(mock_session)
           end
 
           it "allows requests without Origin header" do
@@ -314,11 +324,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     let(:mock_new_session) { VectorMCP::Transport::HttpStream::SessionManager::Session.new(session_id, mock_new_session_context, Time.now, Time.now, nil) }
 
     before do
-      allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_new_session)
+      allow(transport.session_manager).to receive(:get_session).and_return(mock_new_session)
+      allow(transport.session_manager).to receive(:create_session).and_return(mock_new_session)
     end
 
     it "integrates with session manager for POST requests" do
-      expect(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything)
+      expect(transport.session_manager).to receive(:get_session).with(session_id, kind_of(Hash)).and_return(mock_new_session)
 
       post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
            "HTTP_MCP_SESSION_ID" => session_id, "CONTENT_TYPE" => "application/json"
@@ -555,7 +566,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       let(:json_request) { { "jsonrpc" => "2.0", "id" => 1, "method" => "test" }.to_json }
 
       before do
-        allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_session).and_return(mock_session)
       end
 
       it "handles VectorMCP::ProtocolError" do

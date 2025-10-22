@@ -75,24 +75,33 @@ module VectorMCP
           session
         end
 
-        # Override to add rack_env support
+        # Override to add rack_env support without allowing client-provided IDs to spawn sessions.
+        #
+        # When session_id is provided, this returns the existing session or nil if not found.
+        # When session_id is nil, a new session is created with a server-generated ID.
         def get_or_create_session(session_id = nil, rack_env = nil)
           if session_id
-            session = get_session(session_id)
-            if session
-              # Update existing session context if rack_env is provided
-              if rack_env
-                request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-                session.context.request_context = request_context
-              end
-              return session
-            end
+            get_session(session_id, rack_env)
+          else
+            create_session(nil, rack_env)
+          end
+        end
 
-            # If session_id was provided but not found, create with that ID
-            return create_session(session_id, rack_env)
+        # Retrieves an existing session and optionally refreshes its request context.
+        #
+        # @param session_id [String] The session to retrieve
+        # @param rack_env [Hash, nil] Optional Rack environment to update context
+        # @return [Session, nil] The existing session or nil if not found/expired
+        def get_session(session_id, rack_env = nil)
+          session = super(session_id)
+          return nil unless session
+
+          if rack_env
+            request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
+            session.context.request_context = request_context
           end
 
-          create_session(nil, rack_env)
+          session
         end
 
         # Creates a VectorMCP::Session with proper request context from Rack environment

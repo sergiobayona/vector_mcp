@@ -63,13 +63,19 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
     end
 
     describe "session_manager.get_or_create_session" do
-      it "creates new session with context" do
-        session = session_manager.get_or_create_session("new-session", rack_env)
+      it "creates new session with context when session_id is nil" do
+        session = session_manager.get_or_create_session(nil, rack_env)
 
-        expect(session.id).to eq("new-session")
+        expect(session.id).to be_a(String)
         request_context = session.context.request_context
         expect(request_context.header("Authorization")).to eq("Bearer token123")
         expect(request_context.param("api_key")).to eq("test123")
+      end
+
+      it "returns nil when session does not exist" do
+        session = session_manager.get_or_create_session("new-session", rack_env)
+
+        expect(session).to be_nil
       end
 
       it "updates existing session context" do
@@ -156,7 +162,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
       it "passes rack_env to session creation" do
         # Use real transport but mock its session manager
         real_session_manager = real_transport.instance_variable_get(:@session_manager)
-        allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        allow(real_session_manager).to receive(:get_session).with("test-session", kind_of(Hash)).and_return(mock_session)
         allow(server).to receive(:handle_message).and_return({ jsonrpc: "2.0", id: 1, result: "ok" })
 
         rack_env = {
@@ -167,7 +173,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
 
         result = real_transport.send(:handle_post_request, rack_env)
 
-        expect(real_session_manager).to have_received(:get_or_create_session).with("test-session", anything)
+        expect(real_session_manager).to have_received(:get_session).with("test-session", kind_of(Hash))
         expect(result).to be_an(Array) # Rack response
       end
     end
@@ -178,7 +184,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         real_session_manager = real_transport.instance_variable_get(:@session_manager)
         real_stream_handler = real_transport.instance_variable_get(:@stream_handler)
 
-        allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        allow(real_session_manager).to receive(:get_session).with("test-session", kind_of(Hash)).and_return(mock_session)
         allow(real_stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
 
         rack_env = {
@@ -189,7 +195,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
 
         result = real_transport.send(:handle_get_request, rack_env)
 
-        expect(real_session_manager).to have_received(:get_or_create_session).with("test-session", anything)
+        expect(real_session_manager).to have_received(:get_session).with("test-session", kind_of(Hash))
         expect(result).to be_an(Array) # Rack response
       end
     end
