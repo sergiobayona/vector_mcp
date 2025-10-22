@@ -2,7 +2,9 @@
 
 require "json"
 require "securerandom"
-require "puma"
+require "async"
+require "async/http/endpoint"
+require "falcon/server"
 require "rack"
 require "concurrent-ruby"
 require "timeout"
@@ -13,6 +15,7 @@ require_relative "../session"
 require_relative "http_stream/session_manager"
 require_relative "http_stream/event_store"
 require_relative "http_stream/stream_handler"
+require_relative "http_stream/falcon_config"
 
 module VectorMCP
   module Transport
@@ -81,7 +84,7 @@ module VectorMCP
       # @return [void]
       # @raise [StandardError] if there's a fatal error during server startup
       def run
-        start_puma_server
+        start_falcon_server
       rescue StandardError => e
         handle_fatal_error(e)
       end
@@ -205,10 +208,9 @@ module VectorMCP
       # @return [void]
       def stop
         logger.info { "Stopping HttpStream transport" }
-        @running = false
         cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
-        @puma_server&.stop
+        stop_falcon_server
         logger.info { "HttpStream transport stopped" }
       end
 
@@ -243,20 +245,22 @@ module VectorMCP
         prefix.empty? ? "/" : prefix
       end
 
-      # Starts the Puma HTTP server
+      # Starts the Falcon HTTP server
       #
       # @return [void]
-      def start_puma_server
-        @puma_server = Puma::Server.new(self)
-        @puma_server.add_tcp_listener(@host, @port)
-
+      def start_falcon_server
         @running = true
         setup_signal_handlers
 
         logger.info { "HttpStream server listening on #{@host}:#{@port}#{@path_prefix}" }
-        @puma_server.run.join
+
+        # Create Falcon configuration
+        falcon_config = HttpStream::FalconConfig.new(@host, @port, logger)
+
+        # Run Falcon server (this blocks)
+        @falcon_task = falcon_config.run(self)
       rescue StandardError => e
-        logger.error { "Error starting Puma server: #{e.message}" }
+        logger.error { "Error starting Falcon server: #{e.message}" }
         raise
       ensure
         cleanup_server
@@ -280,14 +284,32 @@ module VectorMCP
       #
       # @return [void]
       def stop_server_safely
-        return unless @puma_server
+        return unless @running
 
         begin
-          @puma_server.stop
+          stop_falcon_server
         rescue StandardError => e
           # Simple puts to avoid logger issues in signal context
           puts "Error stopping server: #{e.message}"
         end
+      end
+
+      # Stops the Falcon server
+      #
+      # @return [void]
+      def stop_falcon_server
+        return unless @running
+
+        logger.info { "Stopping Falcon server" }
+
+        # Stop the async reactor by interrupting the task
+        if @falcon_task && @falcon_task.respond_to?(:stop)
+          @falcon_task.stop
+        end
+
+        @running = false
+      rescue StandardError => e
+        logger.error { "Error stopping Falcon server: #{e.message}" }
       end
 
       # Cleans up server resources
@@ -736,7 +758,7 @@ module VectorMCP
 
       # Initialize server state variables
       def initialize_server_state
-        @puma_server = nil
+        @falcon_task = nil
         @running = false
       end
 

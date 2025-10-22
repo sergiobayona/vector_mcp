@@ -182,8 +182,8 @@ Use VectorMCP-specific error classes:
 
 ### Dependencies
 
-**Runtime**: base64, bigdecimal, concurrent-ruby, json-schema, jwt, puma, rack
-**Development**: rspec, rubocop, simplecov, yard, pry-byebug
+**Runtime**: async, async-http, base64, bigdecimal, concurrent-ruby, falcon, json-schema, jwt, rack
+**Development**: async-rspec, rspec, rubocop, simplecov, yard, pry-byebug
 **Optional**: jwt (for JWT authentication strategy)
 
 ### Version Management

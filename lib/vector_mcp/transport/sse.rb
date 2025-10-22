@@ -2,7 +2,9 @@
 
 require "json"
 require "securerandom"
-require "puma"
+require "async"
+require "async/http/endpoint"
+require "falcon/server"
 require "rack"
 require "concurrent-ruby"
 
@@ -13,13 +15,13 @@ require_relative "sse_session_manager"
 require_relative "sse/client_connection"
 require_relative "sse/stream_manager"
 require_relative "sse/message_handler"
-require_relative "sse/puma_config"
+require_relative "sse/falcon_config"
 
 module VectorMCP
   module Transport
     # Implements the Model Context Protocol transport over HTTP using Server-Sent Events (SSE)
     # for server-to-client messages and HTTP POST for client-to-server messages.
-    # This transport uses Puma as the HTTP server with Ruby threading for concurrency.
+    # This transport uses Falcon as the HTTP server with fiber-based async concurrency.
     #
     # It provides two main HTTP endpoints:
     # 1.  SSE Endpoint (`<path_prefix>/sse`): Clients connect here via GET to establish an SSE stream.
@@ -77,22 +79,22 @@ module VectorMCP
         else
           @session_manager = SseSessionManager.new(self)
         end
-        @puma_server = nil
+        @falcon_task = nil
         @running = false
 
         logger.debug { "SSE Transport initialized with prefix: #{@path_prefix}, SSE path: #{@sse_path}, Message path: #{@message_path}" }
       end
 
-      # Starts the SSE transport, creating a shared session and launching the Puma server.
+      # Starts the SSE transport, creating a shared session and launching the Falcon server.
       # This method will block until the server is stopped (e.g., via SIGINT/SIGTERM).
       #
       # @return [void]
       # @raise [StandardError] if there's a fatal error during server startup.
       def run
-        logger.info("Starting server with Puma SSE transport on #{@host}:#{@port}")
+        logger.info("Starting server with Falcon SSE transport on #{@host}:#{@port}")
         # Only create shared session if explicitly using legacy mode (deprecated)
         create_session unless @session_manager
-        start_puma_server
+        start_falcon_server
       rescue StandardError => e
         handle_fatal_error(e)
       end
@@ -182,13 +184,12 @@ module VectorMCP
 
       # Stops the transport and cleans up resources
       def stop
-        @running = false
         if @session_manager
           @session_manager.cleanup_all_sessions
         else
           cleanup_clients
         end
-        @puma_server&.stop
+        stop_falcon_server
         logger.info("SSE transport stopped")
       end
 
@@ -212,18 +213,20 @@ module VectorMCP
         @session = VectorMCP::Session.new(server, self, id: SecureRandom.uuid)
       end
 
-      # Starts the Puma HTTP server.
-      def start_puma_server
-        @puma_server = Puma::Server.new(build_rack_app)
-        puma_config = PumaConfig.new(@host, @port, logger)
-        puma_config.configure(@puma_server)
-
+      # Starts the Falcon HTTP server.
+      def start_falcon_server
         @running = true
         setup_signal_traps
 
-        logger.info("Puma server starting on #{@host}:#{@port}")
-        @puma_server.run.join # This blocks until server stops
-        logger.info("Puma server stopped.")
+        logger.info("Falcon server starting on #{@host}:#{@port}")
+
+        # Create Falcon configuration
+        falcon_config = FalconConfig.new(@host, @port, logger)
+
+        # Run Falcon server with Rack app (this blocks)
+        @falcon_task = falcon_config.run(build_rack_app)
+
+        logger.info("Falcon server stopped.")
       ensure
         # Only cleanup if session manager is enabled
         @session_manager&.cleanup_all_sessions
@@ -240,6 +243,22 @@ module VectorMCP
           logger.info("SIGTERM received, stopping server...")
           stop
         end
+      end
+
+      # Stops the Falcon server
+      def stop_falcon_server
+        return unless @running
+
+        logger.info("Stopping Falcon server")
+
+        # Stop the async reactor by interrupting the task
+        if @falcon_task && @falcon_task.respond_to?(:stop)
+          @falcon_task.stop
+        end
+
+        @running = false
+      rescue StandardError => e
+        logger.error("Error stopping Falcon server: #{e.message}")
       end
 
       # Handles fatal errors during server startup or main run loop.

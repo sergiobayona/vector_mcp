@@ -512,24 +512,27 @@ RSpec.describe VectorMCP::Transport::HttpStream do
   end
 
   describe "#stop" do
-    let(:mock_puma_server) { instance_double("Puma::Server", stop: nil) }
+    let(:mock_falcon_task) { instance_double("Async::Task", stop: nil) }
 
     before do
-      transport.instance_variable_set(:@puma_server, mock_puma_server)
+      transport.instance_variable_set(:@falcon_task, mock_falcon_task)
+      transport.instance_variable_set(:@running, true)
       allow(transport.session_manager).to receive(:cleanup_all_sessions)
     end
 
     it "stops the server and cleans up resources" do
-      expect(mock_logger).to receive(:info) { |&block| expect(block.call).to include("Stopping HttpStream transport") }
-      expect(mock_logger).to receive(:info) { |&block| expect(block.call).to include("HttpStream transport stopped") }
+      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("Stopping HttpStream transport") }
+      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("Stopping Falcon server") }
+      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("HttpStream transport stopped") }
       expect(transport.session_manager).to receive(:cleanup_all_sessions)
-      expect(mock_puma_server).to receive(:stop)
+      expect(mock_falcon_task).to receive(:stop)
 
       transport.stop
     end
 
-    it "handles missing puma server gracefully" do
-      transport.instance_variable_set(:@puma_server, nil)
+    it "handles missing falcon task gracefully" do
+      transport.instance_variable_set(:@falcon_task, nil)
+      transport.instance_variable_set(:@running, false)
 
       expect { transport.stop }.not_to raise_error
     end

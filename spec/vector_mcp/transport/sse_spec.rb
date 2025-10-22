@@ -357,12 +357,13 @@ RSpec.describe VectorMCP::Transport::SSE do
   describe "#stop" do
     let(:client1) { instance_double(VectorMCP::Transport::SSE::ClientConnection, close: nil) }
     let(:client2) { instance_double(VectorMCP::Transport::SSE::ClientConnection, close: nil) }
-    let(:mock_puma_server) { instance_double(Puma::Server, stop: nil) }
+    let(:mock_falcon_task) { instance_double("Async::Task", stop: nil) }
 
     before do
       clients["client1"] = client1
       clients["client2"] = client2
-      transport.instance_variable_set(:@puma_server, mock_puma_server)
+      transport.instance_variable_set(:@falcon_task, mock_falcon_task)
+      transport.instance_variable_set(:@running, true)
     end
 
     it "stops the running flag" do
@@ -381,8 +382,8 @@ RSpec.describe VectorMCP::Transport::SSE do
       expect(clients).to be_empty
     end
 
-    it "stops the Puma server" do
-      expect(mock_puma_server).to receive(:stop)
+    it "stops the Falcon server" do
+      expect(mock_falcon_task).to receive(:stop)
       transport.stop
     end
 
