@@ -270,14 +270,14 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "allows requests with any Origin header" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
         end
 
@@ -293,14 +293,14 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "allows requests from allowed origins" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://example.com")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "rejects requests from disallowed origins" do
