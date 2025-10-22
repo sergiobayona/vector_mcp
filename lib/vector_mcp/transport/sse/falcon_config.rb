@@ -39,7 +39,13 @@ module VectorMCP
         # @param rack_app [#call] The Rack application to serve
         # @return [Falcon::Server] Configured Falcon server
         def create_server(rack_app)
-          server = Falcon::Server.new(rack_app, @endpoint)
+          middleware = Falcon::Server.middleware(
+            rack_app,
+            verbose: @options.fetch(:verbose, false),
+            cache: @options.fetch(:cache, false)
+          )
+
+          server = Falcon::Server.new(middleware, @endpoint)
 
           # Configure server options optimized for SSE
           configure_server_options(server)
