@@ -33,6 +33,8 @@ module VectorMCP
           @options = options
           @container_count = options[:container_count] || DEFAULT_CONTAINER_COUNT
           @cache_size = options[:cache_size] || DEFAULT_CACHE_SIZE
+          @async_task = nil
+          @server_task = nil
 
           # Create HTTP endpoint for Falcon
           @endpoint = create_endpoint
@@ -64,24 +66,33 @@ module VectorMCP
         # This method blocks until the server is stopped.
         #
         # @param rack_app [#call] The Rack application to serve
+        # @yield [Async::Task] Yields the async task used to control the server before blocking
         # @return [void]
         def run(rack_app)
           logger.info { "Starting Falcon server on #{@host}:#{@port}" }
 
-          # Run server in async reactor
           Async do |task|
+            @async_task = task
+            yield task if block_given?
+
             server = create_server(rack_app)
 
-            # Falcon's run method handles the server loop
-            server.run
+            begin
+              @server_task = server.run
+              logger.info { "Falcon server started successfully" }
 
-            logger.info { "Falcon server started successfully" }
-          rescue StandardError => e
-            logger.error { "Error running Falcon server: #{e.message}" }
-            logger.error { e.backtrace.join("\n") }
-            raise
-          ensure
-            logger.info { "Falcon server shutdown" }
+              @server_task.wait
+            rescue Async::Stop
+              logger.debug { "Falcon server task cancelled" }
+            rescue StandardError => e
+              logger.error { "Error running Falcon server: #{e.message}" }
+              logger.error { e.backtrace.join("\n") }
+              raise
+            ensure
+              logger.info { "Falcon server shutdown" }
+              @server_task = nil
+              @async_task = nil
+            end
           end.wait
         end
 
@@ -89,12 +100,12 @@ module VectorMCP
         #
         # @param server [Falcon::Server, nil] The server to stop
         # @return [void]
-        def stop_server(server)
-          return unless server
+        def stop_server(_server = nil)
+          return unless @async_task
 
           logger.info { "Stopping Falcon server" }
-          # Falcon servers stop when the async task is interrupted
-          # The reactor will handle cleanup
+          @async_task.stop
+          @async_task = nil
         rescue StandardError => e
           logger.error { "Error stopping Falcon server: #{e.message}" }
         end

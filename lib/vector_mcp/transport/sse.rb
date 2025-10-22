@@ -80,6 +80,7 @@ module VectorMCP
           @session_manager = SseSessionManager.new(self)
         end
         @falcon_task = nil
+        @falcon_config = nil
         @running = false
 
         logger.debug { "SSE Transport initialized with prefix: #{@path_prefix}, SSE path: #{@sse_path}, Message path: #{@message_path}" }
@@ -222,14 +223,19 @@ module VectorMCP
 
         # Create Falcon configuration
         falcon_config = FalconConfig.new(@host, @port, logger)
+        @falcon_config = falcon_config
 
         # Run Falcon server with Rack app (this blocks)
-        @falcon_task = falcon_config.run(build_rack_app)
+        falcon_config.run(build_rack_app) do |task|
+          @falcon_task = task
+        end
 
         logger.info("Falcon server stopped.")
       ensure
         # Only cleanup if session manager is enabled
         @session_manager&.cleanup_all_sessions
+        @falcon_task = nil
+        @falcon_config = nil
         logger.info("SSE transport and resources shut down.")
       end
 
@@ -252,9 +258,18 @@ module VectorMCP
         logger.info("Stopping Falcon server")
 
         # Stop the async reactor by interrupting the task
-        if @falcon_task && @falcon_task.respond_to?(:stop)
+        stopped = false
+        if @falcon_config&.respond_to?(:stop_server)
+          @falcon_config.stop_server(nil)
+          stopped = true
+        end
+
+        if !stopped && @falcon_task && @falcon_task.respond_to?(:stop)
           @falcon_task.stop
         end
+
+        @falcon_task = nil
+        @falcon_config = nil
 
         @running = false
       rescue StandardError => e

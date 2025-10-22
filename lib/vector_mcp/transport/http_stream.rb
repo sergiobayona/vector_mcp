@@ -256,9 +256,12 @@ module VectorMCP
 
         # Create Falcon configuration
         falcon_config = HttpStream::FalconConfig.new(@host, @port, logger)
+        @falcon_config = falcon_config
 
         # Run Falcon server (this blocks)
-        @falcon_task = falcon_config.run(self)
+        falcon_config.run(self) do |task|
+          @falcon_task = task
+        end
       rescue StandardError => e
         logger.error { "Error starting Falcon server: #{e.message}" }
         raise
@@ -303,9 +306,18 @@ module VectorMCP
         logger.info { "Stopping Falcon server" }
 
         # Stop the async reactor by interrupting the task
-        if @falcon_task && @falcon_task.respond_to?(:stop)
+        stopped = false
+        if @falcon_config
+          @falcon_config.stop_server(nil)
+          stopped = true
+        end
+
+        if !stopped && @falcon_task && @falcon_task.respond_to?(:stop)
           @falcon_task.stop
         end
+
+        @falcon_task = nil
+        @falcon_config = nil
 
         @running = false
       rescue StandardError => e
@@ -319,6 +331,8 @@ module VectorMCP
         cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
         @running = false
+        @falcon_task = nil
+        @falcon_config = nil
         logger.info { "HttpStream server cleanup completed" }
       end
 
@@ -759,6 +773,7 @@ module VectorMCP
       # Initialize server state variables
       def initialize_server_state
         @falcon_task = nil
+        @falcon_config = nil
         @running = false
       end
 
