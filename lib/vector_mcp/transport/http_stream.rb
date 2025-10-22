@@ -384,6 +384,11 @@ module VectorMCP
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
+        if notification?(message)
+          @server.handle_message(message, session.context, session.id)
+          return [202, { "Mcp-Session-Id" => session.id }, []]
+        end
+
         result = @server.handle_message(message, session.context, session.id)
 
         # Set session ID header in response
@@ -661,6 +666,14 @@ module VectorMCP
         # go through normal request processing
         request_id = message["id"]
         @outgoing_request_ivars.key?(request_id)
+      end
+
+      # Determines if the message is a JSON-RPC notification (no id field).
+      #
+      # @param message [Hash] The parsed message
+      # @return [Boolean] True if message is a notification
+      def notification?(message)
+        !message.key?("id")
       end
 
       # Handles a response to an outgoing request.

@@ -88,3 +88,4 @@ $RECYCLE.BIN/
 # Gem builds
 /gems/*.gem
 .cursor/**/*
+mise.toml

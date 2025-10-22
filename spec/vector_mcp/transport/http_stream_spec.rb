@@ -181,6 +181,17 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(last_response.body).to eq("Not Found")
         end
 
+        it "returns 202 Accepted for notifications without id" do
+          notification = { "jsonrpc" => "2.0", "method" => "progress" }
+          expect(mock_mcp_server).to receive(:handle_message).with(notification, anything, anything).and_return(nil)
+
+          post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+          expect(last_response.status).to eq(202)
+          expect(last_response.body).to be_empty
+          expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+        end
+
         it "creates session when no session ID provided" do
           expect(transport.session_manager).to receive(:create_session).with(nil, kind_of(Hash)).and_return(mock_session)
 
@@ -532,9 +543,9 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     end
 
     it "stops the server and cleans up resources" do
-      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("Stopping HttpStream transport") }
-      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("Stopping Falcon server") }
-      expect(mock_logger).to receive(:info).ordered { |&block| expect(block.call).to include("HttpStream transport stopped") }
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("Stopping HttpStream transport") })
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("Stopping Falcon server") })
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("HttpStream transport stopped") })
       expect(transport.session_manager).to receive(:cleanup_all_sessions)
       expect(mock_falcon_task).to receive(:stop)
 
