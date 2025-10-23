@@ -625,8 +625,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "handles connection with missing session" do
         client = StreamingTestHelpers::MockStreamingClient.new("non-existent-session", base_url)
 
-        # Should still connect (server may create session)
-        expect(client.start_streaming).to be true
+        # Missing sessions now return 404 until re-initialized
+        expect(client.start_streaming).to be false
 
         client.stop_streaming
       end
