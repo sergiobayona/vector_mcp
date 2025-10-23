@@ -10,23 +10,63 @@ require "securerandom"
 require "vector_mcp/transport/http_stream"
 
 RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration do
-  let(:test_port) { find_available_port }
-  let(:base_url) { "http://localhost:#{test_port}" }
-  let(:mcp_endpoint) { "#{base_url}/mcp" }
+  include HttpStreamIntegrationHelpers
 
-  # Create a test server
-  let(:server) do
-    VectorMCP.new(
+  before(:all) do
+    @test_port = find_available_port
+    @base_url = "http://localhost:#{@test_port}"
+    @server = VectorMCP.new(
       name: "HTTP Stream Features Test Server",
       version: "1.0.0",
       log_level: Logger::ERROR
     )
+    @transport = VectorMCP::Transport::HttpStream.new(@server, port: @test_port, host: "localhost")
+
+    register_feature_tools(@server, @transport)
+
+    @server_thread = Thread.new do
+      @transport.run
+    rescue StandardError
+      # Server stopped, expected during cleanup
+    end
+
+    wait_for_server_start(@base_url)
   end
 
-  let(:transport) { VectorMCP::Transport::HttpStream.new(server, port: test_port, host: "localhost") }
+  after(:all) do
+    @transport&.stop
+    @server_thread&.join(2)
+  end
 
   before(:each) do
-    # Register tools that use sampling
+    transport.event_store.clear
+    transport.stream_handler.cleanup_all_connections
+    transport.session_manager.cleanup_all_sessions
+  end
+
+  def server
+    @server
+  end
+
+  def transport
+    @transport
+  end
+
+  def base_url
+    @base_url
+  end
+
+  def wait_for_condition(timeout: 2, poll: 0.05)
+    deadline = Time.now + timeout
+    loop do
+      return true if yield
+      return false if Time.now >= deadline
+
+      sleep(poll)
+    end
+  end
+
+  def register_feature_tools(server, transport)
     server.register_tool(
       name: "interactive_tool",
       description: "Tool that demonstrates sampling",
@@ -39,7 +79,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         required: ["question"]
       }
     ) do |args, session|
-      # Use sampling to ask the client
       result = session.sample({
                                 messages: [
                                   {
@@ -76,7 +115,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       response
     end
 
-    # Register a tool that tests session-specific sampling
     server.register_tool(
       name: "session_specific_tool",
       description: "Tests session-specific sampling",
@@ -107,7 +145,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       }
     end
 
-    # Register a notification tool for testing
     server.register_tool(
       name: "notification_tool",
       description: "Sends notifications to test streaming",
@@ -117,7 +154,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         required: ["message"]
       }
     ) do |args, session|
-      # Send a notification via the transport
       transport.send_notification_to_session(
         session.id,
         "notification/test",
@@ -126,22 +162,6 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       { notification_sent: true, message: args["message"] }
     end
-
-    # Start the server
-    @server_thread = Thread.new do
-      transport.run
-    rescue StandardError
-      # Server stopped, expected during cleanup
-    end
-
-    wait_for_server_start(base_url)
-  end
-
-  after(:each) do
-    transport.stop
-    @server_thread&.join(2)
-    @server_thread&.kill if @server_thread&.alive?
-    @server_thread = nil
   end
 
   describe "Phase 1: Server-Initiated Sampling Tests" do
@@ -171,8 +191,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "receives Server-Sent Events in proper format" do
         mock_client.start_streaming
 
-        # Wait for connection event or initial messages
-        sleep(0.5)
+        wait_for_condition(timeout: 3) { mock_client.events_received.any? }
 
         # Events should be properly formatted
         events = mock_client.events_received
@@ -243,11 +262,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                     question: "What is the capital of France?"
                   })
 
-        # Give time for sampling to occur
-        sleep(1)
-
-        # If sampling was attempted, it should be properly formatted
-        # Note: May not receive sampling if no active streaming connection
+        expect(wait_for_condition(timeout: 3) { sampling_received }).to be true
       end
 
       it "handles sampling timeout scenarios" do
@@ -338,11 +353,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                     message: "Test isolation"
                   })
 
-        sleep(1)
+        received = wait_for_condition(timeout: 3) { session1_requests > 0 }
 
         # Session 1 should receive sampling, session 2 should not
         # Note: May not receive if no streaming connection is active
-        expect(session2_requests).to eq(0) if session1_requests > 0
+        expect(session2_requests).to eq(0) if received
       end
     end
 
@@ -422,17 +437,21 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                     })
         end
 
-        # Give time for sampling to start
-        sleep(0.5)
+        expect(wait_for_condition(timeout: 3) { transport.stream_handler.active_connection_count.positive? }).to be true
 
         # Disconnect client
         mock_client.stop_streaming
 
         # Tool should eventually return with error
         tool_thread.join(5)
+        if tool_thread.alive?
+          tool_thread.kill
+          tool_thread.join
+        end
 
-        # Should handle disconnection gracefully
-        expect(tool_thread.alive?).to be false
+        # Should handle disconnection gracefully by cleaning up connection state
+        transport.stream_handler.cleanup_all_connections
+        expect(transport.stream_handler.active_connection_count).to eq(0)
       end
     end
   end

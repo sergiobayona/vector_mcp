@@ -10,21 +10,61 @@ require_relative "../support/http_stream_integration_helpers"
 RSpec.describe "HttpStream Routing Security Implications", type: :integration do
   include HttpStreamIntegrationHelpers
 
-  let(:test_port) { find_available_port }
-  let(:base_url) { "http://localhost:#{test_port}" }
-
-  let(:server) do
-    VectorMCP::Server.new(
+  before(:all) do
+    @test_port = find_available_port
+    @base_url = "http://localhost:#{@test_port}"
+    @server = VectorMCP::Server.new(
       name: "Routing Security Test Server",
       version: "1.0.0",
       log_level: Logger::ERROR
     )
+
+    register_security_tools(@server)
+
+    @transport = VectorMCP::Transport::HttpStream.new(@server, port: @test_port, host: "localhost")
+    @server_thread = Thread.new do
+      @transport.run
+    rescue StandardError
+      # Server stopped, expected during cleanup
+    end
+
+    wait_for_server_start(@base_url)
   end
 
-  let(:transport) { VectorMCP::Transport::HttpStream.new(server, port: test_port, host: "localhost") }
+  after(:all) do
+    @transport&.stop
+    @server_thread&.join(2)
+  end
 
   before(:each) do
-    # Register tools that simulate real-world security-sensitive operations
+    transport.event_store.clear
+    transport.stream_handler.cleanup_all_connections
+    transport.session_manager.cleanup_all_sessions
+  end
+
+  def server
+    @server
+  end
+
+  def transport
+    @transport
+  end
+
+  def base_url
+    @base_url
+  end
+
+  def wait_for_condition(timeout: 2, poll: 0.05)
+    deadline = Time.now + timeout
+    loop do
+      return true if yield
+      return false if Time.now >= deadline
+
+      sleep(poll)
+    end
+  end
+
+  def register_security_tools(server)
     server.register_tool(
       name: "get_user_data",
       description: "Retrieves sensitive user data",
@@ -37,7 +77,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
         required: %w[user_id data_type]
       }
     ) do |args, session|
-      # This simulates fetching sensitive user data via sampling
       result = session.sample({
                                 messages: [
                                   {
@@ -74,7 +113,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
         required: %w[account_id amount transaction_type]
       }
     ) do |args, session|
-      # Financial data that must not leak to other clients
       result = session.sample({
                                 messages: [
                                   {
@@ -98,19 +136,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
         session_id: session.id
       }
     end
-
-    @server_thread = Thread.new do
-      transport.run
-    rescue StandardError
-      # Server stopped, expected during cleanup
-    end
-
-    wait_for_server_start(base_url)
-  end
-
-  after(:each) do
-    transport.stop
-    @server_thread&.join(2)
   end
 
   describe "SECURITY VERIFIED: Data Protection Scenarios" do
@@ -131,7 +156,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Doctor connects first (typical in healthcare systems)
         doctor_client.start_streaming
-        sleep(0.1)
         patient_client.start_streaming
 
         doctor_received_data = []
@@ -161,7 +185,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "medical_records_blood_test_results"
                   })
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { patient_received_data.any? }).to be true
+        expect(wait_for_condition(timeout: 0.5) { doctor_received_data.any? }).to be false
 
         doctor_client.stop_streaming
         patient_client.stop_streaming
@@ -200,7 +225,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Customer A connects first (random timing in real world)
         customer_a_client.start_streaming
-        sleep(0.1)
         customer_b_client.start_streaming
 
         financial_data_exposures = []
@@ -239,7 +263,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     transaction_type: "wire_transfer_to_offshore_account"
                   })
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { customer_b_received_own_data.any? }).to be true
+        expect(wait_for_condition(timeout: 0.5) { financial_data_exposures.any? }).to be false
 
         customer_a_client.stop_streaming
         customer_b_client.stop_streaming
@@ -279,7 +304,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Attorney Smith connects first
         attorney1_client.start_streaming
-        sleep(0.1)
         attorney2_client.start_streaming
 
         privileged_communications_leaked = []
@@ -317,7 +341,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "confidential_criminal_defense_strategy"
                   })
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { attorney2_received_own_client_data.any? }).to be true
+        expect(wait_for_condition(timeout: 0.5) { privileged_communications_leaked.any? }).to be false
 
         attorney1_client.stop_streaming
         attorney2_client.stop_streaming
@@ -359,7 +384,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Secret clearance user connects first
         secret_client.start_streaming
-        sleep(0.1)
         top_secret_client.start_streaming
 
         classified_data_leaks = []
@@ -397,7 +421,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "TOP_SECRET_NUCLEAR_SUBMARINE_LOCATIONS"
                   })
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { top_secret_received_own_data.any? }).to be true
+        expect(wait_for_condition(timeout: 0.5) { classified_data_leaks.any? }).to be false
 
         secret_client.stop_streaming
         top_secret_client.stop_streaming
@@ -443,9 +468,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Dev team connects first (they often have long-running connections)
         dev_client.start_streaming
-        sleep(0.1)
         ops_client.start_streaming
-        sleep(0.1)
         monitoring_client.start_streaming
 
         alert_routing_failures = []
@@ -482,7 +505,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "CRITICAL_DATABASE_FAILURE_ALERT"
                   })
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { ops_team_received_alerts.any? }).to be true
+        expect(wait_for_condition(timeout: 0.5) { alert_routing_failures.any? }).to be false
 
         dev_client.stop_streaming
         ops_client.stop_streaming
@@ -538,7 +562,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
       # Start all clients
       clients_data.each do |client_data|
         client_data[:client].start_streaming
-        sleep(0.1) # Stagger connections slightly
 
         # Set up message tracking - verify each client receives their own messages
         client_data[:client].on_method("sampling/createMessage") do |event|
@@ -560,10 +583,10 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "confidential_client_data"
                   })
         client_data[:messages_sent] += 1
-        sleep(0.2) # Allow time for processing
+        expect(
+          wait_for_condition(timeout: 3) { client_data[:correct_messages_received].length == client_data[:messages_sent] }
+        ).to be true
       end
-
-      sleep(1.5) # Allow all sampling to complete
 
       # Stop all clients
       all_clients.each(&:stop_streaming)
@@ -613,9 +636,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
       client1.set_sampling_response("sampling/createMessage", "EVIDENCE: Client 1 received message")
       client2.set_sampling_response("sampling/createMessage", "EVIDENCE: Client 2 received message")
 
-      client1.start_streaming  # First connection
-      sleep(0.1)
-      client2.start_streaming  # Second connection
+      client1.start_streaming
+      client2.start_streaming
 
       evidence = { client1_received: [], client2_received: [] }
 
@@ -641,7 +663,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                   data_type: "technical_verification_data"
                 })
 
-      sleep(1)
+      expect(wait_for_condition(timeout: 3) { evidence[:client2_received].any? }).to be true
+      expect(wait_for_condition(timeout: 0.5) { evidence[:client1_received].any? }).to be false
 
       client1.stop_streaming
       client2.stop_streaming
