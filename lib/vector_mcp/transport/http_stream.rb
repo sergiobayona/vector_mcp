@@ -368,7 +368,7 @@ module VectorMCP
       def handle_post_request(env)
         session_id = extract_session_id(env)
         session = if session_id
-                    @session_manager.get_session(session_id, env)
+                    @session_manager.get_or_create_session(session_id, env)
                   else
                     @session_manager.create_session(nil, env)
                   end

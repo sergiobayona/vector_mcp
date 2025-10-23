@@ -46,10 +46,10 @@ module VectorMCP
           end
         end
 
-        # Initializes a new HTTP stream session manager.
-        #
-        # @param transport [HttpStream] The parent transport instance
-        # @param session_timeout [Integer] Session timeout in seconds
+        def initialize(transport, session_timeout = 300)
+          super
+          @terminated_session_ids = Concurrent::Set.new
+        end
 
         # Optimized session creation with reduced object allocation and faster context creation
         def create_session(session_id = nil, rack_env = nil)
@@ -66,6 +66,8 @@ module VectorMCP
           # Pre-allocate metadata hash for better performance
           metadata = { streaming_connection: nil }
 
+          @terminated_session_ids.delete(session_id)
+
           # Create internal session record with streaming connection metadata
           session = Session.new(session_id, session_context, now, now, metadata)
 
@@ -80,11 +82,20 @@ module VectorMCP
         # When session_id is provided, this returns the existing session or nil if not found.
         # When session_id is nil, a new session is created with a server-generated ID.
         def get_or_create_session(session_id = nil, rack_env = nil)
-          if session_id
-            get_session(session_id, rack_env)
-          else
-            create_session(nil, rack_env)
+          return create_session(nil, rack_env) unless session_id
+
+          logger.debug do
+            terminated = @terminated_session_ids.include?(session_id)
+            existing = @sessions.key?(session_id)
+            "Session lookup: id=#{session_id} existing=#{existing} terminated=#{terminated}"
           end
+
+          session = get_session(session_id, rack_env)
+          return session if session
+
+          return nil if @terminated_session_ids.include?(session_id)
+
+          create_session(session_id, rack_env)
         end
 
         # Retrieves an existing session and optionally refreshes its request context.
@@ -128,6 +139,7 @@ module VectorMCP
 
           on_session_terminated(session)
           logger.info { "Session terminated: #{session_id}" }
+          @terminated_session_ids.add(session_id)
           true
         end
         # rubocop:enable Naming/PredicateMethod

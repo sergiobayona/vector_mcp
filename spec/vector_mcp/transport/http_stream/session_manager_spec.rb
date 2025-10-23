@@ -160,10 +160,11 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
     end
 
     context "when session does not exist" do
-      it "returns nil when session ID is provided" do
+      it "creates new session when session ID is provided" do
         result = session_manager.get_or_create_session(session_id, rack_env)
 
-        expect(result).to be_nil
+        expect(result.id).to eq(session_id)
+        expect(result.context).to be_a(VectorMCP::Session)
       end
 
       it "creates new session when session ID is nil" do
@@ -171,6 +172,15 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
         expect(result.id).to be_a(String)
         expect(result.id).not_to be_empty
+      end
+
+      it "returns nil for terminated session id" do
+        session_manager.create_session(session_id, rack_env)
+        session_manager.terminate_session(session_id)
+
+        result = session_manager.get_or_create_session(session_id, rack_env)
+
+        expect(result).to be_nil
       end
     end
   end

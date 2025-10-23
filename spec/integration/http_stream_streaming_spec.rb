@@ -515,7 +515,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       list_request = create_json_rpc_request("tools/list", {})
       response = make_request("POST", "/mcp", body: list_request, session_id: session_id)
       # Should fail since session was terminated and needs re-initialization
-      expect(response.code).to eq("400")
+      expect(response.code).to eq("404")
     end
 
     it "handles streaming connection without active session" do
@@ -534,7 +534,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       begin
         response = http.request(request)
         # If we get a response, it should be an error or create new session
-        expect(response.code).to be_in(%w[200 400 404])
+        expect(%w[200 400 404]).to include(response.code)
       rescue Net::ReadTimeout
         # Timeout is also acceptable for SSE connections
         expect(true).to be true
