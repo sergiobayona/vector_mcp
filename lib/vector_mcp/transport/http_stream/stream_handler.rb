@@ -22,38 +22,20 @@ module VectorMCP
           def initialize(*)
             super
             self.closed ||= false
-            return if queue.is_a?(Queue)
-
-            @legacy_yielder = queue
-            self.queue = Queue.new
-          end
-
-          def yielder
-            @legacy_yielder || QueueYielder.new(queue)
+            self.queue ||= Queue.new
           end
 
           def close
             return if closed?
 
             self.closed = true
-            target = queue
-            target << nil if target.respond_to?(:<<)
+            queue << nil # Queue natively supports <<
             thread&.kill if thread
             thread&.join if thread
           end
 
           def closed?
             closed
-          end
-
-          class QueueYielder
-            def initialize(queue)
-              @queue = queue
-            end
-
-            def <<(event)
-              @queue << event
-            end
           end
         end
 
@@ -316,16 +298,12 @@ module VectorMCP
           target << format_sse_event(data, type, event_id)
         end
 
-        # Cleans up a specific connection.
+        # Gets the delivery target (queue) for a connection.
         #
-        # @param session [SessionManager::Session] The session to clean up
-        # @return [void]
+        # @param connection [StreamingConnection] The streaming connection
+        # @return [Queue, nil] The queue for event delivery
         def delivery_target(connection)
-          if connection.is_a?(StreamingConnection)
-            connection.queue
-          elsif connection.respond_to?(:yielder)
-            connection.yielder
-          end
+          connection.queue if connection.is_a?(StreamingConnection)
         end
 
         def cleanup_connection(session)
