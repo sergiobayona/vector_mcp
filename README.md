@@ -65,13 +65,25 @@ server.run(transport: :http_stream, port: 8080)
 
 Connect via HTTP streaming at `http://localhost:8080/mcp` with resumable connections and session management.
 
-### Legacy SSE Transport **[Deprecated]**
+### Legacy SSE Transport **[DEPRECATED - Removal in v1.0.0]**
 
-⚠️ **Note**: SSE transport is deprecated as of MCP specification 2024-11-05. Use HTTP streaming instead.
+⚠️ **DEPRECATION NOTICE**: SSE transport is deprecated as of MCP specification 2024-11-05 and will be **removed in VectorMCP v1.0.0** (Q4 2025).
+
+**Timeline**:
+- **v0.4.0+**: Deprecated with runtime warnings
+- **v1.0.0**: Complete removal
+
+**Action Required**: Migrate to HTTP Stream transport before v1.0.0.
 
 ```ruby
-server.run(transport: :sse, port: 8080)  # Deprecated
+# ❌ Deprecated (will be removed in v1.0.0)
+server.run(transport: :sse, port: 8080)
+
+# ✅ Recommended alternative
+server.run(transport: :http_stream, port: 8080)
 ```
+
+**Migration Guide**: See [docs/MIGRATION_SSE_TO_HTTP_STREAM.md](docs/MIGRATION_SSE_TO_HTTP_STREAM.md) for detailed migration instructions.
 
 ## Core Features
 

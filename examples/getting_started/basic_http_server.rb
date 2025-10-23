@@ -2,10 +2,13 @@
 # frozen_string_literal: true
 
 # Example HTTP server implementation using VectorMCP
+# Uses HTTP Stream transport (MCP-compliant, recommended)
 
-require_relative "../lib/vector_mcp"
+require_relative "../../lib/vector_mcp"
 
-# Configure logging using the new structured logging system
+# Configure logging
+ENV["VECTORMCP_LOG_LEVEL"] ||= "INFO"
+ENV["VECTORMCP_LOG_FORMAT"] ||= "text"
 
 # Create a server instance
 server = VectorMCP.new(
@@ -55,8 +58,8 @@ end
 # Start the HTTP server
 port = ENV["PORT"]&.to_i || 7464
 begin
-  puts "Starting VectorMCP HTTP server on port #{port}..."
-  server.run(transport: :sse, options: { port: port, host: "localhost" })
+  puts "Starting VectorMCP HTTP Stream server on port #{port}..."
+  server.run(transport: :http_stream, port: port, host: "localhost")
 rescue Interrupt
   puts "Server interrupted"
   exit 0
