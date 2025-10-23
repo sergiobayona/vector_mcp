@@ -399,15 +399,19 @@ RSpec.describe "HTTP Stream Transport Integration", type: :integration do
       expect(%w[200 204]).to include(response.code) # May return 204 No Content
 
       # Verify session is gone - new request should create new session
-      # First need to re-initialize the session
+      # First need to re-initialize without providing old session id
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      new_session_id = response["Mcp-Session-Id"]
+      expect(new_session_id).not_to be_nil
+      expect(new_session_id).not_to eq(session_id)
+      session_id = new_session_id
 
       # Now we can make other requests
       list_request = create_json_rpc_request("tools/list", {})

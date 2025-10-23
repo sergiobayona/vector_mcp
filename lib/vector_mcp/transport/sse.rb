@@ -258,14 +258,16 @@ module VectorMCP
         logger.info("Stopping Falcon server")
 
         # Stop the async reactor by interrupting the task
-        stopped = false
-        if @falcon_config&.respond_to?(:stop_server)
+        if @falcon_task&.respond_to?(:stop)
+          begin
+            @falcon_task.stop
+            @falcon_task.wait if @falcon_task.respond_to?(:wait)
+          rescue NoMethodError => e
+            raise unless e.receiver.nil? && e.name == :raise
+            logger.debug("Falcon SSE task already stopped")
+          end
+        elsif @falcon_config&.respond_to?(:stop_server)
           @falcon_config.stop_server(nil)
-          stopped = true
-        end
-
-        if !stopped && @falcon_task && @falcon_task.respond_to?(:stop)
-          @falcon_task.stop
         end
 
         @falcon_task = nil

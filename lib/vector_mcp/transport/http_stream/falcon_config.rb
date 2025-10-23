@@ -101,16 +101,27 @@ module VectorMCP
         # @param server [Falcon::Server, nil] The server to stop
         # @return [void]
         def stop_server(_server = nil)
-          return unless @async_task
+          return unless @async_task || @server_task
 
           logger.info { "Stopping Falcon server" }
           begin
-            @async_task.stop
-          rescue NoMethodError => e
-            raise unless e.receiver.nil? && e.name == :raise
-            logger.debug { "Falcon async task already stopped" }
+            server_task = @server_task if @server_task&.respond_to?(:stop)
+            server_task&.stop
+
+            if @async_task
+              begin
+                @async_task.stop
+              rescue NoMethodError => e
+                raise unless e.receiver.nil? && e.name == :raise
+                logger.debug { "Falcon async task already stopped" }
+              end
+            end
+
+            server_task&.wait if server_task&.respond_to?(:wait)
+          ensure
+            @server_task = nil
+            @async_task = nil
           end
-          @async_task = nil
         rescue StandardError => e
           logger.error { "Error stopping Falcon server: #{e.message}" }
         end

@@ -597,4 +597,79 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
       puts "  ✅ System security: 100% compliant"
     end
   end
+
+  describe "Technical Evidence and Documentation" do
+    it "documents the routing implementation and verifies correct behavior" do
+      # Create evidence of correct routing behavior for technical documentation
+      session1 = "evidence-client-1"
+      session2 = "evidence-client-2"
+
+      initialize_mcp_session(base_url, session1)
+      initialize_mcp_session(base_url, session2)
+
+      client1 = StreamingTestHelpers::MockStreamingClient.new(session1, base_url)
+      client2 = StreamingTestHelpers::MockStreamingClient.new(session2, base_url)
+
+      client1.set_sampling_response("sampling/createMessage", "EVIDENCE: Client 1 received message")
+      client2.set_sampling_response("sampling/createMessage", "EVIDENCE: Client 2 received message")
+
+      client1.start_streaming  # First connection
+      sleep(0.1)
+      client2.start_streaming  # Second connection
+
+      evidence = { client1_received: [], client2_received: [] }
+
+      client1.on_method("sampling/createMessage") do |event|
+        evidence[:client1_received] << {
+          timestamp: Time.now.iso8601,
+          message: event[:data]["params"]["messages"].first["content"]["text"],
+          request_id: event[:data]["id"]
+        }
+      end
+
+      client2.on_method("sampling/createMessage") do |event|
+        evidence[:client2_received] << {
+          timestamp: Time.now.iso8601,
+          message: event[:data]["params"]["messages"].first["content"]["text"],
+          request_id: event[:data]["id"]
+        }
+      end
+
+      # Client 2 makes a request that should go to Client 2
+      call_tool(base_url, session2, "get_user_data", {
+                  user_id: "CLIENT_2",
+                  data_type: "technical_verification_data"
+                })
+
+      sleep(1)
+
+      client1.stop_streaming
+      client2.stop_streaming
+
+      puts "\n📋 TECHNICAL EVIDENCE FOR ROUTING VERIFICATION:"
+      puts "  Implementation: HttpStream uses session-aware routing for sampling requests"
+      puts ""
+      puts "  Code Location: lib/vector_mcp/transport/http_stream.rb"
+      puts "    - send_request method: Routes to session-specific streaming connection"
+      puts "    - Session isolation: Each session maintains independent streaming state"
+      puts ""
+      puts "  Evidence:"
+      puts "    - Client 2 made request: '#{evidence[:client2_received].empty? ? "NO MESSAGES RECEIVED" : "RECEIVED MESSAGES"}'"
+      puts "    - Client 1 received: #{evidence[:client1_received].length} messages"
+      puts "    - Client 2 received: #{evidence[:client2_received].length} messages"
+
+      puts "    - Message correctly routed to Client 2: '#{evidence[:client2_received].first[:message]}'" if evidence[:client2_received].any?
+
+      # Assert correct behavior
+      expect(evidence[:client1_received]).to be_empty,
+                                             "ROUTING VERIFIED: Client 1 correctly receives no messages (proper isolation)"
+      expect(evidence[:client2_received]).not_to be_empty,
+                                                 "ROUTING VERIFIED: Client 2 correctly receives their own request"
+
+      puts "\n✅ ROUTING IMPLEMENTATION VERIFICATION:"
+      puts "  - Session-specific routing working correctly"
+      puts "  - No cross-session message leakage"
+      puts "  - Proper security boundaries maintained"
+    end
+  end
 end
