@@ -564,13 +564,6 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 
 ## Code Quality and Maintenance
 
-### Constants and Configuration
-
-**Centralized Constants:**
-- **Location**: `lib/vector_mcp/logging/constants.rb`
-- **Purpose**: Self-documenting configuration limits and defaults
-- **Examples**: `MAX_SERIALIZATION_DEPTH`, `DEFAULT_MAX_MESSAGE_LENGTH`, `TIMESTAMP_PRECISION`
-
 ### Testing Categories
 
 **Core Functionality:**
