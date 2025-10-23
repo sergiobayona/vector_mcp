@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "concurrent-ruby"
-require "thread"
 
 module VectorMCP
   module Transport
@@ -23,19 +22,38 @@ module VectorMCP
           def initialize(*)
             super
             self.closed ||= false
+            return if queue.is_a?(Queue)
+
+            @legacy_yielder = queue
+            self.queue = Queue.new
+          end
+
+          def yielder
+            @legacy_yielder || QueueYielder.new(queue)
           end
 
           def close
             return if closed?
 
             self.closed = true
-            queue << nil
-            thread&.kill if thread&.alive?
+            target = queue
+            target << nil if target.respond_to?(:<<)
+            thread&.kill if thread
             thread&.join if thread
           end
 
           def closed?
             closed
+          end
+
+          class QueueYielder
+            def initialize(queue)
+              @queue = queue
+            end
+
+            def <<(event)
+              @queue << event
+            end
           end
         end
 
@@ -73,11 +91,12 @@ module VectorMCP
           return false unless session.streaming?
 
           connection = @active_connections[session.id]
-          return false unless connection && !connection.closed?
+          return false unless connection
+          return false if connection.respond_to?(:closed?) && connection.closed?
 
           begin
             event_data = message.to_json
-            enqueue_event(connection, event_data, "message")
+            enqueue_event(connection, session, event_data, "message")
             logger.debug("Message sent to session #{session.id}")
             true
           rescue StandardError => e
@@ -176,7 +195,6 @@ module VectorMCP
         # @return [void]
         def stream_to_client(connection, last_event_id)
           session = connection.session
-          # Send initial connection event
           connection_event = {
             jsonrpc: "2.0",
             method: "connection/established",
@@ -186,45 +204,62 @@ module VectorMCP
             }
           }
 
-          enqueue_event(connection, connection_event.to_json, "connection")
-
-          # Replay missed events if resuming
+          enqueue_event(connection, session, connection_event.to_json, "connection")
           replay_events(connection, last_event_id) if last_event_id
-
-          # Send periodic keep-alive events
           keep_alive_loop(connection)
         end
 
         # Replays events after a specific event ID.
-        #
-        # @param connection [StreamingConnection] The streaming connection
-        # @param last_event_id [String] The last event ID received by client
-        # @return [void]
-        def replay_events(connection, last_event_id)
-          session = connection.session
-          missed_events = @transport.event_store.get_events_after(session.id, last_event_id)
+        def replay_events(connection_or_session, last_event_id_or_target, maybe_last_event_id = nil)
+          if connection_or_session.is_a?(StreamingConnection)
+            connection = connection_or_session
+            session = connection.session
+            target = delivery_target(connection)
+            last_event_id = last_event_id_or_target
+          else
+            session = connection_or_session
+            connection = @active_connections[session.id]
+            target = last_event_id_or_target
+            last_event_id = maybe_last_event_id
+          end
 
+          return unless last_event_id
+
+          missed_events = @transport.event_store.get_events_after(session.id, last_event_id)
           logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
 
           missed_events.each do |event|
-            connection.queue << event.to_sse_format
+            payload = event.to_sse_format
+            if target
+              target << payload
+            elsif connection
+              delivery_target(connection)&.<< payload
+            end
           end
         end
 
         # Keeps the connection alive with periodic heartbeat events.
-        #
-        # @param connection [StreamingConnection] The streaming connection
-        # @return [void]
-        def keep_alive_loop(connection)
-          session = connection.session
+        def keep_alive_loop(connection_or_session, maybe_target = nil)
+          if connection_or_session.is_a?(StreamingConnection)
+            connection = connection_or_session
+            session = connection.session
+            target = delivery_target(connection)
+          else
+            session = connection_or_session
+            connection = @active_connections[session.id]
+            target = maybe_target
+          end
+
+          return unless session
+
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
 
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
-            current_connection = @active_connections[session.id]
-            break if current_connection.nil? || current_connection.closed?
+            current_connection = connection ? @active_connections[session.id] : nil
+            break if connection && (current_connection.nil? || current_connection.closed?)
 
             # Check if connection has been alive too long
             if Time.now - start_time > max_duration
@@ -240,7 +275,13 @@ module VectorMCP
             }
 
             begin
-              enqueue_event(connection, heartbeat_event.to_json, "heartbeat")
+              payload = heartbeat_event.to_json
+              if target
+                event_id = @transport.event_store.store_event(session.id, payload, "heartbeat")
+                target << format_sse_event(payload, "heartbeat", event_id)
+              elsif current_connection
+                enqueue_event(current_connection, session, payload, "heartbeat")
+              end
             rescue StandardError
               logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
               break
@@ -254,30 +295,39 @@ module VectorMCP
         # @param type [String] The event type
         # @param event_id [String] The event ID
         # @return [String] Formatted SSE event
-      def format_sse_event(data, type, event_id)
-        lines = []
-        lines << "id: #{event_id}"
-        lines << "event: #{type}" if type
-        lines << "data: #{data}"
-        lines << ""
-        "#{lines.join("\n")}\n"
-      end
+        def format_sse_event(data, type, event_id)
+          lines = []
+          lines << "id: #{event_id}"
+          lines << "event: #{type}" if type
+          lines << "data: #{data}"
+          lines << ""
+          "#{lines.join("\n")}\n"
+        end
 
         # Enqueues an event for delivery via SSE, storing it for resumability.
         #
-        # @param connection [StreamingConnection] The streaming connection
-        # @param data [String] JSON-encoded payload
-        # @param type [String] SSE event type
-        # @return [void]
-        def enqueue_event(connection, data, type)
-          event_id = @transport.event_store.store_event(connection.session.id, data, type)
-          connection.queue << format_sse_event(data, type, event_id) unless connection.closed?
+        def enqueue_event(connection, session, data, type)
+          return if connection.respond_to?(:closed?) && connection.closed?
+
+          event_id = @transport.event_store.store_event(session.id, data, type)
+          target = delivery_target(connection)
+          raise StandardError, "No streaming target available" unless target
+
+          target << format_sse_event(data, type, event_id)
         end
 
         # Cleans up a specific connection.
         #
         # @param session [SessionManager::Session] The session to clean up
         # @return [void]
+        def delivery_target(connection)
+          if connection.is_a?(StreamingConnection)
+            connection.queue
+          elsif connection.respond_to?(:yielder)
+            connection.yielder
+          end
+        end
+
         def cleanup_connection(session)
           connection = @active_connections.delete(session.id)
           return unless connection

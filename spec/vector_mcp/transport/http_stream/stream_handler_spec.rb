@@ -371,7 +371,13 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       allow(mock_event_store).to receive(:get_events_after).and_return([])
       allow(mock_yielder).to receive(:<<)
       allow(Thread).to receive(:new).and_yield.and_return(mock_thread)
+      allow(mock_thread).to receive(:kill)
       allow(mock_thread).to receive(:join)
+      allow(stream_handler).to receive(:keep_alive_loop)
+    end
+
+    after do
+      allow(stream_handler).to receive(:keep_alive_loop).and_call_original
     end
 
     describe "SSE stream creation" do
@@ -462,6 +468,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(mock_connection).to receive(:closed?).and_return(false, false, true) # Stop after 2 iterations
         stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
         allow(stream_handler).to receive(:sleep) # Mock sleep to speed up tests
+        allow(mock_event_store).to receive(:store_event).and_return("event-heartbeat")
       end
 
       it "sends periodic heartbeat events" do
@@ -515,8 +522,12 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     end
 
     describe "#close" do
-      it "marks connection as closed" do
+      before do
         allow(mock_thread).to receive(:kill)
+        allow(mock_thread).to receive(:join)
+      end
+
+      it "marks connection as closed" do
         connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
           mock_session, mock_yielder, mock_thread, false
         )
@@ -527,7 +538,6 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "kills the thread" do
-        allow(mock_thread).to receive(:kill)
         connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
           mock_session, mock_yielder, mock_thread, false
         )
