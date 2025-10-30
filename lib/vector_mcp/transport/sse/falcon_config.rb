@@ -46,7 +46,7 @@ module VectorMCP
           logger.info { "Stopping Falcon SSE server" }
 
           begin
-            server_task = @server_task if @server_task&.respond_to?(:stop)
+            server_task = @server_task if @server_task.respond_to?(:stop)
             server_task&.stop
 
             if @async_task
@@ -54,11 +54,12 @@ module VectorMCP
                 @async_task.stop
               rescue NoMethodError => e
                 raise unless e.receiver.nil? && e.name == :raise
+
                 logger.debug { "Falcon SSE async task already stopped" }
               end
             end
 
-            server_task&.wait if server_task&.respond_to?(:wait)
+            server_task&.wait if server_task.respond_to?(:wait)
           ensure
             @server_task = nil
             @async_task = nil
@@ -151,7 +152,7 @@ module VectorMCP
         #
         # @param endpoint [Async::HTTP::Endpoint] The endpoint to configure
         # @return [void]
-        def configure_endpoint_for_sse(endpoint)
+        def configure_endpoint_for_sse(_endpoint)
           # SSE connections should be long-lived with minimal timeouts
           # Falcon handles this automatically with async I/O
 

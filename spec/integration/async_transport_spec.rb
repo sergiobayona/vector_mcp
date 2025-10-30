@@ -183,7 +183,7 @@ RSpec.describe "Async HTTP Client Integration", type: :integration do
       # Verify all results are correct
       expect(results.size).to eq(session_count)
       results.each do |item|
-        expected = item[:session] * 10 + 5
+        expected = (item[:session] * 10) + 5
         expect(item[:result]).to eq(expected)
       end
     end
@@ -205,14 +205,13 @@ RSpec.describe "Async HTTP Client Integration", type: :integration do
       end
 
       # Make concurrent calls with different arguments
-      threads = []
       results = {}
 
-      [
+      threads = [
         [session1_id, "Session 1 message"],
         [session2_id, "Session 2 message"]
-      ].each do |session_id, message|
-        threads << Thread.new do
+      ].map do |session_id, message|
+        Thread.new do
           call_request = create_json_rpc_request("tools/call", {
                                                    name: "echo",
                                                    arguments: { message: message }

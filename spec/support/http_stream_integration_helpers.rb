@@ -55,7 +55,7 @@ module HttpStreamIntegrationHelpers
                  when "GET"
                    internet.get(url, headers: request_headers)
                  when "POST"
-                   internet.post(url, headers: request_headers, body: body ? body.to_json : nil)
+                   internet.post(url, headers: request_headers, body: body&.to_json)
                  when "DELETE"
                    internet.delete(url, headers: request_headers)
                  else
@@ -385,7 +385,7 @@ module HttpStreamIntegrationHelpers
     def handle_stream
       Async do
         internet = Async::HTTP::Internet.new
-        
+
         headers = {
           "Mcp-Session-Id" => @session_id,
           "Accept" => "text/event-stream",
@@ -393,7 +393,7 @@ module HttpStreamIntegrationHelpers
         }
 
         response = internet.get("#{@base_url}/mcp", headers: headers)
-        
+
         while @running && (chunk = response.read)
           # Parse SSE events
           parse_sse_events(chunk) do |message|
@@ -454,7 +454,7 @@ module HttpStreamIntegrationHelpers
     def send_response(response)
       Async do
         internet = Async::HTTP::Internet.new
-        
+
         headers = {
           "Mcp-Session-Id" => @session_id,
           "Content-Type" => "application/json"

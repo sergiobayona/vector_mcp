@@ -91,9 +91,7 @@ RSpec.describe VectorMCP::Transport::SSE::FalconConfig do
       config = described_class.new(host, port, logger, cache_size: custom_size)
       server = config.create_server(mock_rack_app)
 
-      if server.respond_to?(:cache_size)
-        expect(server.cache_size).to eq(custom_size)
-      end
+      expect(server.cache_size).to eq(custom_size) if server.respond_to?(:cache_size)
     end
   end
 

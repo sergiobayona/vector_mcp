@@ -234,7 +234,7 @@ class WebScrapingServer
       url = args["url"]
 
       begin
-        uri = URI.parse(url)
+        URI.parse(url)
         start_time = Time.now
 
         response = Async do
@@ -248,7 +248,7 @@ class WebScrapingServer
         ensure
           internet&.close
         end.wait
-        
+
         response_time = Time.now - start_time
 
         {

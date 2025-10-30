@@ -42,17 +42,11 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     transport.session_manager.cleanup_all_sessions
   end
 
-  def server
-    @server
-  end
+  attr_reader :server
 
-  def transport
-    @transport
-  end
+  attr_reader :transport
 
-  def base_url
-    @base_url
-  end
+  attr_reader :base_url
 
   def wait_for_condition(timeout: 2, poll: 0.05)
     deadline = Time.now + timeout

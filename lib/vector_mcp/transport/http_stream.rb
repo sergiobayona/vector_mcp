@@ -306,11 +306,12 @@ module VectorMCP
         logger.info { "Stopping Falcon server" }
 
         # Prefer to stop the async task directly
-        if @falcon_task&.respond_to?(:stop)
+        if @falcon_task.respond_to?(:stop)
           begin
             @falcon_task.stop
           rescue NoMethodError => e
             raise unless e.receiver.nil? && e.name == :raise
+
             logger.debug { "Falcon task already stopped" }
           end
         elsif @falcon_config

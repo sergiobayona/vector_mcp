@@ -30,8 +30,8 @@ module VectorMCP
 
             self.closed = true
             queue << nil # Queue natively supports <<
-            thread&.kill if thread
-            thread&.join if thread
+            thread&.kill
+            thread&.join
           end
 
           def closed?

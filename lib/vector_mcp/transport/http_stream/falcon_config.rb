@@ -105,7 +105,7 @@ module VectorMCP
 
           logger.info { "Stopping Falcon server" }
           begin
-            server_task = @server_task if @server_task&.respond_to?(:stop)
+            server_task = @server_task if @server_task.respond_to?(:stop)
             server_task&.stop
 
             if @async_task
@@ -113,11 +113,12 @@ module VectorMCP
                 @async_task.stop
               rescue NoMethodError => e
                 raise unless e.receiver.nil? && e.name == :raise
+
                 logger.debug { "Falcon async task already stopped" }
               end
             end
 
-            server_task&.wait if server_task&.respond_to?(:wait)
+            server_task&.wait if server_task.respond_to?(:wait)
           ensure
             @server_task = nil
             @async_task = nil
@@ -148,7 +149,7 @@ module VectorMCP
         #
         # @param endpoint [Async::HTTP::Endpoint] The endpoint to configure
         # @return [void]
-        def configure_endpoint_options(endpoint)
+        def configure_endpoint_options(_endpoint)
           # Endpoint options can be configured here if needed
           # For now, we use the defaults which work well for SSE and HTTP streaming
 
