@@ -222,6 +222,30 @@ module VectorMCP
 
         # Keeps the connection alive with periodic heartbeat events.
         def keep_alive_loop(connection_or_session, maybe_target = nil)
+          connection, session, target = extract_connection_info(connection_or_session, maybe_target)
+          return unless session
+
+          start_time = Time.now
+          max_duration = 300 # 5 minutes maximum connection time
+
+          loop do
+            sleep(30) # Send heartbeat every 30 seconds
+
+            break if connection_expired?(connection, session, start_time, max_duration)
+
+            send_heartbeat(connection, session, target)
+          rescue StandardError
+            logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
+            break
+          end
+        end
+
+        # Extracts connection info from the connection_or_session parameter.
+        #
+        # @param connection_or_session [StreamingConnection, SessionManager::Session] Connection or session
+        # @param maybe_target [Queue, nil] Optional target queue
+        # @return [Array(StreamingConnection, SessionManager::Session, Queue)] Connection, session, target
+        def extract_connection_info(connection_or_session, maybe_target)
           if connection_or_session.is_a?(StreamingConnection)
             connection = connection_or_session
             session = connection.session
@@ -232,42 +256,49 @@ module VectorMCP
             target = maybe_target
           end
 
-          return unless session
+          [connection, session, target]
+        end
 
-          start_time = Time.now
-          max_duration = 300 # 5 minutes maximum connection time
+        # Checks if a connection has expired or been closed.
+        #
+        # @param connection [StreamingConnection, nil] The connection
+        # @param session [SessionManager::Session] The session
+        # @param start_time [Time] When the connection started
+        # @param max_duration [Integer] Maximum duration in seconds
+        # @return [Boolean] True if the connection should be closed
+        def connection_expired?(connection, session, start_time, max_duration)
+          current_connection = connection ? @active_connections[session.id] : nil
+          return true if connection && (current_connection.nil? || current_connection.closed?)
 
-          loop do
-            sleep(30) # Send heartbeat every 30 seconds
+          if Time.now - start_time > max_duration
+            logger.debug("Connection for #{session.id} reached maximum duration, closing")
+            return true
+          end
 
-            current_connection = connection ? @active_connections[session.id] : nil
-            break if connection && (current_connection.nil? || current_connection.closed?)
+          false
+        end
 
-            # Check if connection has been alive too long
-            if Time.now - start_time > max_duration
-              logger.debug("Connection for #{session.id} reached maximum duration, closing")
-              break
-            end
+        # Sends a heartbeat event to the client.
+        #
+        # @param connection [StreamingConnection, nil] The connection
+        # @param session [SessionManager::Session] The session
+        # @param target [Queue, nil] Optional target queue
+        # @return [void]
+        def send_heartbeat(connection, session, target)
+          heartbeat_event = {
+            jsonrpc: "2.0",
+            method: "heartbeat",
+            params: { timestamp: Time.now.iso8601 }
+          }
 
-            # Send heartbeat
-            heartbeat_event = {
-              jsonrpc: "2.0",
-              method: "heartbeat",
-              params: { timestamp: Time.now.iso8601 }
-            }
+          payload = heartbeat_event.to_json
+          current_connection = connection ? @active_connections[session.id] : nil
 
-            begin
-              payload = heartbeat_event.to_json
-              if target
-                event_id = @transport.event_store.store_event(session.id, payload, "heartbeat")
-                target << format_sse_event(payload, "heartbeat", event_id)
-              elsif current_connection
-                enqueue_event(current_connection, session, payload, "heartbeat")
-              end
-            rescue StandardError
-              logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
-              break
-            end
+          if target
+            event_id = @transport.event_store.store_event(session.id, payload, "heartbeat")
+            target << format_sse_event(payload, "heartbeat", event_id)
+          elsif current_connection
+            enqueue_event(current_connection, session, payload, "heartbeat")
           end
         end
 

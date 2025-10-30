@@ -46,23 +46,10 @@ module VectorMCP
           logger.info { "Stopping Falcon SSE server" }
 
           begin
-            server_task = @server_task if @server_task.respond_to?(:stop)
-            server_task&.stop
-
-            if @async_task
-              begin
-                @async_task.stop
-              rescue NoMethodError => e
-                raise unless e.receiver.nil? && e.name == :raise
-
-                logger.debug { "Falcon SSE async task already stopped" }
-              end
-            end
-
-            server_task&.wait if server_task.respond_to?(:wait)
+            stop_server_task
+            stop_async_task
           ensure
-            @server_task = nil
-            @async_task = nil
+            clear_tasks
           end
         rescue StandardError => e
           logger.error { "Error stopping Falcon SSE server: #{e.message}" }
@@ -134,6 +121,38 @@ module VectorMCP
         end
 
         private
+
+        # Stops the server task if it's running.
+        #
+        # @return [void]
+        def stop_server_task
+          server_task = @server_task if @server_task.respond_to?(:stop)
+          server_task&.stop
+          server_task&.wait if server_task.respond_to?(:wait)
+        end
+
+        # Stops the async task if it's running.
+        #
+        # @return [void]
+        def stop_async_task
+          return unless @async_task
+
+          begin
+            @async_task.stop
+          rescue NoMethodError => e
+            raise unless e.receiver.nil? && e.name == :raise
+
+            logger.debug { "Falcon SSE async task already stopped" }
+          end
+        end
+
+        # Clears the task references.
+        #
+        # @return [void]
+        def clear_tasks
+          @server_task = nil
+          @async_task = nil
+        end
 
         # Creates an Async::HTTP::Endpoint for Falcon.
         #
