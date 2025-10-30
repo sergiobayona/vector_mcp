@@ -190,6 +190,7 @@ module VectorMCP
         else
           cleanup_clients
         end
+
         stop_falcon_server
         logger.info("SSE transport stopped")
       end
@@ -253,9 +254,11 @@ module VectorMCP
 
       # Stops the Falcon server
       def stop_falcon_server
-        return unless @running
+        return false unless @running
 
         logger.info("Stopping Falcon server")
+
+        @falcon_config&.stop_server(nil) if @falcon_config&.respond_to?(:stop_server)
 
         # Stop the async reactor by interrupting the task
         if @falcon_task&.respond_to?(:stop)
@@ -266,16 +269,16 @@ module VectorMCP
             raise unless e.receiver.nil? && e.name == :raise
             logger.debug("Falcon SSE task already stopped")
           end
-        elsif @falcon_config&.respond_to?(:stop_server)
-          @falcon_config.stop_server(nil)
         end
 
         @falcon_task = nil
         @falcon_config = nil
 
         @running = false
+        true
       rescue StandardError => e
         logger.error("Error stopping Falcon server: #{e.message}")
+        false
       end
 
       # Handles fatal errors during server startup or main run loop.

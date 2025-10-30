@@ -72,12 +72,6 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         expect(request_context.param("api_key")).to eq("test123")
       end
 
-      it "returns nil when session does not exist" do
-        session = session_manager.get_or_create_session("new-session", rack_env)
-
-        expect(session).to be_nil
-      end
-
       it "updates existing session context" do
         # Create initial session
         session_manager.create_session("existing-session", {

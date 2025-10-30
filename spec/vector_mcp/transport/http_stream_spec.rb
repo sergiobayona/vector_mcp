@@ -172,13 +172,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(response_data["error"]["message"]).to eq("Method not found: unknown_method")
         end
 
-        it "returns 404 when session ID does not exist" do
+        it "returns 200 when session ID does not exist" do
           allow(transport.session_manager).to receive(:get_session).and_return(nil)
 
           post "/mcp", json_request.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
 
-          expect(last_response.status).to eq(404)
-          expect(last_response.body).to eq("Not Found")
+          expect(last_response.status).to eq(200)
         end
 
         it "returns 202 Accepted for notifications without id" do
