@@ -133,6 +133,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
         allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
         allow(transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
+        # Allow request context updates on existing sessions
+        allow(mock_session_context).to receive(:request_context=)
       end
 
       describe "POST requests" do
@@ -172,13 +174,51 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(response_data["error"]["message"]).to eq("Method not found: unknown_method")
         end
 
-        it "creates session when no session ID provided" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(nil, anything).and_return(mock_session)
+        context "session ID validation" do
+          let(:initialize_request) { { "jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => {} } }
+          let(:unknown_session_id) { "unknown-session-id" }
 
-          post "/mcp", json_request.to_json, "CONTENT_TYPE" => "application/json"
+          it "returns 404 for unknown session ID" do
+            allow(transport.session_manager).to receive(:get_session).with(unknown_session_id).and_return(nil)
 
-          expect(last_response.status).to eq(200)
-          expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("HTTP_MCP_SESSION_ID" => unknown_session_id, "CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(404)
+            expect(last_response.body).to eq("Unknown or expired session")
+          end
+
+          it "returns 404 for expired session ID" do
+            allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(nil)
+
+            post "/mcp", json_request.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(404)
+            expect(last_response.body).to eq("Unknown or expired session")
+          end
+
+          it "returns 400 when non-initialize request is sent without session ID" do
+            post "/mcp", json_request.to_json, "CONTENT_TYPE" => "application/json"
+
+            expect(last_response.status).to eq(400)
+            expect(last_response.body).to eq("Missing Mcp-Session-Id header")
+          end
+
+          it "creates a new session for initialize request without session ID" do
+            allow(transport.session_manager).to receive(:create_session).with(nil, anything).and_return(mock_session)
+
+            post "/mcp", initialize_request.to_json, "CONTENT_TYPE" => "application/json"
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+          end
+
+          it "returns a server-generated UUID session ID, not client-supplied value" do
+            post "/mcp", initialize_request.to_json, "CONTENT_TYPE" => "application/json"
+
+            returned_id = last_response.headers["Mcp-Session-Id"]
+            expect(returned_id).to match(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/)
+          end
         end
       end
 
@@ -266,6 +306,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
           before do
             allow(restricted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+            allow(restricted_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+            allow(mock_session_context).to receive(:request_context=)
           end
 
           it "allows requests without Origin header" do
@@ -314,11 +356,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     let(:mock_new_session) { VectorMCP::Transport::HttpStream::SessionManager::Session.new(session_id, mock_new_session_context, Time.now, Time.now, nil) }
 
     before do
-      allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_new_session)
+      allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_new_session)
+      allow(mock_new_session_context).to receive(:request_context=)
     end
 
     it "integrates with session manager for POST requests" do
-      expect(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything)
+      expect(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_new_session)
 
       post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
            "HTTP_MCP_SESSION_ID" => session_id, "CONTENT_TYPE" => "application/json"
@@ -552,7 +595,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       let(:json_request) { { "jsonrpc" => "2.0", "id" => 1, "method" => "test" }.to_json }
 
       before do
-        allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+        allow(mock_session_context).to receive(:request_context=)
       end
 
       it "handles VectorMCP::ProtocolError" do

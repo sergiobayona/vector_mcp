@@ -160,11 +160,10 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
     end
 
     context "when session does not exist" do
-      it "creates new session with provided ID" do
+      it "returns nil when session ID provided but not found" do
         result = session_manager.get_or_create_session(session_id, rack_env)
 
-        expect(result.id).to eq(session_id)
-        expect(result.context).to be_a(VectorMCP::Session)
+        expect(result).to be_nil
       end
 
       it "creates new session with auto-generated ID when nil provided" do

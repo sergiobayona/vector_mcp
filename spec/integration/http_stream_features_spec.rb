@@ -146,11 +146,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
   describe "Phase 1: Server-Initiated Sampling Tests" do
     describe "1.1 Basic Sampling Infrastructure" do
-      let(:session_id) { "sampling-test-session" }
+      let(:session_id) { @session_id }
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
       end
 
       after do
@@ -195,11 +195,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "1.2 Sampling Request/Response Cycle" do
-      let(:session_id) { "sampling-cycle-test" }
+      let(:session_id) { @session_id }
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
         mock_client.set_sampling_response("sampling/createMessage", "This is a test response")
         mock_client.start_streaming
       end
@@ -252,8 +252,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
       it "handles sampling timeout scenarios" do
         # Create a session but don't start streaming connection
-        timeout_session_id = "timeout-test-#{SecureRandom.hex(4)}"
-        initialize_mcp_session(base_url, timeout_session_id)
+        timeout_session_id = initialize_mcp_session(base_url)
         # NOTE: NOT starting streaming connection - this should cause a "no streaming session" error
 
         response = call_tool(base_url, timeout_session_id, "interactive_tool", {
@@ -276,14 +275,14 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "1.3 Session-Specific Sampling" do
-      let(:session1_id) { "session-specific-1" }
-      let(:session2_id) { "session-specific-2" }
+      let(:session1_id) { @session1_id }
+      let(:session2_id) { @session2_id }
       let(:client1) { StreamingTestHelpers::MockStreamingClient.new(session1_id, base_url) }
       let(:client2) { StreamingTestHelpers::MockStreamingClient.new(session2_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session1_id)
-        initialize_mcp_session(base_url, session2_id)
+        @session1_id = initialize_mcp_session(base_url)
+        @session2_id = initialize_mcp_session(base_url)
 
         client1.set_sampling_response("sampling/createMessage", "Response from session 1")
         client2.set_sampling_response("sampling/createMessage", "Response from session 2")
@@ -347,11 +346,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "1.4 Sampling Error Handling" do
-      let(:session_id) { "error-handling-test" }
+      let(:session_id) { @session_id }
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
       end
 
       after do
@@ -439,10 +438,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
   describe "Phase 2: Event Store Functionality" do
     describe "2.1 Event Storage and Retrieval" do
-      let(:session_id) { "event-store-test" }
-
       before do
-        initialize_mcp_session(base_url, session_id)
+        initialize_mcp_session(base_url)
       end
 
       it "stores events in the event store" do
@@ -500,11 +497,11 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "2.2 Connection Resumability" do
-      let(:session_id) { "resumability-test" }
+      let(:session_id) { @session_id }
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
       end
 
       after do
@@ -607,10 +604,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
 
   describe "Phase 3: Streaming Connection Management" do
     describe "3.1 Connection Establishment" do
-      let(:session_id) { "connection-test" }
+      let(:session_id) { @session_id }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
       end
 
       it "establishes connection with valid session" do
@@ -625,10 +622,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "handles connection with missing session" do
         client = StreamingTestHelpers::MockStreamingClient.new("non-existent-session", base_url)
 
-        # Should still connect (server may create session)
-        expect(client.start_streaming).to be true
-
-        client.stop_streaming
+        # Server returns 404 for unknown sessions (security fix)
+        expect(client.start_streaming).to be false
       end
 
       it "tracks connection state correctly" do
@@ -645,12 +640,12 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "3.2 Multi-Session Streaming" do
-      let(:session1_id) { "multi-session-1" }
-      let(:session2_id) { "multi-session-2" }
+      let(:session1_id) { @session1_id }
+      let(:session2_id) { @session2_id }
 
       before do
-        initialize_mcp_session(base_url, session1_id)
-        initialize_mcp_session(base_url, session2_id)
+        @session1_id = initialize_mcp_session(base_url)
+        @session2_id = initialize_mcp_session(base_url)
       end
 
       it "supports multiple concurrent streaming connections" do
@@ -684,10 +679,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
     end
 
     describe "3.3 Connection Cleanup" do
-      let(:session_id) { "cleanup-test" }
+      let(:session_id) { @session_id }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
       end
 
       it "cleans up resources on disconnect" do

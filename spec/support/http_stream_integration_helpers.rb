@@ -68,8 +68,10 @@ module HttpStreamIntegrationHelpers
     request
   end
 
-  # Helper method to initialize an MCP session
-  def initialize_mcp_session(base_url, session_id, client_info: nil)
+  # Helper method to initialize an MCP session.
+  # The _session_id parameter is accepted but ignored; the server always generates the session ID.
+  # Returns the server-generated session ID string from the response header.
+  def initialize_mcp_session(base_url, _session_id = nil, client_info: nil)
     client_info ||= { name: "test-client", version: "1.0.0" }
 
     init_request = create_json_rpc_request("initialize", {
@@ -78,7 +80,7 @@ module HttpStreamIntegrationHelpers
                                              clientInfo: client_info
                                            })
 
-    response = make_http_request("POST", base_url, "/mcp", { body: init_request, session_id: session_id })
+    response = make_http_request("POST", base_url, "/mcp", { body: init_request })
     expect(response.code).to eq("200")
 
     data = parse_json_rpc_response(response)
@@ -90,7 +92,7 @@ module HttpStreamIntegrationHelpers
       expect(data).not_to be_nil
     end
 
-    response
+    response["Mcp-Session-Id"]
   end
 
   # Helper method to establish streaming connection
@@ -188,7 +190,7 @@ module HttpStreamIntegrationHelpers
   # Helper method to terminate session
   def terminate_session(base_url, session_id)
     response = make_http_request("DELETE", base_url, "/mcp", { session_id: session_id })
-    expect(response.code).to eq("200")
+    expect(response.code).to eq("204")
     response
   end
 
@@ -304,18 +306,16 @@ module HttpStreamIntegrationHelpers
 
   # Concurrent testing helper
   def run_concurrent_sessions(base_url, session_count: 3)
-    sessions = []
+    sessions = Concurrent::Array.new
     threads = []
 
     session_count.times do |i|
-      session_id = "concurrent-session-#{i}"
-      sessions << session_id
-
       threads << Thread.new do
-        initialize_mcp_session(base_url, session_id, client_info: {
-                                 name: "test-client-#{i}",
-                                 version: "1.0.0"
-                               })
+        session_id = initialize_mcp_session(base_url, client_info: {
+                                              name: "test-client-#{i}",
+                                              version: "1.0.0"
+                                            })
+        sessions << session_id
 
         yield(session_id, i) if block_given?
       end
@@ -324,7 +324,7 @@ module HttpStreamIntegrationHelpers
     # Wait for all threads to complete
     threads.each(&:join)
 
-    sessions
+    sessions.to_a
   end
 
   # Streaming client mock for testing sampling

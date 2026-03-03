@@ -331,10 +331,11 @@ module VectorMCP
       # @return [Array] Rack response triplet
       def handle_post_request(env)
         session_id = extract_session_id(env)
-        session = @session_manager.get_or_create_session(session_id, env)
-
         request_body = read_request_body(env)
         message = parse_json_message(request_body)
+
+        session = resolve_session_for_post(session_id, message, env)
+        return session if session.is_a?(Array) # Rack error response
 
         # Check if this is a response to a server-initiated request
         if outgoing_response?(message)
@@ -352,6 +353,35 @@ module VectorMCP
         json_error_response(e.request_id, e.code, e.message, e.details)
       rescue JSON::ParserError => e
         json_error_response(nil, -32_700, "Parse error", { details: e.message })
+      end
+
+      # Resolves or creates the session for a POST request following MCP spec rules:
+      # - session_id present and known  → return existing session (updating request context)
+      # - session_id present but unknown/expired → 404 Not Found
+      # - no session_id + initialize request → create new session
+      # - no session_id + other request → 400 Bad Request
+      #
+      # @param session_id [String, nil] Client-supplied Mcp-Session-Id header value
+      # @param message [Hash] Parsed JSON-RPC message
+      # @param env [Hash] Rack environment
+      # @return [Session, Array] Session object or Rack error response triplet
+      def resolve_session_for_post(session_id, message, env)
+        is_initialize = message.is_a?(Hash) && message["method"] == "initialize"
+
+        if session_id
+          session = @session_manager.get_session(session_id)
+          return not_found_response("Unknown or expired session") unless session
+
+          if env
+            request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+            session.context.request_context = request_context
+          end
+          session
+        elsif is_initialize
+          @session_manager.create_session(nil, env)
+        else
+          bad_request_response("Missing Mcp-Session-Id header")
+        end
       end
 
       # Handles GET requests (SSE streaming)
@@ -469,8 +499,8 @@ module VectorMCP
         [400, { "Content-Type" => "application/json" }, [response.to_json]]
       end
 
-      def not_found_response
-        [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+      def not_found_response(message = "Not Found")
+        [404, { "Content-Type" => "text/plain" }, [message]]
       end
 
       def bad_request_response(message = "Bad Request")
