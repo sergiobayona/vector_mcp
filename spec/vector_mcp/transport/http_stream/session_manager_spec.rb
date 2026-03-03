@@ -90,7 +90,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
         expect(session.id).to be_a(String)
         expect(session.id).not_to be_empty
-        expect(session.id).to match(/^[a-f0-9\-]+$/) # UUID-like format
+        expect(session.id).to match(/^[a-f0-9-]+$/) # UUID-like format
       end
 
       it "creates unique session IDs" do
