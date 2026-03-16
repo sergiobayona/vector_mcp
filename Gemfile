@@ -6,6 +6,7 @@ source "https://rubygems.org"
 gemspec
 
 group :development, :test do
+  gem "async-rspec", "~> 1.0"
   gem "bundler", "~> 2.0"
   gem "irb"
   gem "rack-test", "~> 2.1"

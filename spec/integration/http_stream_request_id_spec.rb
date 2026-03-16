@@ -10,22 +10,57 @@ require_relative "../support/http_stream_integration_helpers"
 RSpec.describe "HttpStream Request ID Generation Integration", type: :integration do
   include HttpStreamIntegrationHelpers
 
-  let(:test_port) { find_available_port }
-  let(:base_url) { "http://localhost:#{test_port}" }
-  let(:session_id) { "request-id-test-#{SecureRandom.hex(4)}" }
-
-  let(:server) do
-    VectorMCP::Server.new(
+  before(:all) do
+    @test_port = find_available_port
+    @base_url = "http://localhost:#{@test_port}"
+    @server = VectorMCP::Server.new(
       name: "Request ID Test Server",
       version: "1.0.0",
       log_level: Logger::ERROR
     )
+
+    register_request_id_tool(@server)
+
+    @transport = VectorMCP::Transport::HttpStream.new(@server, port: @test_port, host: "localhost")
+    @server_thread = Thread.new do
+      @transport.run
+    rescue StandardError
+      # Server stopped, expected during cleanup
+    end
+
+    wait_for_server_start(@base_url)
   end
 
-  let(:transport) { VectorMCP::Transport::HttpStream.new(server, port: test_port, host: "localhost") }
+  after(:all) do
+    @transport&.stop
+    @server_thread&.join(2)
+  end
 
   before(:each) do
-    # Register a tool that triggers server-initiated sampling
+    transport.event_store.clear
+    transport.stream_handler.cleanup_all_connections
+    transport.session_manager.cleanup_all_sessions
+  end
+
+  let(:session_id) { "request-id-test-#{SecureRandom.hex(4)}" }
+
+  attr_reader :server
+
+  attr_reader :transport
+
+  attr_reader :base_url
+
+  def wait_for_condition(timeout: 2, poll: 0.05)
+    deadline = Time.now + timeout
+    loop do
+      return true if yield
+      return false if Time.now >= deadline
+
+      sleep(poll)
+    end
+  end
+
+  def register_request_id_tool(server)
     server.register_tool(
       name: "id_test_tool",
       description: "Tool that tests request ID generation",
@@ -37,7 +72,6 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         required: ["message"]
       }
     ) do |args, session|
-      # Use sampling to test request ID generation
       result = session.sample({
                                 messages: [
                                   {
@@ -58,21 +92,6 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         request_processed: true
       }
     end
-
-    # Start the server
-    @server_thread = Thread.new do
-      transport.run
-    rescue StandardError
-      # Server stopped, expected during cleanup
-    end
-
-    # Wait for server to start
-    wait_for_server_start(base_url)
-  end
-
-  after(:each) do
-    transport.stop
-    @server_thread&.join(2)
   end
 
   describe "Request ID Generation in Real Scenarios" do
@@ -90,7 +109,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       end
 
       it "generates unique request IDs for each sampling call" do
-        request_ids = []
+        request_ids = Concurrent::Array.new
 
         # Capture request IDs from sampling calls
         mock_client.on_method("sampling/createMessage") do |event|
@@ -102,15 +121,13 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           call_tool(base_url, session_id, "id_test_tool", {
                       message: "Test message #{i}"
                     })
-          sleep(0.1) # Small delay to ensure proper ordering
         end
 
-        # Wait for all sampling calls to be captured
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { request_ids.length == 3 }).to be true
 
         # Verify unique IDs generated
         expect(request_ids.length).to eq(3)
-        expect(request_ids.uniq.length).to eq(3)
+        expect(request_ids.to_a.uniq.length).to eq(3)
 
         # Verify all IDs follow the expected format
         request_ids.each do |id|
@@ -119,12 +136,12 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         end
 
         # Verify incrementing counter pattern
-        counters = request_ids.map { |id| id.split("_").last.to_i }
+        counters = request_ids.to_a.map { |id| id.split("_").last.to_i }
         expect(counters.sort).to eq(counters) # Should be in ascending order
       end
 
       it "maintains consistent base across multiple requests" do
-        request_ids = []
+        request_ids = Concurrent::Array.new
 
         mock_client.on_method("sampling/createMessage") do |event|
           request_ids << event[:data]["id"]
@@ -135,13 +152,12 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           call_tool(base_url, session_id, "id_test_tool", {
                       message: "Base test #{i}"
                     })
-          sleep(0.05)
         end
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { request_ids.length == 5 }).to be true
 
         # Extract base pattern (everything except the counter)
-        bases = request_ids.map { |id| id.gsub(/_\d+\z/, "") }
+        bases = request_ids.to_a.map { |id| id.gsub(/_\d+\z/, "") }
 
         # All should have the same base
         expect(bases.uniq.length).to eq(1)
@@ -175,9 +191,9 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       end
 
       it "generates unique IDs across multiple concurrent sessions" do
-        all_request_ids = []
-        session1_ids = []
-        session2_ids = []
+        all_request_ids = Concurrent::Array.new
+        session1_ids = Concurrent::Array.new
+        session2_ids = Concurrent::Array.new
 
         # Capture IDs from both sessions
         client1.on_method("sampling/createMessage") do |event|
@@ -200,7 +216,6 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
             call_tool(base_url, session1_id, "id_test_tool", {
                         message: "Session 1 message #{i}"
                       })
-            sleep(0.02)
           end
         end
 
@@ -209,16 +224,17 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
             call_tool(base_url, session2_id, "id_test_tool", {
                         message: "Session 2 message #{i}"
                       })
-            sleep(0.02)
           end
         end
 
         threads.each(&:join)
-        sleep(1.5) # Wait for all sampling calls to complete
+        expect(
+          wait_for_condition(timeout: 3) { session1_ids.length == 3 && session2_ids.length == 3 }
+        ).to be true
 
         # All IDs should be unique across sessions
         expect(all_request_ids.length).to eq(6)
-        expect(all_request_ids.uniq.length).to eq(6)
+        expect(all_request_ids.to_a.uniq.length).to eq(6)
 
         # Each session should have received requests
         expect(session1_ids.length).to eq(3)
@@ -230,7 +246,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         end
 
         # No ID collisions between sessions
-        expect((session1_ids & session2_ids).empty?).to be true
+        expect((session1_ids.to_a & session2_ids.to_a).empty?).to be true
       end
     end
 
@@ -262,7 +278,6 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
               # Access the transport directly to test ID generation
               id = transport.send(:generate_request_id)
               request_ids << id
-              sleep(0.001) # Simulate rapid generation
             end
           end
         end
@@ -280,11 +295,11 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           expect(id).to match(/\Avecmcp_http_\d+_[a-f0-9]{8}_\d+\z/)
         end
 
-        # Verify counter incrementing works correctly under load
-        counters = request_ids.map { |id| id.split("_").last.to_i }.sort
-        expect(counters.first).to be >= 1
-        expect(counters.last).to be <= total_expected
-        expect(counters).to eq(counters.uniq.sort) # All unique, ascending
+        # Verify counter values are strictly increasing (no duplicates) under load
+        counters = request_ids.map { |id| id.split("_").last.to_i }
+        sorted_counters = counters.sort
+        expect(sorted_counters).to eq(sorted_counters.uniq)
+        expect(sorted_counters.each_cons(2).all? { |a, b| b > a }).to be true
       end
     end
 
@@ -302,8 +317,8 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       end
 
       it "maintains ID generation state across multiple tool calls" do
-        first_batch_ids = []
-        second_batch_ids = []
+        first_batch_ids = Concurrent::Array.new
+        second_batch_ids = Concurrent::Array.new
 
         # First batch of requests
         mock_client.on_method("sampling/createMessage") do |event|
@@ -316,7 +331,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
                     })
         end
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { first_batch_ids.length == 3 }).to be true
 
         # Clear the handler and capture second batch
         mock_client.clear_method_handlers
@@ -330,10 +345,10 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
                     })
         end
 
-        sleep(1)
+        expect(wait_for_condition(timeout: 3) { second_batch_ids.length == 3 }).to be true
 
         # Verify counter continued incrementing
-        all_ids = first_batch_ids + second_batch_ids
+        all_ids = first_batch_ids.to_a + second_batch_ids.to_a
         counters = all_ids.map { |id| id.split("_").last.to_i }
 
         expect(counters).to eq(counters.sort) # Should be in ascending order

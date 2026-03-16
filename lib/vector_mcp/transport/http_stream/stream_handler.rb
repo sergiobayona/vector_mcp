@@ -18,10 +18,20 @@ module VectorMCP
         attr_reader :transport, :logger
 
         # Streaming connection data structure
-        StreamingConnection = Struct.new(:session, :yielder, :thread, :closed) do
+        StreamingConnection = Struct.new(:session, :queue, :thread, :closed) do
+          def initialize(*)
+            super
+            self.closed ||= false
+            self.queue ||= Queue.new
+          end
+
           def close
+            return if closed?
+
             self.closed = true
+            queue << nil # Queue natively supports <<
             thread&.kill
+            thread&.join
           end
 
           def closed?
@@ -63,24 +73,16 @@ module VectorMCP
           return false unless session.streaming?
 
           connection = @active_connections[session.id]
-          return false unless connection && !connection.closed?
+          return false unless connection
+          return false if connection.respond_to?(:closed?) && connection.closed?
 
           begin
-            # Store event for resumability
             event_data = message.to_json
-            event_id = @transport.event_store.store_event(event_data, "message")
-
-            # Send via SSE
-            sse_event = format_sse_event(event_data, "message", event_id)
-            connection.yielder << sse_event
-
+            enqueue_event(connection, session, event_data, "message")
             logger.debug("Message sent to session #{session.id}")
-
             true
           rescue StandardError => e
             logger.error("Error sending message to session #{session.id}: #{e.message}")
-
-            # Mark connection as closed and clean up
             cleanup_connection(session)
             false
           end
@@ -135,7 +137,8 @@ module VectorMCP
         # @return [Enumerator] SSE stream enumerator
         def create_sse_stream(session, last_event_id)
           Enumerator.new do |yielder|
-            connection = StreamingConnection.new(session, yielder, nil, false)
+            queue = Queue.new
+            connection = StreamingConnection.new(session, queue, nil, false)
 
             # Register connection
             @active_connections[session.id] = connection
@@ -143,26 +146,37 @@ module VectorMCP
 
             # Start streaming thread
             connection.thread = Thread.new do
-              stream_to_client(session, yielder, last_event_id)
+              begin
+                stream_to_client(connection, last_event_id)
+              rescue StandardError => e
+                logger.error("Error in streaming thread for #{session.id}: #{e.message}")
+              ensure
+                queue << nil unless connection.closed?
+              end
             rescue StandardError => e
-              logger.error("Error in streaming thread for #{session.id}: #{e.message}")
-            ensure
-              cleanup_connection(session)
+              logger.error("Error creating streaming thread for #{session.id}: #{e.message}")
             end
 
-            # Keep connection alive until thread completes
-            connection.thread.join
+            # Drain queue and send events to client
+            loop do
+              event = queue.pop
+              break if event.nil?
+
+              yielder << event
+            end
+          ensure
+            cleanup_connection(session)
           end
         end
 
         # Streams events to a client.
         #
         # @param session [SessionManager::Session] The session
-        # @param yielder [Enumerator::Yielder] The SSE yielder
+        # @param connection [StreamingConnection] The streaming connection
         # @param last_event_id [String, nil] The last event ID for resumability
         # @return [void]
-        def stream_to_client(session, yielder, last_event_id)
-          # Send initial connection event
+        def stream_to_client(connection, last_event_id)
+          session = connection.session
           connection_event = {
             jsonrpc: "2.0",
             method: "connection/established",
@@ -172,66 +186,119 @@ module VectorMCP
             }
           }
 
-          event_id = @transport.event_store.store_event(connection_event.to_json, "connection")
-          yielder << format_sse_event(connection_event.to_json, "connection", event_id)
-
-          # Replay missed events if resuming
-          replay_events(yielder, last_event_id) if last_event_id
-
-          # Send periodic keep-alive events
-          keep_alive_loop(session, yielder)
+          enqueue_event(connection, session, connection_event.to_json, "connection")
+          replay_events(connection, last_event_id) if last_event_id
+          keep_alive_loop(connection)
         end
 
         # Replays events after a specific event ID.
-        #
-        # @param yielder [Enumerator::Yielder] The SSE yielder
-        # @param last_event_id [String] The last event ID received by client
-        # @return [void]
-        def replay_events(yielder, last_event_id)
-          missed_events = @transport.event_store.get_events_after(last_event_id)
+        def replay_events(connection_or_session, last_event_id_or_target, maybe_last_event_id = nil)
+          if connection_or_session.is_a?(StreamingConnection)
+            connection = connection_or_session
+            session = connection.session
+            target = delivery_target(connection)
+            last_event_id = last_event_id_or_target
+          else
+            session = connection_or_session
+            connection = @active_connections[session.id]
+            target = last_event_id_or_target
+            last_event_id = maybe_last_event_id
+          end
 
+          return unless last_event_id
+
+          missed_events = @transport.event_store.get_events_after(session.id, last_event_id)
           logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
 
           missed_events.each do |event|
-            yielder << event.to_sse_format
+            payload = event.to_sse_format
+            if target
+              target << payload
+            elsif connection
+              delivery_target(connection)&.<< payload
+            end
           end
         end
 
         # Keeps the connection alive with periodic heartbeat events.
-        #
-        # @param session [SessionManager::Session] The session
-        # @param yielder [Enumerator::Yielder] The SSE yielder
-        # @return [void]
-        def keep_alive_loop(session, yielder)
+        def keep_alive_loop(connection_or_session, maybe_target = nil)
+          connection, session, target = extract_connection_info(connection_or_session, maybe_target)
+          return unless session
+
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
 
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
+            break if connection_expired?(connection, session, start_time, max_duration)
+
+            send_heartbeat(connection, session, target)
+          rescue StandardError
+            logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
+            break
+          end
+        end
+
+        # Extracts connection info from the connection_or_session parameter.
+        #
+        # @param connection_or_session [StreamingConnection, SessionManager::Session] Connection or session
+        # @param maybe_target [Queue, nil] Optional target queue
+        # @return [Array(StreamingConnection, SessionManager::Session, Queue)] Connection, session, target
+        def extract_connection_info(connection_or_session, maybe_target)
+          if connection_or_session.is_a?(StreamingConnection)
+            connection = connection_or_session
+            session = connection.session
+            target = delivery_target(connection)
+          else
+            session = connection_or_session
             connection = @active_connections[session.id]
-            break if connection.nil? || connection.closed?
+            target = maybe_target
+          end
 
-            # Check if connection has been alive too long
-            if Time.now - start_time > max_duration
-              logger.debug("Connection for #{session.id} reached maximum duration, closing")
-              break
-            end
+          [connection, session, target]
+        end
 
-            # Send heartbeat
-            heartbeat_event = {
-              jsonrpc: "2.0",
-              method: "heartbeat",
-              params: { timestamp: Time.now.iso8601 }
-            }
+        # Checks if a connection has expired or been closed.
+        #
+        # @param connection [StreamingConnection, nil] The connection
+        # @param session [SessionManager::Session] The session
+        # @param start_time [Time] When the connection started
+        # @param max_duration [Integer] Maximum duration in seconds
+        # @return [Boolean] True if the connection should be closed
+        def connection_expired?(connection, session, start_time, max_duration)
+          current_connection = connection ? @active_connections[session.id] : nil
+          return true if connection && (current_connection.nil? || current_connection.closed?)
 
-            begin
-              event_id = @transport.event_store.store_event(heartbeat_event.to_json, "heartbeat")
-              yielder << format_sse_event(heartbeat_event.to_json, "heartbeat", event_id)
-            rescue StandardError
-              logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
-              break
-            end
+          if Time.now - start_time > max_duration
+            logger.debug("Connection for #{session.id} reached maximum duration, closing")
+            return true
+          end
+
+          false
+        end
+
+        # Sends a heartbeat event to the client.
+        #
+        # @param connection [StreamingConnection, nil] The connection
+        # @param session [SessionManager::Session] The session
+        # @param target [Queue, nil] Optional target queue
+        # @return [void]
+        def send_heartbeat(connection, session, target)
+          heartbeat_event = {
+            jsonrpc: "2.0",
+            method: "heartbeat",
+            params: { timestamp: Time.now.iso8601 }
+          }
+
+          payload = heartbeat_event.to_json
+          current_connection = connection ? @active_connections[session.id] : nil
+
+          if target
+            event_id = @transport.event_store.store_event(session.id, payload, "heartbeat")
+            target << format_sse_event(payload, "heartbeat", event_id)
+          elsif current_connection
+            enqueue_event(current_connection, session, payload, "heartbeat")
           end
         end
 
@@ -250,10 +317,26 @@ module VectorMCP
           "#{lines.join("\n")}\n"
         end
 
-        # Cleans up a specific connection.
+        # Enqueues an event for delivery via SSE, storing it for resumability.
         #
-        # @param session [SessionManager::Session] The session to clean up
-        # @return [void]
+        def enqueue_event(connection, session, data, type)
+          return if connection.respond_to?(:closed?) && connection.closed?
+
+          event_id = @transport.event_store.store_event(session.id, data, type)
+          target = delivery_target(connection)
+          raise StandardError, "No streaming target available" unless target
+
+          target << format_sse_event(data, type, event_id)
+        end
+
+        # Gets the delivery target (queue) for a connection.
+        #
+        # @param connection [StreamingConnection] The streaming connection
+        # @return [Queue, nil] The queue for event delivery
+        def delivery_target(connection)
+          connection.queue if connection.is_a?(StreamingConnection)
+        end
+
         def cleanup_connection(session)
           connection = @active_connections.delete(session.id)
           return unless connection

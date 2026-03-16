@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "tempfile"
 
 RSpec.describe VectorMCP::Definitions do
   describe VectorMCP::Definitions::Tool do

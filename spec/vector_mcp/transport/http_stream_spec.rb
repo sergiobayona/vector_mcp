@@ -130,8 +130,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
       before do
         # Mock session manager to return a session
-        allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
-        allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_session).and_return(mock_session)
+        allow(transport.session_manager).to receive(:create_session).and_return(mock_session)
         allow(transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
       end
 
@@ -172,8 +172,27 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(response_data["error"]["message"]).to eq("Method not found: unknown_method")
         end
 
+        it "returns 200 when session ID does not exist" do
+          allow(transport.session_manager).to receive(:get_session).and_return(nil)
+
+          post "/mcp", json_request.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "returns 202 Accepted for notifications without id" do
+          notification = { "jsonrpc" => "2.0", "method" => "progress" }
+          expect(mock_mcp_server).to receive(:handle_message).with(notification, anything, anything).and_return(nil)
+
+          post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+          expect(last_response.status).to eq(202)
+          expect(last_response.body).to be_empty
+          expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+        end
+
         it "creates session when no session ID provided" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(nil, anything).and_return(mock_session)
+          expect(transport.session_manager).to receive(:create_session).with(nil, kind_of(Hash)).and_return(mock_session)
 
           post "/mcp", json_request.to_json, "CONTENT_TYPE" => "application/json"
 
@@ -191,7 +210,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
 
         it "returns 404 for non-existent sessions" do
-          allow(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(nil)
+          allow(transport.session_manager).to receive(:get_session).and_return(nil)
 
           get "/mcp", {}, valid_headers
 
@@ -250,14 +269,14 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "allows requests with any Origin header" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
         end
 
@@ -265,21 +284,22 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           let(:app) { restricted_app }
 
           before do
-            allow(restricted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+            allow(restricted_transport.session_manager).to receive(:get_session).and_return(mock_session)
+            allow(restricted_transport.session_manager).to receive(:create_session).and_return(mock_session)
           end
 
           it "allows requests without Origin header" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "allows requests from allowed origins" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://example.com")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(202)
           end
 
           it "rejects requests from disallowed origins" do
@@ -314,11 +334,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     let(:mock_new_session) { VectorMCP::Transport::HttpStream::SessionManager::Session.new(session_id, mock_new_session_context, Time.now, Time.now, nil) }
 
     before do
-      allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_new_session)
+      allow(transport.session_manager).to receive(:get_session).and_return(mock_new_session)
+      allow(transport.session_manager).to receive(:create_session).and_return(mock_new_session)
     end
 
     it "integrates with session manager for POST requests" do
-      expect(transport.session_manager).to receive(:get_or_create_session).with(session_id, anything)
+      expect(transport.session_manager).to receive(:get_session).with(session_id, kind_of(Hash)).and_return(mock_new_session)
 
       post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
            "HTTP_MCP_SESSION_ID" => session_id, "CONTENT_TYPE" => "application/json"
@@ -512,24 +533,27 @@ RSpec.describe VectorMCP::Transport::HttpStream do
   end
 
   describe "#stop" do
-    let(:mock_puma_server) { instance_double("Puma::Server", stop: nil) }
+    let(:mock_falcon_task) { instance_double("Async::Task", stop: nil) }
 
     before do
-      transport.instance_variable_set(:@puma_server, mock_puma_server)
+      transport.instance_variable_set(:@falcon_task, mock_falcon_task)
+      transport.instance_variable_set(:@running, true)
       allow(transport.session_manager).to receive(:cleanup_all_sessions)
     end
 
     it "stops the server and cleans up resources" do
-      expect(mock_logger).to receive(:info) { |&block| expect(block.call).to include("Stopping HttpStream transport") }
-      expect(mock_logger).to receive(:info) { |&block| expect(block.call).to include("HttpStream transport stopped") }
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("Stopping HttpStream transport") })
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("Stopping Falcon server") })
+      expect(mock_logger).to(receive(:info).ordered { |&block| expect(block.call).to include("HttpStream transport stopped") })
       expect(transport.session_manager).to receive(:cleanup_all_sessions)
-      expect(mock_puma_server).to receive(:stop)
+      expect(mock_falcon_task).to receive(:stop)
 
       transport.stop
     end
 
-    it "handles missing puma server gracefully" do
-      transport.instance_variable_set(:@puma_server, nil)
+    it "handles missing falcon task gracefully" do
+      transport.instance_variable_set(:@falcon_task, nil)
+      transport.instance_variable_set(:@running, false)
 
       expect { transport.stop }.not_to raise_error
     end
@@ -552,7 +576,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       let(:json_request) { { "jsonrpc" => "2.0", "id" => 1, "method" => "test" }.to_json }
 
       before do
-        allow(transport.session_manager).to receive(:get_or_create_session).and_return(mock_session)
+        allow(transport.session_manager).to receive(:get_session).and_return(mock_session)
       end
 
       it "handles VectorMCP::ProtocolError" do

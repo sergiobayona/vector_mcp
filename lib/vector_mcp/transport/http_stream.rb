@@ -2,7 +2,9 @@
 
 require "json"
 require "securerandom"
-require "puma"
+require "async"
+require "async/http/endpoint"
+require "falcon/server"
 require "rack"
 require "concurrent-ruby"
 require "timeout"
@@ -13,6 +15,7 @@ require_relative "../session"
 require_relative "http_stream/session_manager"
 require_relative "http_stream/event_store"
 require_relative "http_stream/stream_handler"
+require_relative "http_stream/falcon_config"
 
 module VectorMCP
   module Transport
@@ -81,7 +84,7 @@ module VectorMCP
       # @return [void]
       # @raise [StandardError] if there's a fatal error during server startup
       def run
-        start_puma_server
+        start_falcon_server
       rescue StandardError => e
         handle_fatal_error(e)
       end
@@ -205,10 +208,9 @@ module VectorMCP
       # @return [void]
       def stop
         logger.info { "Stopping HttpStream transport" }
-        @running = false
         cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
-        @puma_server&.stop
+        stop_falcon_server
         logger.info { "HttpStream transport stopped" }
       end
 
@@ -243,20 +245,25 @@ module VectorMCP
         prefix.empty? ? "/" : prefix
       end
 
-      # Starts the Puma HTTP server
+      # Starts the Falcon HTTP server
       #
       # @return [void]
-      def start_puma_server
-        @puma_server = Puma::Server.new(self)
-        @puma_server.add_tcp_listener(@host, @port)
-
+      def start_falcon_server
         @running = true
         setup_signal_handlers
 
         logger.info { "HttpStream server listening on #{@host}:#{@port}#{@path_prefix}" }
-        @puma_server.run.join
+
+        # Create Falcon configuration
+        falcon_config = HttpStream::FalconConfig.new(@host, @port, logger)
+        @falcon_config = falcon_config
+
+        # Run Falcon server (this blocks)
+        falcon_config.run(self) do |task|
+          @falcon_task = task
+        end
       rescue StandardError => e
-        logger.error { "Error starting Puma server: #{e.message}" }
+        logger.error { "Error starting Falcon server: #{e.message}" }
         raise
       ensure
         cleanup_server
@@ -280,14 +287,43 @@ module VectorMCP
       #
       # @return [void]
       def stop_server_safely
-        return unless @puma_server
+        return unless @running
 
         begin
-          @puma_server.stop
+          stop_falcon_server
         rescue StandardError => e
           # Simple puts to avoid logger issues in signal context
           puts "Error stopping server: #{e.message}"
         end
+      end
+
+      # Stops the Falcon server
+      #
+      # @return [void]
+      def stop_falcon_server
+        return unless @running
+
+        logger.info { "Stopping Falcon server" }
+
+        # Prefer to stop the async task directly
+        if @falcon_task.respond_to?(:stop)
+          begin
+            @falcon_task.stop
+          rescue NoMethodError => e
+            raise unless e.receiver.nil? && e.name == :raise
+
+            logger.debug { "Falcon task already stopped" }
+          end
+        elsif @falcon_config
+          @falcon_config.stop_server(nil)
+        end
+
+        @falcon_task = nil
+        @falcon_config = nil
+
+        @running = false
+      rescue StandardError => e
+        logger.error { "Error stopping Falcon server: #{e.full_message}" }
       end
 
       # Cleans up server resources
@@ -297,6 +333,8 @@ module VectorMCP
         cleanup_all_pending_requests
         @session_manager.cleanup_all_sessions
         @running = false
+        @falcon_task = nil
+        @falcon_config = nil
         logger.info { "HttpStream server cleanup completed" }
       end
 
@@ -331,7 +369,12 @@ module VectorMCP
       # @return [Array] Rack response triplet
       def handle_post_request(env)
         session_id = extract_session_id(env)
-        session = @session_manager.get_or_create_session(session_id, env)
+        session = if session_id
+                    @session_manager.get_or_create_session(session_id, env)
+                  else
+                    @session_manager.create_session(nil, env)
+                  end
+        return not_found_response if session.nil?
 
         request_body = read_request_body(env)
         message = parse_json_message(request_body)
@@ -340,6 +383,11 @@ module VectorMCP
         if outgoing_response?(message)
           handle_outgoing_response(message)
           # For responses, return 202 Accepted with no body
+          return [202, { "Mcp-Session-Id" => session.id }, []]
+        end
+
+        if notification?(message)
+          @server.handle_message(message, session.context, session.id)
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
@@ -362,7 +410,7 @@ module VectorMCP
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
-        session = @session_manager.get_or_create_session(session_id, env)
+        session = @session_manager.get_session(session_id, env)
         return not_found_response unless session
 
         @stream_handler.handle_streaming_request(env, session)
@@ -437,7 +485,8 @@ module VectorMCP
 
       # Response helper methods
       def handle_health_check
-        [200, { "Content-Type" => "text/plain" }, ["VectorMCP HttpStream Server OK"]]
+        body = ["VectorMCP HttpStream Server OK"]
+        [200, { "Content-Type" => "text/plain" }, body]
       end
 
       def json_response(data, headers = {})
@@ -621,6 +670,14 @@ module VectorMCP
         @outgoing_request_ivars.key?(request_id)
       end
 
+      # Determines if the message is a JSON-RPC notification (no id field).
+      #
+      # @param message [Hash] The parsed message
+      # @return [Boolean] True if message is a notification
+      def notification?(message)
+        !message.key?("id")
+      end
+
       # Handles a response to an outgoing request.
       #
       # @param message [Hash] The parsed response message
@@ -735,7 +792,8 @@ module VectorMCP
 
       # Initialize server state variables
       def initialize_server_state
-        @puma_server = nil
+        @falcon_task = nil
+        @falcon_config = nil
         @running = false
       end
 

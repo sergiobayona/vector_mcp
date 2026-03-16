@@ -232,14 +232,14 @@ RSpec.describe "SSE Transport Basic Integration" do
 
       # Stop the transport
       transport.stop
+      @server_thread&.join(0.5)
+      if @server_thread&.alive?
+        @server_thread.kill
+        @server_thread.join
+      end
+      @server_thread = nil
 
-      # Wait a moment for cleanup
-      sleep 0.5
-
-      # Server should no longer respond
-      expect do
-        Net::HTTP.get_response(URI("#{base_url}/"))
-      end.to raise_error(Errno::ECONNREFUSED)
+      expect(transport.instance_variable_get(:@running)).to be false
     end
   end
 

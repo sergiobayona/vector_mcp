@@ -6,6 +6,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "vector_mcp"
 require "simplecov"
 require "simplecov_json_formatter"
+require "async/rspec"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

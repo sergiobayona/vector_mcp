@@ -90,7 +90,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
         expect(session.id).to be_a(String)
         expect(session.id).not_to be_empty
-        expect(session.id).to match(/^[a-f0-9\-]+$/) # UUID-like format
+        expect(session.id).to match(/^[a-f0-9-]+$/) # UUID-like format
       end
 
       it "creates unique session IDs" do
@@ -160,18 +160,27 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
     end
 
     context "when session does not exist" do
-      it "creates new session with provided ID" do
+      it "creates new session when session ID is provided" do
         result = session_manager.get_or_create_session(session_id, rack_env)
 
         expect(result.id).to eq(session_id)
         expect(result.context).to be_a(VectorMCP::Session)
       end
 
-      it "creates new session with auto-generated ID when nil provided" do
+      it "creates new session when session ID is nil" do
         result = session_manager.get_or_create_session(nil, rack_env)
 
         expect(result.id).to be_a(String)
         expect(result.id).not_to be_empty
+      end
+
+      it "returns nil for terminated session id" do
+        session_manager.create_session(session_id, rack_env)
+        session_manager.terminate_session(session_id)
+
+        result = session_manager.get_or_create_session(session_id, rack_env)
+
+        expect(result).to be_nil
       end
     end
   end
@@ -197,11 +206,32 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
         session_manager.get_session(session_id)
       end
+
+      it "updates request context when rack_env provided" do
+        rack_env = {
+          "REQUEST_METHOD" => "POST",
+          "PATH_INFO" => "/mcp",
+          "HTTP_AUTHORIZATION" => "Bearer context-token"
+        }
+
+        result = session_manager.get_session(session_id, rack_env)
+
+        request_context = result.context.request_context
+        expect(request_context.method).to eq("POST")
+        expect(request_context.path).to eq("/mcp")
+        expect(request_context.header("Authorization")).to eq("Bearer context-token")
+      end
     end
 
     context "when session does not exist" do
       it "returns nil" do
         result = session_manager.get_session("non-existent")
+
+        expect(result).to be_nil
+      end
+
+      it "returns nil when rack_env provided" do
+        result = session_manager.get_session("non-existent", { "REQUEST_METHOD" => "GET" })
 
         expect(result).to be_nil
       end

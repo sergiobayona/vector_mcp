@@ -8,7 +8,7 @@ require "timeout"
 require "socket"
 require "vector_mcp/transport/http_stream"
 
-RSpec.describe "HTTP Stream Transport Integration" do
+RSpec.describe "HTTP Stream Transport Integration", type: :integration do
   # Find an available port for testing
   def find_available_port
     server = TCPServer.new("localhost", 0)
@@ -97,7 +97,7 @@ RSpec.describe "HTTP Stream Transport Integration" do
     end
 
     # Wait for server to start
-    wait_for_server_start
+    wait_for_server_start(base_url)
   end
 
   after(:each) do
@@ -106,20 +106,6 @@ RSpec.describe "HTTP Stream Transport Integration" do
     @server_thread&.join(2) # Wait up to 2 seconds for graceful shutdown
     @server_thread&.kill if @server_thread&.alive? # Force kill if still alive
     @server_thread = nil
-  end
-
-  # Helper method to wait for server to start
-  def wait_for_server_start
-    Timeout.timeout(10) do
-      loop do
-        Net::HTTP.get_response(URI("#{base_url}/"))
-        break
-      rescue Errno::ECONNREFUSED
-        sleep(0.1)
-      end
-    end
-  rescue Timeout::Error
-    raise "Server failed to start within 10 seconds"
   end
 
   # Helper method to make HTTP requests with session ID
@@ -413,15 +399,19 @@ RSpec.describe "HTTP Stream Transport Integration" do
       expect(%w[200 204]).to include(response.code) # May return 204 No Content
 
       # Verify session is gone - new request should create new session
-      # First need to re-initialize the session
+      # First need to re-initialize without providing old session id
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      new_session_id = response["Mcp-Session-Id"]
+      expect(new_session_id).not_to be_nil
+      expect(new_session_id).not_to eq(session_id)
+      session_id = new_session_id
 
       # Now we can make other requests
       list_request = create_json_rpc_request("tools/list", {})

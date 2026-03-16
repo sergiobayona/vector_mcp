@@ -10,7 +10,8 @@ require "vector_mcp"
 # VECTORMCP_LOG_LEVEL=DEBUG VECTORMCP_LOG_FORMAT=json ruby examples/getting_started/minimal_server.rb
 
 # Create an instance of the server
-server = VectorMCP.new(name: "VectorMCP::ExampleSSE_Server", version: "0.0.1")
+# Using HTTP Stream transport (MCP-compliant, recommended)
+server = VectorMCP.new(name: "VectorMCP::ExampleHTTPStream_Server", version: "0.0.1")
 
 # --- Register Tools, Resources, Prompts (same as before) ---
 # ... (copy the register_tool, register_resource, register_prompt blocks) ...
@@ -22,19 +23,19 @@ server.register_tool(
     properties: { message: { type: "string", description: "The message to echo." } },
     required: ["message"]
   }
-) { |args, _session| "You said via VectorMCP SSE: #{args["message"]}" }
+) { |args, _session| "You said via VectorMCP HttpStream: #{args["message"]}" }
 
 server.register_resource(
   uri: "memory://data/example.txt", name: "Example Data", description: "Test data."
-) { |_session| "SSE Resource Content at #{Time.now}" }
+) { |_session| "HttpStream Resource Content at #{Time.now}" }
 
 server.register_prompt(
   name: "simple_greeting", description: "Greets someone.", arguments: [{ name: "name", required: true }]
-) { |args, _session| [{ role: "user", content: { type: "text", text: "Hi #{args["name"]} from SSE!" } }] }
+) { |args, _session| [{ role: "user", content: { type: "text", text: "Hi #{args["name"]} from HttpStream!" } }] }
 
-# --- Run the server using SSE transport ---
+# --- Run the server using HTTP Stream transport ---
 begin
-  server.run(transport: :sse, options: { host: "localhost", port: 8080, path_prefix: "/mcp" })
+  server.run(transport: :http_stream, host: "localhost", port: 8080, path_prefix: "/mcp")
 rescue VectorMCP::Error => e
   logger = VectorMCP.logger_for("server")
   logger.fatal("VectorMCP Error: #{e.message}")

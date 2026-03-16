@@ -182,8 +182,8 @@ Use VectorMCP-specific error classes:
 
 ### Dependencies
 
-**Runtime**: base64, bigdecimal, concurrent-ruby, json-schema, jwt, puma, rack
-**Development**: rspec, rubocop, simplecov, yard, pry-byebug
+**Runtime**: async, async-http, base64, bigdecimal, concurrent-ruby, falcon, json-schema, jwt, rack
+**Development**: async-rspec, rspec, rubocop, simplecov, yard, pry-byebug
 **Optional**: jwt (for JWT authentication strategy)
 
 ### Version Management
@@ -563,13 +563,6 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 - Feature flag integration
 
 ## Code Quality and Maintenance
-
-### Constants and Configuration
-
-**Centralized Constants:**
-- **Location**: `lib/vector_mcp/logging/constants.rb`
-- **Purpose**: Self-documenting configuration limits and defaults
-- **Examples**: `MAX_SERIALIZATION_DEPTH`, `DEFAULT_MAX_MESSAGE_LENGTH`, `TIMESTAMP_PRECISION`
 
 ### Testing Categories
 

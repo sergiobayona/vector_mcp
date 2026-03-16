@@ -17,7 +17,7 @@ module VectorMCP
       # @api private
       class EventStore
         # Event data structure
-        Event = Struct.new(:id, :data, :type, :timestamp) do
+        Event = Struct.new(:id, :session_id, :data, :type, :timestamp) do
           def to_sse_format
             lines = []
             lines << "id: #{id}"
@@ -45,11 +45,11 @@ module VectorMCP
         # @param data [String] The event data
         # @param type [String] The event type (optional)
         # @return [String] The generated event ID
-        def store_event(data, type = nil)
-          event_id = generate_event_id
+        def store_event(session_id, data, type = nil)
+          event_id = generate_event_id(session_id)
           timestamp = Time.now
 
-          event = Event.new(event_id, data, type, timestamp)
+          event = Event.new(event_id, session_id, data, type, timestamp)
 
           # Add to events array
           @events.push(event)
@@ -73,17 +73,18 @@ module VectorMCP
         #
         # @param last_event_id [String] The last event ID received by client
         # @return [Array<Event>] Array of events after the specified ID
-        def get_events_after(last_event_id)
-          return @events.to_a if last_event_id.nil?
+        def get_events_after(session_id, last_event_id)
+          start_index = if last_event_id.nil?
+                          0
+                        else
+                          last_index = @event_index[last_event_id]
+                          return [] if last_index.nil?
 
-          last_index = @event_index[last_event_id]
-          return [] if last_index.nil?
-
-          # Return events after the last_event_id
-          start_index = last_index + 1
+                          last_index + 1
+                        end
           return [] if start_index >= @events.length
 
-          @events[start_index..]
+          @events[start_index..].select { |event| event.session_id == session_id }
         end
 
         # Gets the total number of stored events.
@@ -141,9 +142,9 @@ module VectorMCP
         # Generates a unique event ID.
         #
         # @return [String] A unique event ID
-        def generate_event_id
+        def generate_event_id(session_id)
           sequence = @current_sequence.increment
-          "#{Time.now.to_i}-#{sequence}-#{SecureRandom.hex(4)}"
+          "#{session_id}-#{Time.now.to_i}-#{sequence}-#{SecureRandom.hex(4)}"
         end
       end
     end

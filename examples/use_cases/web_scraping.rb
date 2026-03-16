@@ -11,8 +11,9 @@
 # - Extract specific data patterns (prices, contacts, etc.)
 # - Generate reports from scraped content
 
-require_relative "../../../lib/vector_mcp"
-require "net/http"
+require_relative "../../lib/vector_mcp"
+require "async"
+require "async/http"
 require "uri"
 require "json"
 
@@ -92,29 +93,42 @@ class WebScrapingServer
         if respect_robots
           robots_url = "#{uri.scheme}://#{uri.host}/robots.txt"
           begin
-            robots_response = Net::HTTP.get_response(URI.parse(robots_url))
-            if robots_response.is_a?(Net::HTTPSuccess)
-              robots_content = robots_response.body
-              if robots_content.include?("Disallow: #{uri.path}") ||
-                 robots_content.include?("Disallow: /")
-                return {
-                  status: "error",
-                  error: "Scraping disallowed by robots.txt",
-                  robots_txt: robots_content.lines.first(10).join
-                }
+            Async do
+              internet = Async::HTTP::Internet.new
+              robots_response = internet.get(robots_url)
+              if robots_response.success?
+                robots_content = robots_response.read
+                if robots_content.include?("Disallow: #{uri.path}") ||
+                   robots_content.include?("Disallow: /")
+                  return {
+                    status: "error",
+                    error: "Scraping disallowed by robots.txt",
+                    robots_txt: robots_content.lines.first(10).join
+                  }
+                end
               end
-            end
+            rescue StandardError
+              # Continue if robots.txt check fails
+            ensure
+              internet&.close
+            end.wait
           rescue StandardError
             # Continue if robots.txt check fails
           end
         end
 
         # Fetch the page
-        response = Net::HTTP.get_response(uri)
+        response = Async do
+          internet = Async::HTTP::Internet.new
+          result = internet.get(url)
+          { success: result.success?, body: result.read, status: result.status }
+        ensure
+          internet&.close
+        end.wait
 
-        return { status: "error", error: "HTTP #{response.code}: #{response.message}" } unless response.is_a?(Net::HTTPSuccess)
+        return { status: "error", error: "HTTP #{response[:status]}" } unless response[:success]
 
-        content = response.body
+        content = response[:body]
 
         # Basic HTML parsing (simplified - would use Nokogiri in real implementation)
         if selector
@@ -131,8 +145,8 @@ class WebScrapingServer
           url: url,
           scraped_at: Time.now,
           content: text_content,
-          response_code: response.code,
-          content_type: response["content-type"]
+          response_code: response[:status],
+          content_type: "text/html" # Default since we don't have headers easily accessible
         }
 
         {
@@ -141,8 +155,8 @@ class WebScrapingServer
           url: url,
           content_length: text_content.length,
           content: text_content,
-          response_code: response.code,
-          content_type: response["content-type"]
+          response_code: response[:status],
+          content_type: "text/html"
         }
       rescue StandardError => e
         @logger.error("Failed to extract content", url: url, error: e.message)
@@ -177,11 +191,17 @@ class WebScrapingServer
         sleep(@default_delay - (Time.now - last_time)) if last_time && (Time.now - last_time) < @default_delay
         @last_request_time[domain] = Time.now
 
-        response = Net::HTTP.get_response(uri)
+        response = Async do
+          internet = Async::HTTP::Internet.new
+          result = internet.get(url)
+          { success: result.success?, body: result.read, status: result.status }
+        ensure
+          internet&.close
+        end.wait
 
-        return { status: "error", error: "HTTP #{response.code}: #{response.message}" } unless response.is_a?(Net::HTTPSuccess)
+        return { status: "error", error: "HTTP #{response[:status]}" } unless response[:success]
 
-        content = response.body
+        content = response[:body]
         links = extract_links(content, uri, filter_domain: filter_domain)
 
         # Limit results
@@ -214,22 +234,33 @@ class WebScrapingServer
       url = args["url"]
 
       begin
-        uri = URI.parse(url)
+        URI.parse(url)
         start_time = Time.now
 
-        response = Net::HTTP.get_response(uri)
+        response = Async do
+          internet = Async::HTTP::Internet.new
+          result = internet.get(url)
+          {
+            success: result.success?,
+            status: result.status,
+            headers: result.headers
+          }
+        ensure
+          internet&.close
+        end.wait
+
         response_time = Time.now - start_time
 
         {
           status: "success",
           url: url,
-          http_status: response.code.to_i,
-          http_message: response.message,
+          http_status: response[:status],
+          http_message: response[:success] ? "OK" : "Error",
           response_time_ms: (response_time * 1000).round(2),
-          content_type: response["content-type"],
-          content_length: response["content-length"]&.to_i,
-          server: response["server"],
-          accessible: response.is_a?(Net::HTTPSuccess)
+          content_type: response.dig(:headers, "content-type"),
+          content_length: response.dig(:headers, "content-length")&.to_i,
+          server: response.dig(:headers, "server"),
+          accessible: response[:success]
         }
       rescue StandardError => e
         {
