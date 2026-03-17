@@ -327,7 +327,7 @@ RSpec.describe VectorMCP::ImageUtil do
       let(:base_dir) { Dir.mktmpdir("image_base") }
       let(:image_file) do
         path = File.join(base_dir, "test.jpg")
-        File.open(path, "wb") { |f| f.write(jpeg_data) }
+        File.binwrite(path, jpeg_data)
         path
       end
 
