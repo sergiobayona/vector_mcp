@@ -1,3 +1,24 @@
+## [0.3.4] – 2026-03-17
+
+### Added
+
+* **Batch JSON-RPC Support**: Added batch request dispatch on POST endpoint for processing multiple JSON-RPC requests in a single HTTP call
+* **SSE Response Mode for POST**: POST requests can now receive responses via Server-Sent Events streaming
+* **Accept Header Validation**: Added proper Accept header validation on POST and GET endpoints per MCP specification
+
+### Security
+
+* **Constant-Time API Key Comparison** (SECURITY-001): Replaced direct string comparison with `Rack::Utils.secure_compare` to prevent timing attacks
+* **Disable Query Parameter Token Extraction** (SECURITY-002): Token extraction from query parameters now disabled by default to prevent token leakage via URL logging and browser history
+* **Path Traversal Protection for ImageUtil** (SECURITY-004): Added path traversal validation to `ImageUtil` file operations to prevent unauthorized file access
+* **Sensitive Data Filtering in Debug Logs** (SECURITY-005): Debug log output now filters sensitive fields (tokens, keys, credentials) to prevent accidental credential exposure
+* **Cross-Session Event Leakage Prevention**: Fixed EventStore to prevent events from one session being accessible to another session
+* **Session ID Validation on POST**: Fixed session fixation vulnerability where unknown session IDs were silently accepted; server now returns 404 for invalid sessions
+
+### Fixed
+
+* **Code Quality**: RuboCop style fixes and cleanup of unnecessary files
+
 ## [0.3.3] – 2025-07-29
 
 ### Fixed
