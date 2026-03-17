@@ -354,7 +354,20 @@ RSpec.describe VectorMCP::ImageUtil do
         end.to raise_error(ArgumentError, /Path traversal detected/)
       end
 
-      it "allows access without base_directory (backward compatible)" do
+      it "allows access without base_directory for non-traversal paths" do
+        result = described_class.file_to_mcp_image_content(temp_file.path)
+        expect(result[:type]).to eq("image")
+      end
+    end
+
+    context "without base_directory (enforced traversal rejection)" do
+      it "rejects relative paths with .. that escape the working directory" do
+        expect do
+          described_class.file_to_mcp_image_content("../../etc/passwd")
+        end.to raise_error(ArgumentError, /Path traversal detected/)
+      end
+
+      it "allows absolute paths that do not contain .." do
         result = described_class.file_to_mcp_image_content(temp_file.path)
         expect(result[:type]).to eq("image")
       end

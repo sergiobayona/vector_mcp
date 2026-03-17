@@ -231,29 +231,52 @@ module VectorMCP
     #     base_directory: "/app/uploads"
     #   )
     def file_to_mcp_image_content(file_path, validate: true, max_size: DEFAULT_MAX_SIZE, base_directory: nil)
-      validate_path_safety!(file_path, base_directory) if base_directory
+      validated_path = validate_path_safety!(file_path, base_directory)
 
-      raise ArgumentError, "Image file not found: #{file_path}" unless File.exist?(file_path)
+      raise ArgumentError, "Image file not found: #{validated_path}" unless File.exist?(validated_path)
 
-      raise ArgumentError, "Image file not readable: #{file_path}" unless File.readable?(file_path)
+      raise ArgumentError, "Image file not readable: #{validated_path}" unless File.readable?(validated_path)
 
-      binary_data = File.binread(file_path)
+      binary_data = File.binread(validated_path)
       to_mcp_image_content(binary_data, validate: validate, max_size: max_size)
     end
 
-    # Validates that a file path does not escape the given base directory.
+    # Validates that a file path is safe to access.
+    #
+    # When +base_directory+ is provided, the resolved path must reside within it.
+    # When +base_directory+ is omitted, the path is still canonicalized and
+    # rejected if it contains path traversal sequences (+..+) that resolve
+    # outside the current working directory.
     #
     # @param file_path [String] The file path to validate.
-    # @param base_directory [String] The base directory boundary.
-    # @raise [ArgumentError] If the resolved path is outside base_directory.
+    # @param base_directory [String, nil] Optional base directory boundary.
+    # @return [String] The canonicalized, validated path.
+    # @raise [ArgumentError] If path traversal is detected.
     # @api private
     def validate_path_safety!(file_path, base_directory)
-      resolved_base = File.expand_path(base_directory)
-      resolved_path = File.expand_path(file_path, resolved_base)
+      if base_directory
+        resolved_base = File.expand_path(base_directory)
+        resolved_path = File.expand_path(file_path, resolved_base)
 
-      return if resolved_path.start_with?("#{resolved_base}/") || resolved_path == resolved_base
+        unless resolved_path.start_with?("#{resolved_base}/") || resolved_path == resolved_base
+          raise ArgumentError, "Path traversal detected: resolved path is outside the allowed base directory"
+        end
+      else
+        resolved_path = File.expand_path(file_path)
 
-      raise ArgumentError, "Path traversal detected: resolved path is outside the allowed base directory"
+        # Reject paths that use traversal sequences to escape upward, even without
+        # an explicit base directory.  This catches the common case of
+        # user-supplied input like "../../etc/passwd".
+        if file_path.to_s.include?("..")
+          canonical_base = File.expand_path(".")
+          unless resolved_path.start_with?("#{canonical_base}/") || resolved_path == canonical_base
+            raise ArgumentError,
+                  "Path traversal detected: '#{file_path}' resolves outside the working directory"
+          end
+        end
+      end
+
+      resolved_path
     end
 
     # Extracts image metadata from binary data.

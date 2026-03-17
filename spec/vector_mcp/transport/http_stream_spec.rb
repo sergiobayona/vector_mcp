@@ -560,7 +560,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         let(:restricted_transport) { described_class.new(mock_mcp_server, allowed_origins: ["https://example.com"]) }
         let(:restricted_app) { restricted_transport }
 
-        context "with unrestricted origins (default)" do
+        context "with default origins (localhost only)" do
           it "allows requests without Origin header" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
@@ -568,9 +568,43 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(last_response.status).to eq(200)
           end
 
-          it "allows requests with any Origin header" do
+          it "allows requests from localhost origins" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "http://localhost:3000")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "allows requests from 127.0.0.1 origins" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "http://127.0.0.1:8080")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "rejects requests from non-localhost origins" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
+
+            expect(last_response.status).to eq(403)
+          end
+        end
+
+        context "with wildcard origins (opt-in)" do
+          let(:wildcard_transport) do
+            described_class.new(mock_mcp_server, allowed_origins: ["*"])
+          end
+          let(:app) { wildcard_transport }
+
+          before do
+            allow(wildcard_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+            allow(wildcard_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+            allow(mock_session_context).to receive(:request_context=)
+          end
+
+          it "allows requests from any origin" do
+            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://anywhere.com")
 
             expect(last_response.status).to eq(200)
           end
