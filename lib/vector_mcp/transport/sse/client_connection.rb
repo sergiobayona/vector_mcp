@@ -71,7 +71,7 @@ module VectorMCP
 
           begin
             @message_queue.push(message)
-            logger.debug { "Message enqueued for client #{session_id}: #{message.inspect}" }
+            logger.debug { "Message enqueued for client #{session_id}: #{VectorMCP::LogFilter.filter_hash(message).inspect}" }
             true
           rescue ClosedQueueError
             logger.warn { "Attempted to enqueue message to closed queue for client #{session_id}" }
