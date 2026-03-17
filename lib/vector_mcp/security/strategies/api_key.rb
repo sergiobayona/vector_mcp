@@ -12,8 +12,10 @@ module VectorMCP
 
         # Initialize with a list of valid API keys
         # @param keys [Array<String>] array of valid API keys
-        def initialize(keys: [])
+        # @param allow_query_params [Boolean] whether to accept API keys from query parameters (default: false)
+        def initialize(keys: [], allow_query_params: false)
           @valid_keys = Set.new(keys.map(&:to_s))
+          @allow_query_params = allow_query_params
         end
 
         # Add a valid API key
@@ -79,9 +81,14 @@ module VectorMCP
         # @return [String, nil] the extracted API key
         def extract_api_key(request)
           headers = normalize_headers(request)
-          params = normalize_params(request)
 
-          extract_from_headers(headers) || extract_from_params(params)
+          from_headers = extract_from_headers(headers)
+          return from_headers if from_headers
+
+          return nil unless @allow_query_params
+
+          params = normalize_params(request)
+          extract_from_params(params)
         end
 
         # Normalize headers to handle different formats

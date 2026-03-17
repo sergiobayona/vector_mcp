@@ -77,7 +77,25 @@ RSpec.describe VectorMCP::Security::Strategies::ApiKey do
       end
     end
 
-    context "with query parameter" do
+    context "with query parameter (disabled by default)" do
+      it "rejects valid api_key from query params when allow_query_params is false" do
+        request = { params: { "api_key" => "valid-key-1" } }
+        result = api_key_strategy.authenticate(request)
+
+        expect(result).to be false
+      end
+
+      it "rejects valid apikey from query params when allow_query_params is false" do
+        request = { params: { "apikey" => "valid-key-1" } }
+        result = api_key_strategy.authenticate(request)
+
+        expect(result).to be false
+      end
+    end
+
+    context "with query parameter (explicitly enabled)" do
+      let(:api_key_strategy) { described_class.new(keys: %w[valid-key-1 valid-key-2], allow_query_params: true) }
+
       it "authenticates valid api_key parameter" do
         request = { params: { "api_key" => "valid-key-1" } }
         result = api_key_strategy.authenticate(request)

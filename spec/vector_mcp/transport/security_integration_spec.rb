@@ -118,7 +118,7 @@ RSpec.describe "Transport Security Integration" do
       end
     end
 
-    describe "query parameter authentication" do
+    describe "query parameter authentication (disabled by default, SECURITY-002)" do
       context "with API key in query string" do
         let(:rack_env) do
           {
@@ -129,12 +129,10 @@ RSpec.describe "Transport Security Integration" do
           }
         end
 
-        it "successfully authenticates request" do
+        it "rejects request when allow_query_params is not enabled" do
           result = server.security_middleware.process_request(rack_env)
 
-          expect(result[:success]).to be true
-          expect(result[:session_context].authenticated?).to be true
-          expect(result[:session_context].user[:api_key]).to eq("valid-api-key")
+          expect(result[:success]).to be false
         end
       end
 
@@ -148,11 +146,10 @@ RSpec.describe "Transport Security Integration" do
           }
         end
 
-        it "successfully authenticates request" do
+        it "rejects request when allow_query_params is not enabled" do
           result = server.security_middleware.process_request(rack_env)
 
-          expect(result[:success]).to be true
-          expect(result[:session_context].authenticated?).to be true
+          expect(result[:success]).to be false
         end
       end
     end

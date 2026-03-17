@@ -265,7 +265,25 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
       end
     end
 
-    context "from query parameters" do
+    context "from query parameters (disabled by default, SECURITY-002)" do
+      it "rejects jwt_token from query params when allow_query_params is false" do
+        request = { params: { "jwt_token" => "query.jwt.token" } }
+        token = strategy.send(:extract_token, request)
+
+        expect(token).to be_nil
+      end
+
+      it "rejects token from query params when allow_query_params is false" do
+        request = { params: { "token" => "query.jwt.token" } }
+        token = strategy.send(:extract_token, request)
+
+        expect(token).to be_nil
+      end
+    end
+
+    context "from query parameters (explicitly enabled)" do
+      let(:strategy) { described_class.new(secret: secret, allow_query_params: true) }
+
       it "extracts from jwt_token parameter" do
         request = { params: { "jwt_token" => "query.jwt.token" } }
         token = strategy.send(:extract_token, request)
@@ -301,12 +319,13 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
         expect(token).to eq("auth.token")
       end
 
-      it "prefers custom header over query parameters" do
+      it "prefers custom header over query parameters (even when query params enabled)" do
+        strategy_with_params = described_class.new(secret: secret, allow_query_params: true)
         request = {
           headers: { "X-JWT-Token" => "custom.token" },
           params: { "jwt_token" => "query.token" }
         }
-        token = strategy.send(:extract_token, request)
+        token = strategy_with_params.send(:extract_token, request)
 
         expect(token).to eq("custom.token")
       end
