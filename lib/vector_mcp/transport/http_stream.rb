@@ -340,17 +340,13 @@ module VectorMCP
         # Check if this is a response to a server-initiated request
         if outgoing_response?(message)
           handle_outgoing_response(message)
-          # For responses, return 202 Accepted with no body
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
         result = @server.handle_message(message, session.context, session.id)
-
-        # Set session ID header in response
-        headers = { "Mcp-Session-Id" => session.id }
-        json_rpc_response(result, message["id"], headers)
+        build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
-        json_error_response(e.request_id, e.code, e.message, e.details)
+        build_protocol_error_response(env, e)
       rescue JSON::ParserError => e
         json_error_response(nil, -32_700, "Parse error", { details: e.message })
       end
@@ -497,6 +493,71 @@ module VectorMCP
         error_obj[:data] = data if data
         response = { jsonrpc: "2.0", id: id, error: error_obj }
         [400, { "Content-Type" => "application/json" }, [response.to_json]]
+      end
+
+      def build_rpc_response(env, result, request_id, session_id)
+        headers = { "Mcp-Session-Id" => session_id }
+        if client_accepts_sse?(env)
+          sse_rpc_response(result, request_id, headers)
+        else
+          json_rpc_response(result, request_id, headers)
+        end
+      end
+
+      def build_protocol_error_response(env, error)
+        if client_accepts_sse?(env)
+          sse_error_response(error.request_id, error.code, error.message, error.details)
+        else
+          json_error_response(error.request_id, error.code, error.message, error.details)
+        end
+      end
+
+      def client_accepts_sse?(env)
+        accept = env["HTTP_ACCEPT"] || ""
+        accept.include?("text/event-stream")
+      end
+
+      def format_sse_event(data, type, event_id)
+        lines = []
+        lines << "id: #{event_id}"
+        lines << "event: #{type}" if type
+        lines << "data: #{data}"
+        lines << ""
+        "#{lines.join("\n")}\n"
+      end
+
+      def sse_rpc_response(result, request_id, headers = {})
+        response = { jsonrpc: "2.0", id: request_id, result: result }
+        event_data = response.to_json
+
+        event_id = @event_store.store_event(event_data, "message")
+        sse_event = format_sse_event(event_data, "message", event_id)
+
+        response_headers = {
+          "Content-Type" => "text/event-stream",
+          "Cache-Control" => "no-cache",
+          "Connection" => "keep-alive",
+          "X-Accel-Buffering" => "no"
+        }.merge(headers)
+
+        [200, response_headers, [sse_event]]
+      end
+
+      def sse_error_response(id, code, err_message, data = nil, headers = {})
+        error_obj = { code: code, message: err_message }
+        error_obj[:data] = data if data
+        response = { jsonrpc: "2.0", id: id, error: error_obj }
+        event_data = response.to_json
+
+        event_id = @event_store.store_event(event_data, "message")
+        sse_event = format_sse_event(event_data, "message", event_id)
+
+        response_headers = {
+          "Content-Type" => "text/event-stream",
+          "Cache-Control" => "no-cache"
+        }.merge(headers)
+
+        [200, response_headers, [sse_event]]
       end
 
       def not_found_response(message = "Not Found")

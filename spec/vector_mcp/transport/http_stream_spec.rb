@@ -220,6 +220,97 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(returned_id).to match(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/)
           end
         end
+
+        context "SSE response mode on POST" do
+          let(:sse_accept_headers) do
+            valid_headers.merge(
+              "CONTENT_TYPE" => "application/json",
+              "HTTP_ACCEPT" => "text/event-stream, application/json"
+            )
+          end
+          let(:json_accept_headers) do
+            valid_headers.merge(
+              "CONTENT_TYPE" => "application/json",
+              "HTTP_ACCEPT" => "application/json"
+            )
+          end
+          let(:no_accept_headers) do
+            valid_headers.merge("CONTENT_TYPE" => "application/json")
+          end
+
+          it "returns SSE when client accepts text/event-stream" do
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.content_type).to eq("text/event-stream")
+            expect(last_response.headers["Cache-Control"]).to eq("no-cache")
+            expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+          end
+
+          it "returns JSON when client only accepts application/json" do
+            post "/mcp", json_request.to_json, json_accept_headers
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.content_type).to eq("application/json")
+          end
+
+          it "returns JSON when no Accept header is present" do
+            post "/mcp", json_request.to_json, no_accept_headers
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.content_type).to eq("application/json")
+          end
+
+          it "returns a valid SSE event with id, event, and data fields" do
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            body = last_response.body
+            expect(body).to match(/^id: .+$/)
+            expect(body).to match(/^event: message$/)
+            expect(body).to match(/^data: .+$/)
+          end
+
+          it "SSE data field contains a valid JSON-RPC response" do
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            data_line = last_response.body.lines.find { |l| l.start_with?("data: ") }
+            json_data = JSON.parse(data_line.sub("data: ", ""))
+
+            expect(json_data["jsonrpc"]).to eq("2.0")
+            expect(json_data["id"]).to eq(1)
+            expect(json_data["result"]).to eq("success")
+          end
+
+          it "stores the SSE response event in the event store" do
+            expect { post "/mcp", json_request.to_json, sse_accept_headers }
+              .to change { transport.event_store.event_count }.by(1)
+          end
+
+          it "returns SSE-formatted errors when client accepts text/event-stream" do
+            protocol_error = VectorMCP::MethodNotFoundError.new("unknown_method", request_id: 1)
+            allow(mock_mcp_server).to receive(:handle_message).and_raise(protocol_error)
+
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.content_type).to eq("text/event-stream")
+
+            data_line = last_response.body.lines.find { |l| l.start_with?("data: ") }
+            json_data = JSON.parse(data_line.sub("data: ", ""))
+
+            expect(json_data["error"]["code"]).to eq(-32_601)
+          end
+
+          it "returns JSON-formatted errors when client does not accept SSE" do
+            protocol_error = VectorMCP::MethodNotFoundError.new("unknown_method", request_id: 1)
+            allow(mock_mcp_server).to receive(:handle_message).and_raise(protocol_error)
+
+            post "/mcp", json_request.to_json, json_accept_headers
+
+            expect(last_response.status).to eq(400)
+            expect(last_response.content_type).to eq("application/json")
+          end
+        end
       end
 
       describe "GET requests (SSE streaming)" do
