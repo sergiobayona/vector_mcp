@@ -361,7 +361,7 @@ module VectorMCP
         result = @server.handle_message(message, session.context, session.id)
         build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
-        build_protocol_error_response(env, e)
+        build_protocol_error_response(env, e, session_id: session.id)
       end
 
       # Handles a batch of JSON-RPC messages per JSON-RPC 2.0 spec.
@@ -561,15 +561,15 @@ module VectorMCP
       def build_rpc_response(env, result, request_id, session_id)
         headers = { "Mcp-Session-Id" => session_id }
         if client_accepts_sse?(env)
-          sse_rpc_response(result, request_id, headers)
+          sse_rpc_response(result, request_id, headers, session_id: session_id)
         else
           json_rpc_response(result, request_id, headers)
         end
       end
 
-      def build_protocol_error_response(env, error)
+      def build_protocol_error_response(env, error, session_id: nil)
         if client_accepts_sse?(env)
-          sse_error_response(error.request_id, error.code, error.message, error.details)
+          sse_error_response(error.request_id, error.code, error.message, error.details, session_id: session_id)
         else
           json_error_response(error.request_id, error.code, error.message, error.details)
         end
@@ -589,11 +589,11 @@ module VectorMCP
         "#{lines.join("\n")}\n"
       end
 
-      def sse_rpc_response(result, request_id, headers = {})
+      def sse_rpc_response(result, request_id, headers = {}, session_id: nil)
         response = { jsonrpc: "2.0", id: request_id, result: result }
         event_data = response.to_json
 
-        event_id = @event_store.store_event(event_data, "message")
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
         sse_event = format_sse_event(event_data, "message", event_id)
 
         response_headers = {
@@ -606,19 +606,19 @@ module VectorMCP
         [200, response_headers, [sse_event]]
       end
 
-      def sse_error_response(id, code, err_message, data = nil, headers = {})
+      def sse_error_response(id, code, err_message, data = nil, session_id: nil)
         error_obj = { code: code, message: err_message }
         error_obj[:data] = data if data
         response = { jsonrpc: "2.0", id: id, error: error_obj }
         event_data = response.to_json
 
-        event_id = @event_store.store_event(event_data, "message")
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
         sse_event = format_sse_event(event_data, "message", event_id)
 
         response_headers = {
           "Content-Type" => "text/event-stream",
           "Cache-Control" => "no-cache"
-        }.merge(headers)
+        }
 
         [200, response_headers, [sse_event]]
       end

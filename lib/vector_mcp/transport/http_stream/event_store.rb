@@ -17,7 +17,7 @@ module VectorMCP
       # @api private
       class EventStore
         # Event data structure
-        Event = Struct.new(:id, :data, :type, :timestamp) do
+        Event = Struct.new(:id, :data, :type, :timestamp, :session_id) do
           def to_sse_format
             lines = []
             lines << "id: #{id}"
@@ -44,12 +44,13 @@ module VectorMCP
         #
         # @param data [String] The event data
         # @param type [String] The event type (optional)
+        # @param session_id [String, nil] The session ID to scope this event to
         # @return [String] The generated event ID
-        def store_event(data, type = nil)
+        def store_event(data, type = nil, session_id: nil)
           event_id = generate_event_id
           timestamp = Time.now
 
-          event = Event.new(event_id, data, type, timestamp)
+          event = Event.new(event_id, data, type, timestamp, session_id)
 
           # Add to events array
           @events.push(event)
@@ -69,21 +70,26 @@ module VectorMCP
           event_id
         end
 
-        # Retrieves events starting from a specific event ID.
+        # Retrieves events starting from a specific event ID, optionally filtered by session.
         #
         # @param last_event_id [String] The last event ID received by client
+        # @param session_id [String, nil] Filter events to this session only
         # @return [Array<Event>] Array of events after the specified ID
-        def get_events_after(last_event_id)
-          return @events.to_a if last_event_id.nil?
+        def get_events_after(last_event_id, session_id: nil)
+          events = if last_event_id.nil?
+                     @events.to_a
+                   else
+                     last_index = @event_index[last_event_id]
+                     return [] if last_index.nil?
 
-          last_index = @event_index[last_event_id]
-          return [] if last_index.nil?
+                     start_index = last_index + 1
+                     return [] if start_index >= @events.length
 
-          # Return events after the last_event_id
-          start_index = last_index + 1
-          return [] if start_index >= @events.length
+                     @events[start_index..]
+                   end
 
-          @events[start_index..]
+          events = events.select { |e| e.session_id == session_id } if session_id
+          events
         end
 
         # Gets the total number of stored events.

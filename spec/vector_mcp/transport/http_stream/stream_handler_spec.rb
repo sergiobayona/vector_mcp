@@ -129,7 +129,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         result = stream_handler.send_message_to_session(mock_session, message)
 
         expect(result).to be true
-        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message")
+        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message", session_id: session_id)
         expect(mock_yielder).to have_received(:<<).with(/^id: event-789/)
       end
 
@@ -388,7 +388,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "sends initial connection established event" do
-        expect(mock_event_store).to receive(:store_event).with(anything, "connection")
+        expect(mock_event_store).to receive(:store_event).with(anything, "connection", session_id: session_id)
 
         enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
         # Execute the enumerator block to trigger the setup
@@ -420,24 +420,24 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       before do
         allow(mock_event1).to receive(:to_sse_format).and_return("id: event-457\ndata: test1\n\n")
         allow(mock_event2).to receive(:to_sse_format).and_return("id: event-458\ndata: test2\n\n")
-        allow(mock_event_store).to receive(:get_events_after).with(last_event_id).and_return([mock_event1, mock_event2])
+        allow(mock_event_store).to receive(:get_events_after).with(last_event_id, session_id: session_id).and_return([mock_event1, mock_event2])
       end
 
       it "replays missed events after Last-Event-ID" do
         expect(mock_logger).to receive(:info).with(/Replaying 2 missed events from #{last_event_id}/)
 
-        stream_handler.send(:replay_events, mock_yielder, last_event_id)
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session)
 
         expect(mock_yielder).to have_received(:<<).with("id: event-457\ndata: test1\n\n")
         expect(mock_yielder).to have_received(:<<).with("id: event-458\ndata: test2\n\n")
       end
 
       it "handles empty missed events" do
-        allow(mock_event_store).to receive(:get_events_after).and_return([])
+        allow(mock_event_store).to receive(:get_events_after).with(last_event_id, session_id: session_id).and_return([])
 
         expect(mock_logger).to receive(:info).with(/Replaying 0 missed events/)
 
-        stream_handler.send(:replay_events, mock_yielder, last_event_id)
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session)
       end
     end
 
@@ -451,7 +451,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "sends periodic heartbeat events" do
-        expect(mock_event_store).to receive(:store_event).with(anything, "heartbeat").at_least(:once)
+        expect(mock_event_store).to receive(:store_event).with(anything, "heartbeat", session_id: session_id).at_least(:once)
 
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
       end
@@ -460,7 +460,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(mock_connection).to receive(:closed?).and_return(true)
 
         # Should not send heartbeat if connection is closed
-        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat")
+        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", session_id: session_id)
 
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
       end
