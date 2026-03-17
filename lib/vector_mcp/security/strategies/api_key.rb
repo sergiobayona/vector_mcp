@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "openssl"
+
 module VectorMCP
   module Security
     module Strategies
@@ -33,7 +35,7 @@ module VectorMCP
           api_key = extract_api_key(request)
           return false unless api_key&.length&.positive?
 
-          if @valid_keys.include?(api_key)
+          if secure_key_match?(api_key)
             {
               api_key: api_key,
               strategy: "api_key",
@@ -57,6 +59,20 @@ module VectorMCP
         end
 
         private
+
+        # Constant-time comparison of API key against all valid keys.
+        # Iterates all keys to prevent timing side-channels.
+        # @param candidate [String] the API key to check
+        # @return [Boolean] true if the candidate matches a valid key
+        def secure_key_match?(candidate)
+          matched = false
+          @valid_keys.each do |valid_key|
+            next unless candidate.bytesize == valid_key.bytesize
+
+            matched = true if OpenSSL.fixed_length_secure_compare(candidate, valid_key)
+          end
+          matched
+        end
 
         # Extract API key from various request formats
         # @param request [Hash] the request object

@@ -153,4 +153,29 @@ RSpec.describe VectorMCP::Security::Strategies::ApiKey do
       expect(api_key_strategy.key_count).to eq(2)
     end
   end
+
+  describe "constant-time comparison (SECURITY-001)" do
+    it "uses OpenSSL.fixed_length_secure_compare internally" do
+      expect(OpenSSL).to receive(:fixed_length_secure_compare).at_least(:once).and_call_original
+      request = { headers: { "X-API-Key" => "valid-key-1" } }
+      api_key_strategy.authenticate(request)
+    end
+
+    it "does not leak key validity through exceptions" do
+      request = { headers: { "X-API-Key" => "wrong-length" } }
+      expect { api_key_strategy.authenticate(request) }.not_to raise_error
+    end
+
+    it "correctly matches keys of same length" do
+      request = { headers: { "X-API-Key" => "valid-key-1" } }
+      result = api_key_strategy.authenticate(request)
+      expect(result).to be_truthy
+    end
+
+    it "rejects keys of different length" do
+      request = { headers: { "X-API-Key" => "short" } }
+      result = api_key_strategy.authenticate(request)
+      expect(result).to be false
+    end
+  end
 end
