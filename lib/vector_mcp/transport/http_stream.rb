@@ -53,6 +53,16 @@ module VectorMCP
       DEFAULT_EVENT_RETENTION = 100 # Keep last 100 events for resumability
       DEFAULT_REQUEST_TIMEOUT = 30 # Default timeout for server-initiated requests
 
+      # Default allowed origins — restrict to localhost by default for security.
+      DEFAULT_ALLOWED_ORIGINS = %w[
+        http://localhost
+        https://localhost
+        http://127.0.0.1
+        https://127.0.0.1
+        http://[::1]
+        https://[::1]
+      ].freeze
+
       # Initializes a new HTTP Stream transport.
       #
       # @param server [VectorMCP::Server] The server instance that will handle messages
@@ -62,7 +72,8 @@ module VectorMCP
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints
       # @option options [Integer] :session_timeout (300) Session timeout in seconds
       # @option options [Integer] :event_retention (100) Number of events to retain for resumability
-      # @option options [Array<String>] :allowed_origins (["*"]) List of allowed origins for CORS. Use ["*"] to allow all origins.
+      # @option options [Array<String>] :allowed_origins Allowed origins for CORS validation.
+      #   Defaults to localhost origins only. Pass ["*"] to allow all origins (NOT recommended for production).
       def initialize(server, options = {})
         @server = server
         @logger = server.logger
@@ -668,7 +679,13 @@ module VectorMCP
         accept.include?("text/event-stream") || accept.include?("*/*")
       end
 
-      # Validates the Origin header for security
+      # Validates the Origin header for security.
+      #
+      # Matches are checked both exactly and as prefix (so that
+      # +http://localhost+ in the allowed list matches +http://localhost:3000+).
+      #
+      # Requests without an Origin header are allowed through because they
+      # originate from non-browser contexts (curl, server-to-server, etc.).
       #
       # @param env [Hash] The Rack environment
       # @return [Boolean] True if origin is allowed, false otherwise
@@ -678,7 +695,9 @@ module VectorMCP
         origin = env["HTTP_ORIGIN"]
         return true if origin.nil? # Allow requests without Origin header (e.g., server-to-server)
 
-        @allowed_origins.include?(origin)
+        @allowed_origins.any? do |allowed|
+          origin == allowed || origin.start_with?("#{allowed}:")
+        end
       end
 
       # Logging and error handling
@@ -874,7 +893,17 @@ module VectorMCP
         @path_prefix = normalize_path_prefix(options[:path_prefix] || DEFAULT_PATH_PREFIX)
         @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
         @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
-        @allowed_origins = options[:allowed_origins] || ["*"]
+        @allowed_origins = options[:allowed_origins] || DEFAULT_ALLOWED_ORIGINS
+
+        warn_on_permissive_origins if @allowed_origins.include?("*")
+      end
+
+      # Logs a security warning when wildcard origin is configured.
+      def warn_on_permissive_origins
+        logger.warn do
+          "[SECURITY] allowed_origins includes '*', which permits cross-origin requests from any website. " \
+            "This is not recommended for production. Specify explicit origins instead."
+        end
       end
 
       # Initialize core HTTP stream components
