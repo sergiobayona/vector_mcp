@@ -311,6 +311,115 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(last_response.content_type).to eq("application/json")
           end
         end
+
+        context "batch JSON-RPC requests" do
+          let(:batch_headers) { valid_headers.merge("CONTENT_TYPE" => "application/json") }
+
+          it "returns an array of responses for an array of requests" do
+            batch = [
+              { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" },
+              { "jsonrpc" => "2.0", "id" => 2, "method" => "ping" }
+            ]
+
+            post "/mcp", batch.to_json, batch_headers
+
+            expect(last_response.status).to eq(200)
+            expect(last_response.content_type).to eq("application/json")
+
+            responses = JSON.parse(last_response.body)
+            expect(responses).to be_an(Array)
+            expect(responses.length).to eq(2)
+            expect(responses[0]["id"]).to eq(1)
+            expect(responses[1]["id"]).to eq(2)
+          end
+
+          it "omits response objects for notifications in a batch" do
+            allow(mock_mcp_server).to receive(:handle_message) do |msg, _ctx, _sid|
+              msg["id"] ? "success" : nil
+            end
+
+            batch = [
+              { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" },
+              { "jsonrpc" => "2.0", "method" => "initialized" }
+            ]
+
+            post "/mcp", batch.to_json, batch_headers
+
+            responses = JSON.parse(last_response.body)
+            expect(responses).to be_an(Array)
+            expect(responses.length).to eq(1)
+            expect(responses[0]["id"]).to eq(1)
+          end
+
+          it "returns 204 No Content for a batch of only notifications" do
+            allow(mock_mcp_server).to receive(:handle_message).and_return(nil)
+
+            batch = [
+              { "jsonrpc" => "2.0", "method" => "initialized" }
+            ]
+
+            post "/mcp", batch.to_json, batch_headers
+
+            expect(last_response.status).to eq(204)
+          end
+
+          it "returns an error for an empty batch array" do
+            post "/mcp", [].to_json, batch_headers
+
+            expect(last_response.status).to eq(400)
+            response = JSON.parse(last_response.body)
+            expect(response["error"]["code"]).to eq(-32_600)
+          end
+
+          it "returns individual error objects for malformed items in a batch" do
+            batch = [
+              { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" },
+              "not a hash",
+              42
+            ]
+
+            post "/mcp", batch.to_json, batch_headers
+
+            responses = JSON.parse(last_response.body)
+            expect(responses.length).to eq(3)
+            expect(responses[0]["result"]).to eq("success")
+            expect(responses[1]["error"]["code"]).to eq(-32_600)
+            expect(responses[2]["error"]["code"]).to eq(-32_600)
+          end
+
+          it "does not abort the batch when individual items fail" do
+            call_count = 0
+            allow(mock_mcp_server).to receive(:handle_message) do |msg, _ctx, _sid|
+              call_count += 1
+              raise VectorMCP::MethodNotFoundError.new("bad", request_id: msg["id"]) if msg["id"] == 1
+
+              "success"
+            end
+
+            batch = [
+              { "jsonrpc" => "2.0", "id" => 1, "method" => "bad_method" },
+              { "jsonrpc" => "2.0", "id" => 2, "method" => "ping" }
+            ]
+
+            post "/mcp", batch.to_json, batch_headers
+
+            responses = JSON.parse(last_response.body)
+            expect(responses.length).to eq(2)
+            expect(responses[0]["error"]).not_to be_nil
+            expect(responses[1]["result"]).to eq("success")
+            expect(call_count).to eq(2)
+          end
+
+          it "still handles single object POST requests normally" do
+            post "/mcp", json_request.to_json, batch_headers
+
+            expect(last_response.status).to eq(200)
+            response = JSON.parse(last_response.body)
+            expect(response).to be_a(Hash)
+            expect(response["id"]).to eq(1)
+            expect(response["result"]).to eq("success")
+          end
+        end
       end
 
       describe "GET requests (SSE streaming)" do
