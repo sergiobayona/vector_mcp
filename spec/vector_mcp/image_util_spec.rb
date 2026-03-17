@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "tempfile"
 
 RSpec.describe VectorMCP::ImageUtil do
   describe ".detect_image_format" do
@@ -320,6 +321,43 @@ RSpec.describe VectorMCP::ImageUtil do
       end.to raise_error(ArgumentError, /Image validation failed.*Unrecognized or invalid image format/)
 
       FileUtils.rm_rf(temp_dir)
+    end
+
+    context "with base_directory path traversal protection (SECURITY-004)" do
+      let(:base_dir) { Dir.mktmpdir("image_base") }
+      let(:image_file) do
+        path = File.join(base_dir, "test.jpg")
+        File.open(path, "wb") { |f| f.write(jpeg_data) }
+        path
+      end
+
+      after do
+        FileUtils.rm_rf(base_dir)
+      end
+
+      it "allows files within the base directory" do
+        result = described_class.file_to_mcp_image_content(image_file, base_directory: base_dir)
+
+        expect(result[:type]).to eq("image")
+        expect(result[:mimeType]).to eq("image/jpeg")
+      end
+
+      it "rejects paths that traverse outside the base directory" do
+        expect do
+          described_class.file_to_mcp_image_content("../../etc/passwd", base_directory: base_dir)
+        end.to raise_error(ArgumentError, /Path traversal detected/)
+      end
+
+      it "rejects absolute paths outside the base directory" do
+        expect do
+          described_class.file_to_mcp_image_content("/etc/passwd", base_directory: base_dir)
+        end.to raise_error(ArgumentError, /Path traversal detected/)
+      end
+
+      it "allows access without base_directory (backward compatible)" do
+        result = described_class.file_to_mcp_image_content(temp_file.path)
+        expect(result[:type]).to eq("image")
+      end
     end
   end
 

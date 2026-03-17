@@ -217,18 +217,43 @@ module VectorMCP
     # @param file_path [String] Path to the image file.
     # @param validate [Boolean] Whether to validate the image.
     # @param max_size [Integer] Maximum allowed size for validation.
+    # @param base_directory [String, nil] Optional base directory for path traversal protection.
+    #   When provided, the resolved file_path must reside within this directory.
     # @return [Hash] MCP image content hash.
-    # @raise [ArgumentError] If file doesn't exist or validation fails.
+    # @raise [ArgumentError] If file doesn't exist, validation fails, or path traversal is detected.
     #
     # @example
     #   content = VectorMCP::ImageUtil.file_to_mcp_image_content("./avatar.png")
-    def file_to_mcp_image_content(file_path, validate: true, max_size: DEFAULT_MAX_SIZE)
+    #
+    # @example With path traversal protection
+    #   content = VectorMCP::ImageUtil.file_to_mcp_image_content(
+    #     user_input_path,
+    #     base_directory: "/app/uploads"
+    #   )
+    def file_to_mcp_image_content(file_path, validate: true, max_size: DEFAULT_MAX_SIZE, base_directory: nil)
+      validate_path_safety!(file_path, base_directory) if base_directory
+
       raise ArgumentError, "Image file not found: #{file_path}" unless File.exist?(file_path)
 
       raise ArgumentError, "Image file not readable: #{file_path}" unless File.readable?(file_path)
 
       binary_data = File.binread(file_path)
       to_mcp_image_content(binary_data, validate: validate, max_size: max_size)
+    end
+
+    # Validates that a file path does not escape the given base directory.
+    #
+    # @param file_path [String] The file path to validate.
+    # @param base_directory [String] The base directory boundary.
+    # @raise [ArgumentError] If the resolved path is outside base_directory.
+    # @api private
+    def validate_path_safety!(file_path, base_directory)
+      resolved_base = File.expand_path(base_directory)
+      resolved_path = File.expand_path(file_path, resolved_base)
+
+      return if resolved_path.start_with?("#{resolved_base}/") || resolved_path == resolved_base
+
+      raise ArgumentError, "Path traversal detected: resolved path is outside the allowed base directory"
     end
 
     # Extracts image metadata from binary data.
