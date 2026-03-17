@@ -77,8 +77,7 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
 
   describe "Concurrency Race Condition Fixes" do
     it "handles rapid sequential requests without 'no thread waiting' errors" do
-      session_id = "rapid-test-#{SecureRandom.hex(4)}"
-      initialize_mcp_session(base_url, session_id)
+      session_id = initialize_mcp_session(base_url)
 
       mock_client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
       mock_client.set_sampling_response("sampling/createMessage", "Test response")
@@ -108,8 +107,7 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
     end
 
     it "handles concurrent requests from single session without race conditions" do
-      session_id = "concurrent-single-#{SecureRandom.hex(4)}"
-      initialize_mcp_session(base_url, session_id)
+      session_id = initialize_mcp_session(base_url)
 
       mock_client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
       mock_client.set_sampling_response("sampling/createMessage", "Concurrent response")
@@ -140,11 +138,8 @@ RSpec.describe "HttpStream Concurrency Fixes Verification", type: :integration d
     end
 
     it "handles two concurrent sessions without cross-contamination" do
-      session1_id = "concurrent-s1-#{SecureRandom.hex(4)}"
-      session2_id = "concurrent-s2-#{SecureRandom.hex(4)}"
-
-      initialize_mcp_session(base_url, session1_id)
-      initialize_mcp_session(base_url, session2_id)
+      session1_id = initialize_mcp_session(base_url)
+      session2_id = initialize_mcp_session(base_url)
 
       client1 = StreamingTestHelpers::MockStreamingClient.new(session1_id, base_url)
       client2 = StreamingTestHelpers::MockStreamingClient.new(session2_id, base_url)

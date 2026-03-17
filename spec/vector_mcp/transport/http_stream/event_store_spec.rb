@@ -93,6 +93,20 @@ RSpec.describe VectorMCP::Transport::HttpStream::EventStore do
 
       expect(events.first.timestamp).to eq(freeze_time)
     end
+
+    it "stores session_id on the event when provided" do
+      event_store.store_event(test_data, test_type, session_id: "session-abc")
+      events = event_store.get_events_after(nil)
+
+      expect(events.first.session_id).to eq("session-abc")
+    end
+
+    it "defaults session_id to nil when not provided" do
+      event_store.store_event(test_data, test_type)
+      events = event_store.get_events_after(nil)
+
+      expect(events.first.session_id).to be_nil
+    end
   end
 
   describe "#get_events_after" do
@@ -131,6 +145,48 @@ RSpec.describe VectorMCP::Transport::HttpStream::EventStore do
       events = empty_store.get_events_after("any-id")
 
       expect(events).to be_empty
+    end
+
+    context "session-scoped filtering" do
+      let(:store) { described_class.new(100) }
+
+      before do
+        @ids_a = 3.times.map { |i| store.store_event("a-#{i}", "msg", session_id: "session-a") }
+        @ids_b = 3.times.map { |i| store.store_event("b-#{i}", "msg", session_id: "session-b") }
+      end
+
+      it "returns only events for the specified session" do
+        events = store.get_events_after(nil, session_id: "session-a")
+
+        expect(events.length).to eq(3)
+        expect(events.map(&:data)).to eq(%w[a-0 a-1 a-2])
+      end
+
+      it "returns only the other session's events" do
+        events = store.get_events_after(nil, session_id: "session-b")
+
+        expect(events.length).to eq(3)
+        expect(events.map(&:data)).to eq(%w[b-0 b-1 b-2])
+      end
+
+      it "returns all events when no session_id filter is given" do
+        events = store.get_events_after(nil)
+
+        expect(events.length).to eq(6)
+      end
+
+      it "combines last_event_id and session_id filtering" do
+        events = store.get_events_after(@ids_a.last, session_id: "session-b")
+
+        expect(events.length).to eq(3)
+        expect(events.map(&:data)).to eq(%w[b-0 b-1 b-2])
+      end
+
+      it "returns empty when session has no events after last_event_id" do
+        events = store.get_events_after(@ids_b.last, session_id: "session-a")
+
+        expect(events).to be_empty
+      end
     end
   end
 

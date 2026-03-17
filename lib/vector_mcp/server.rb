@@ -190,7 +190,7 @@ module VectorMCP
 
       case strategy
       when :api_key
-        add_api_key_auth(options[:keys] || [])
+        add_api_key_auth(options[:keys] || [], allow_query_params: options[:allow_query_params] || false)
       when :jwt
         add_jwt_auth(options)
       when :custom
@@ -313,9 +313,10 @@ module VectorMCP
 
     # Add API key authentication strategy
     # @param keys [Array<String>] array of valid API keys
+    # @param allow_query_params [Boolean] whether to accept API keys from query parameters
     # @return [void]
-    def add_api_key_auth(keys)
-      strategy = Security::Strategies::ApiKey.new(keys: keys)
+    def add_api_key_auth(keys, allow_query_params: false)
+      strategy = Security::Strategies::ApiKey.new(keys: keys, allow_query_params: allow_query_params)
       @auth_manager.add_strategy(:api_key, strategy)
     end
 

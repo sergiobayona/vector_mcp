@@ -63,10 +63,17 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
     end
 
     describe "session_manager.get_or_create_session" do
-      it "creates new session with context" do
-        session = session_manager.get_or_create_session("new-session", rack_env)
+      it "returns nil for unknown session ID (callers must handle 404)" do
+        result = session_manager.get_or_create_session("new-session", rack_env)
 
-        expect(session.id).to eq("new-session")
+        expect(result).to be_nil
+      end
+
+      it "creates new session with context when no session ID provided" do
+        session = session_manager.get_or_create_session(nil, rack_env)
+
+        expect(session).not_to be_nil
+        expect(session.id).to be_a(String)
         request_context = session.context.request_context
         expect(request_context.header("Authorization")).to eq("Bearer token123")
         expect(request_context.param("api_key")).to eq("test123")
@@ -153,10 +160,11 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
     end
 
     describe "handle_post_request" do
-      it "passes rack_env to session creation" do
+      it "looks up existing session by ID via get_session" do
         # Use real transport but mock its session manager
         real_session_manager = real_transport.instance_variable_get(:@session_manager)
-        allow(real_session_manager).to receive(:get_or_create_session).with("test-session", anything).and_return(mock_session)
+        allow(real_session_manager).to receive(:get_session).with("test-session").and_return(mock_session)
+        allow(mock_vector_session).to receive(:request_context=)
         allow(server).to receive(:handle_message).and_return({ jsonrpc: "2.0", id: 1, result: "ok" })
 
         rack_env = {
@@ -167,7 +175,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
 
         result = real_transport.send(:handle_post_request, rack_env)
 
-        expect(real_session_manager).to have_received(:get_or_create_session).with("test-session", anything)
+        expect(real_session_manager).to have_received(:get_session).with("test-session")
         expect(result).to be_an(Array) # Rack response
       end
     end

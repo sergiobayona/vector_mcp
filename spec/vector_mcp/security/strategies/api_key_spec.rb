@@ -77,7 +77,25 @@ RSpec.describe VectorMCP::Security::Strategies::ApiKey do
       end
     end
 
-    context "with query parameter" do
+    context "with query parameter (disabled by default)" do
+      it "rejects valid api_key from query params when allow_query_params is false" do
+        request = { params: { "api_key" => "valid-key-1" } }
+        result = api_key_strategy.authenticate(request)
+
+        expect(result).to be false
+      end
+
+      it "rejects valid apikey from query params when allow_query_params is false" do
+        request = { params: { "apikey" => "valid-key-1" } }
+        result = api_key_strategy.authenticate(request)
+
+        expect(result).to be false
+      end
+    end
+
+    context "with query parameter (explicitly enabled)" do
+      let(:api_key_strategy) { described_class.new(keys: %w[valid-key-1 valid-key-2], allow_query_params: true) }
+
       it "authenticates valid api_key parameter" do
         request = { params: { "api_key" => "valid-key-1" } }
         result = api_key_strategy.authenticate(request)
@@ -151,6 +169,31 @@ RSpec.describe VectorMCP::Security::Strategies::ApiKey do
   describe "#key_count" do
     it "returns number of configured keys" do
       expect(api_key_strategy.key_count).to eq(2)
+    end
+  end
+
+  describe "constant-time comparison (SECURITY-001)" do
+    it "uses OpenSSL.fixed_length_secure_compare internally" do
+      expect(OpenSSL).to receive(:fixed_length_secure_compare).at_least(:once).and_call_original
+      request = { headers: { "X-API-Key" => "valid-key-1" } }
+      api_key_strategy.authenticate(request)
+    end
+
+    it "does not leak key validity through exceptions" do
+      request = { headers: { "X-API-Key" => "wrong-length" } }
+      expect { api_key_strategy.authenticate(request) }.not_to raise_error
+    end
+
+    it "correctly matches keys of same length" do
+      request = { headers: { "X-API-Key" => "valid-key-1" } }
+      result = api_key_strategy.authenticate(request)
+      expect(result).to be_truthy
+    end
+
+    it "rejects keys of different length" do
+      request = { headers: { "X-API-Key" => "short" } }
+      result = api_key_strategy.authenticate(request)
+      expect(result).to be false
     end
   end
 end

@@ -83,11 +83,8 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
     context "Scenario 1: Multi-Tenant Data Leakage" do
       it "verifies that sensitive data is correctly routed to the right tenant" do
         # Simulate two different tenant clients
-        tenant_a_session = "tenant-a-#{SecureRandom.hex(4)}"
-        tenant_b_session = "tenant-b-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, tenant_a_session)
-        initialize_mcp_session(base_url, tenant_b_session)
+        tenant_a_session = initialize_mcp_session(base_url)
+        tenant_b_session = initialize_mcp_session(base_url)
 
         # Set up streaming clients for both tenants
         client_a = StreamingTestHelpers::MockStreamingClient.new(tenant_a_session, base_url)
@@ -157,11 +154,8 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
     context "Scenario 2: User-Specific Notification Misrouting" do
       it "verifies personal notifications are correctly routed to the right user" do
         # Simulate two users
-        alice_session = "user-alice-#{SecureRandom.hex(4)}"
-        bob_session = "user-bob-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, alice_session)
-        initialize_mcp_session(base_url, bob_session)
+        alice_session = initialize_mcp_session(base_url)
+        bob_session = initialize_mcp_session(base_url)
 
         alice_client = StreamingTestHelpers::MockStreamingClient.new(alice_session, base_url)
         bob_client = StreamingTestHelpers::MockStreamingClient.new(bob_session, base_url)
@@ -214,11 +208,8 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
     context "Scenario 3: Development vs Production Environment Confusion" do
       it "verifies production alerts are correctly sent to production clients only" do
-        dev_session = "dev-client-#{SecureRandom.hex(4)}"
-        prod_session = "prod-client-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, dev_session)
-        initialize_mcp_session(base_url, prod_session)
+        dev_session = initialize_mcp_session(base_url)
+        prod_session = initialize_mcp_session(base_url)
 
         dev_client = StreamingTestHelpers::MockStreamingClient.new(dev_session, base_url)
         prod_client = StreamingTestHelpers::MockStreamingClient.new(prod_session, base_url)
@@ -272,13 +263,9 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
     context "Scenario 4: Race Condition in Connection Timing" do
       it "verifies deterministic routing behavior regardless of connection timing" do
         # Simplified single-run test to avoid resource exhaustion issues
-        session1 = "race-client-1-#{SecureRandom.hex(6)}"
-        session2 = "race-client-2-#{SecureRandom.hex(6)}"
-        session3 = "race-client-3-#{SecureRandom.hex(6)}"
-
-        initialize_mcp_session(base_url, session1)
-        initialize_mcp_session(base_url, session2)
-        initialize_mcp_session(base_url, session3)
+        session1 = initialize_mcp_session(base_url)
+        session2 = initialize_mcp_session(base_url)
+        session3 = initialize_mcp_session(base_url)
 
         client1 = StreamingTestHelpers::MockStreamingClient.new(session1, base_url)
         client2 = StreamingTestHelpers::MockStreamingClient.new(session2, base_url)
@@ -341,13 +328,9 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
     context "Scenario 5: Message Ordering and Client Confusion" do
       it "verifies correct message delivery and service isolation in multi-client scenarios" do
         # Set up 3 clients representing different services
-        auth_session = "auth-service-#{SecureRandom.hex(4)}"
-        billing_session = "billing-service-#{SecureRandom.hex(4)}"
-        notification_session = "notification-service-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, auth_session)
-        initialize_mcp_session(base_url, billing_session)
-        initialize_mcp_session(base_url, notification_session)
+        auth_session = initialize_mcp_session(base_url)
+        billing_session = initialize_mcp_session(base_url)
+        notification_session = initialize_mcp_session(base_url)
 
         auth_client = StreamingTestHelpers::MockStreamingClient.new(auth_session, base_url)
         billing_client = StreamingTestHelpers::MockStreamingClient.new(billing_session, base_url)
@@ -435,11 +418,8 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
   describe "Evidence Collection for Security Verification" do
     it "documents the exact code path demonstrating correct routing behavior" do
       # Create evidence of the problematic behavior for documentation
-      session1 = "evidence-client-1"
-      session2 = "evidence-client-2"
-
-      initialize_mcp_session(base_url, session1)
-      initialize_mcp_session(base_url, session2)
+      session1 = initialize_mcp_session(base_url)
+      session2 = initialize_mcp_session(base_url)
 
       client1 = StreamingTestHelpers::MockStreamingClient.new(session1, base_url)
       client2 = StreamingTestHelpers::MockStreamingClient.new(session2, base_url)

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "openssl"
+
 module VectorMCP
   module Security
     module Strategies
@@ -10,8 +12,10 @@ module VectorMCP
 
         # Initialize with a list of valid API keys
         # @param keys [Array<String>] array of valid API keys
-        def initialize(keys: [])
+        # @param allow_query_params [Boolean] whether to accept API keys from query parameters (default: false)
+        def initialize(keys: [], allow_query_params: false)
           @valid_keys = Set.new(keys.map(&:to_s))
+          @allow_query_params = allow_query_params
         end
 
         # Add a valid API key
@@ -33,7 +37,7 @@ module VectorMCP
           api_key = extract_api_key(request)
           return false unless api_key&.length&.positive?
 
-          if @valid_keys.include?(api_key)
+          if secure_key_match?(api_key)
             {
               api_key: api_key,
               strategy: "api_key",
@@ -58,14 +62,33 @@ module VectorMCP
 
         private
 
+        # Constant-time comparison of API key against all valid keys.
+        # Iterates all keys to prevent timing side-channels.
+        # @param candidate [String] the API key to check
+        # @return [Boolean] true if the candidate matches a valid key
+        def secure_key_match?(candidate)
+          matched = false
+          @valid_keys.each do |valid_key|
+            next unless candidate.bytesize == valid_key.bytesize
+
+            matched = true if OpenSSL.fixed_length_secure_compare(candidate, valid_key)
+          end
+          matched
+        end
+
         # Extract API key from various request formats
         # @param request [Hash] the request object
         # @return [String, nil] the extracted API key
         def extract_api_key(request)
           headers = normalize_headers(request)
-          params = normalize_params(request)
 
-          extract_from_headers(headers) || extract_from_params(params)
+          from_headers = extract_from_headers(headers)
+          return from_headers if from_headers
+
+          return nil unless @allow_query_params
+
+          params = normalize_params(request)
+          extract_from_params(params)
         end
 
         # Normalize headers to handle different formats

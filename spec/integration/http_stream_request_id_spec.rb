@@ -12,7 +12,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
 
   let(:test_port) { find_available_port }
   let(:base_url) { "http://localhost:#{test_port}" }
-  let(:session_id) { "request-id-test-#{SecureRandom.hex(4)}" }
+  let(:session_id) { @session_id }
 
   let(:server) do
     VectorMCP::Server.new(
@@ -80,7 +80,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
         mock_client.set_sampling_response("sampling/createMessage", "Test response")
         mock_client.start_streaming
       end
@@ -153,14 +153,14 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
     end
 
     describe "Multiple Sessions Concurrent Requests" do
-      let(:session1_id) { "id-test-session-1" }
-      let(:session2_id) { "id-test-session-2" }
+      let(:session1_id) { @session1_id }
+      let(:session2_id) { @session2_id }
       let(:client1) { StreamingTestHelpers::MockStreamingClient.new(session1_id, base_url) }
       let(:client2) { StreamingTestHelpers::MockStreamingClient.new(session2_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session1_id)
-        initialize_mcp_session(base_url, session2_id)
+        @session1_id = initialize_mcp_session(base_url)
+        @session2_id = initialize_mcp_session(base_url)
 
         client1.set_sampling_response("sampling/createMessage", "Response from session 1")
         client2.set_sampling_response("sampling/createMessage", "Response from session 2")
@@ -238,7 +238,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
         mock_client.set_sampling_response("sampling/createMessage", "Load test response")
         mock_client.start_streaming
       end
@@ -292,7 +292,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
       let(:mock_client) { StreamingTestHelpers::MockStreamingClient.new(session_id, base_url) }
 
       before do
-        initialize_mcp_session(base_url, session_id)
+        @session_id = initialize_mcp_session(base_url)
         mock_client.set_sampling_response("sampling/createMessage", "Persistence test")
         mock_client.start_streaming
       end

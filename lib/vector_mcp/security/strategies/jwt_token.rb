@@ -17,12 +17,14 @@ module VectorMCP
         # Initialize JWT strategy
         # @param secret [String] the secret key for JWT verification
         # @param algorithm [String] the JWT algorithm (default: HS256)
+        # @param allow_query_params [Boolean] whether to accept JWT tokens from query parameters (default: false)
         # @param options [Hash] additional JWT verification options
-        def initialize(secret:, algorithm: "HS256", **options)
+        def initialize(secret:, algorithm: "HS256", allow_query_params: false, **options)
           raise LoadError, "JWT gem is required for JWT authentication strategy" unless defined?(JWT)
 
           @secret = secret
           @algorithm = algorithm
+          @allow_query_params = allow_query_params
           @options = {
             algorithm: @algorithm,
             verify_expiration: true,
@@ -82,11 +84,14 @@ module VectorMCP
         # @return [String, nil] the extracted token
         def extract_token(request)
           headers = request[:headers] || request["headers"] || {}
-          params = request[:params] || request["params"] || {}
 
-          extract_from_auth_header(headers) ||
-            extract_from_jwt_header(headers) ||
-            extract_from_params(params)
+          from_headers = extract_from_auth_header(headers) || extract_from_jwt_header(headers)
+          return from_headers if from_headers
+
+          return nil unless @allow_query_params
+
+          params = request[:params] || request["params"] || {}
+          extract_from_params(params)
         end
 
         # Extract token from Authorization header

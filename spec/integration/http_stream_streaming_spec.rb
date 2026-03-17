@@ -314,19 +314,20 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   end
 
   describe "Server-Initiated Requests (Sampling)" do
-    let(:session_id) { "sampling-test-session" }
+    let(:session_id) { @session_id }
     let(:mock_client) { MockStreamingClient.new(session_id, base_url) }
 
     before do
-      # Initialize session
+      # Initialize session without a client-supplied ID; server returns one
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: { sampling: {} },
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      @session_id = response["Mcp-Session-Id"]
 
       # Set up mock client responses
       mock_client.set_response_for_method("sampling/createMessage", "This is a mock response to your question")
@@ -404,18 +405,19 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   end
 
   describe "Event Store and Resumable Connections" do
-    let(:session_id) { "event-store-test-session" }
+    let(:session_id) { @session_id }
 
     before do
-      # Initialize session
+      # Initialize session without a client-supplied ID; server returns one
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      @session_id = response["Mcp-Session-Id"]
     end
 
     it "supports streaming endpoint with session ID" do
@@ -480,18 +482,17 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   end
 
   describe "Session Lifecycle with Streaming" do
-    let(:session_id) { "lifecycle-test-session" }
-
     it "supports streaming connection establishment" do
-      # Initialize session
+      # Initialize session without a client-supplied ID; capture the one the server returns
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      session_id = response["Mcp-Session-Id"]
 
       # Establish streaming connection (expect timeout as SSE connections stay open)
       uri = URI("#{base_url}/mcp")
@@ -511,15 +512,16 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
     end
 
     it "supports explicit session termination" do
-      # Initialize session
+      # Initialize session without a client-supplied ID; capture the one the server returns
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      session_id = response["Mcp-Session-Id"]
 
       # Terminate session
       response = make_request("DELETE", "/mcp", session_id: session_id)
@@ -529,7 +531,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       list_request = create_json_rpc_request("tools/list", {})
       response = make_request("POST", "/mcp", body: list_request, session_id: session_id)
       # Should fail since session was terminated and needs re-initialization
-      expect(response.code).to eq("400")
+      expect(response.code).to eq("404")
     end
 
     it "handles streaming connection without active session" do
@@ -547,8 +549,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # SSE connections may timeout (expected) or may get immediate response
       begin
         response = http.request(request)
-        # If we get a response, it should be an error or create new session
-        expect(response.code).to be_in(%w[200 400 404])
+        # If we get a response, it should be a 404 (unknown session) or timeout
+        expect(%w[200 400 404]).to include(response.code)
       rescue Net::ReadTimeout
         # Timeout is also acceptable for SSE connections
         expect(true).to be true
@@ -557,18 +559,19 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
   end
 
   describe "Error Handling in Streaming Context" do
-    let(:session_id) { "error-handling-session" }
+    let(:session_id) { @session_id }
 
     before do
-      # Initialize session
+      # Initialize session without a client-supplied ID; server returns one
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      @session_id = response["Mcp-Session-Id"]
     end
 
     it "handles sampling timeout gracefully" do
@@ -604,8 +607,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
 
       begin
         response = http.request(request)
-        # Should handle gracefully - may return 400 or other status
-        expect(%w[200 400 404]).to include(response.code)
+        # Should handle gracefully - 406 for wrong Accept, or 400/404 for other reasons
+        expect(%w[200 400 404 406]).to include(response.code)
       rescue Net::ReadTimeout
         # May still timeout depending on implementation
         expect(true).to be true

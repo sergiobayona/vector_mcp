@@ -75,7 +75,9 @@ module VectorMCP
           session
         end
 
-        # Override to add rack_env support
+        # Override to add rack_env support.
+        # Returns nil when a session_id is provided but not found (expired or unknown).
+        # Callers are responsible for returning 404 in that case.
         def get_or_create_session(session_id = nil, rack_env = nil)
           if session_id
             session = get_session(session_id)
@@ -88,8 +90,8 @@ module VectorMCP
               return session
             end
 
-            # If session_id was provided but not found, create with that ID
-            return create_session(session_id, rack_env)
+            # Session ID provided but not found — signal 404 to caller
+            return nil
           end
 
           create_session(nil, rack_env)

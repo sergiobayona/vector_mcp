@@ -6,6 +6,8 @@ require "json"
 require "uri"
 require "timeout"
 require "socket"
+require "securerandom"
+require "concurrent"
 require "vector_mcp/transport/http_stream"
 
 RSpec.describe "HTTP Stream Transport Integration" do
@@ -171,19 +173,18 @@ RSpec.describe "HTTP Stream Transport Integration" do
   end
 
   describe "Session Management" do
-    it "accepts requests with session ID header" do
-      session_id = "test-session-123"
-
-      # Send initialize request
+    it "creates new session when no session ID provided on initialize" do
+      # Send initialize request without a session ID header
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
-      expect(response["Mcp-Session-Id"]).to eq(session_id)
+      expect(response["Mcp-Session-Id"]).not_to be_nil
+      expect(response["Mcp-Session-Id"]).to match(/\A[0-9a-f-]{36}\z/)
     end
 
     it "creates new session if no session ID provided" do
@@ -199,20 +200,27 @@ RSpec.describe "HTTP Stream Transport Integration" do
       expect(response["Mcp-Session-Id"]).not_to be_empty
     end
 
-    it "reuses existing session with same session ID" do
-      session_id = "reuse-session-456"
+    it "returns 404 when an unrecognized session ID is provided" do
+      # Using a client-supplied session ID that the server doesn't know about returns 404
+      unknown_session_id = "unknown-session-#{SecureRandom.hex(4)}"
+      list_request = create_json_rpc_request("tools/list", {})
+      response = make_request("POST", "/mcp", body: list_request, session_id: unknown_session_id)
+      expect(response.code).to eq("404")
+    end
 
-      # First request
+    it "reuses existing session with same server-generated session ID" do
+      # First: initialize to get a server-generated session ID
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response1 = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response1 = make_request("POST", "/mcp", body: init_request)
       expect(response1.code).to eq("200")
+      session_id = response1["Mcp-Session-Id"]
 
-      # Second request with same session ID
+      # Second request with server-generated session ID
       list_request = create_json_rpc_request("tools/list", {})
       response2 = make_request("POST", "/mcp", body: list_request, session_id: session_id)
       expect(response2.code).to eq("200")
@@ -221,18 +229,19 @@ RSpec.describe "HTTP Stream Transport Integration" do
   end
 
   describe "MCP Protocol Implementation" do
-    let(:session_id) { "protocol-test-session" }
+    let(:session_id) { @session_id }
 
     before do
-      # Initialize session
+      # Initialize session without providing a session ID; capture server-generated one
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      @session_id = response["Mcp-Session-Id"]
     end
 
     it "handles tools/list requests" do
@@ -323,8 +332,8 @@ RSpec.describe "HTTP Stream Transport Integration" do
       request = create_json_rpc_request("unknown/method", {})
       response = make_request("POST", "/mcp", body: request, session_id: "error-test")
 
-      # Server may return 400 for invalid requests before session initialization
-      expect(%w[200 400]).to include(response.code)
+      # 404: unknown session; 400/200: session found but method unknown
+      expect(%w[200 400 404]).to include(response.code)
 
       if response.code == "200"
         data = parse_json_rpc_response(response)
@@ -340,8 +349,8 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
       response = make_request("POST", "/mcp", body: request, session_id: "error-test")
 
-      # Server may return 400 for invalid requests before session initialization
-      expect(%w[200 400]).to include(response.code)
+      # 404: unknown session; 400/200: session found but params invalid
+      expect(%w[200 400 404]).to include(response.code)
 
       if response.code == "200"
         data = parse_json_rpc_response(response)
@@ -352,24 +361,23 @@ RSpec.describe "HTTP Stream Transport Integration" do
 
   describe "Concurrent Connections" do
     it "handles multiple simultaneous sessions" do
-      sessions = []
+      sessions = Concurrent::Array.new
       threads = []
 
       # Create multiple sessions concurrently
       3.times do |i|
-        session_id = "concurrent-session-#{i}"
-        sessions << session_id
-
         threads << Thread.new do
-          # Initialize session
+          # Initialize session without providing a session ID
           init_request = create_json_rpc_request("initialize", {
                                                    protocolVersion: "2024-11-05",
                                                    capabilities: {},
                                                    clientInfo: { name: "test-client-#{i}", version: "1.0.0" }
                                                  })
 
-          response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+          response = make_request("POST", "/mcp", body: init_request)
           expect(response.code).to eq("200")
+          session_id = response["Mcp-Session-Id"]
+          sessions << session_id
 
           # Make a tool call
           call_request = create_json_rpc_request("tools/call", {
@@ -389,43 +397,47 @@ RSpec.describe "HTTP Stream Transport Integration" do
       # Wait for all threads to complete
       threads.each(&:join)
 
-      # Verify all sessions are isolated
-      expect(sessions.uniq.length).to eq(3)
+      # Verify all sessions are isolated (each got a unique server-generated session ID)
+      expect(sessions.to_a.uniq.length).to eq(3)
     end
   end
 
   describe "Session Cleanup" do
     it "supports explicit session termination" do
-      session_id = "cleanup-test-session"
-
-      # Initialize session
+      # Initialize session without providing a session ID; capture server-generated one
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      session_id = response["Mcp-Session-Id"]
 
       # Terminate session
       response = make_request("DELETE", "/mcp", session_id: session_id)
       expect(%w[200 204]).to include(response.code) # May return 204 No Content
 
-      # Verify session is gone - new request should create new session
-      # First need to re-initialize the session
+      # Verify session is gone - using the old session_id should return 404
+      list_request = create_json_rpc_request("tools/list", {})
+      response = make_request("POST", "/mcp", body: list_request, session_id: session_id)
+      expect(response.code).to eq("404")
+
+      # Re-initialize to get a new session
       init_request = create_json_rpc_request("initialize", {
                                                protocolVersion: "2024-11-05",
                                                capabilities: {},
                                                clientInfo: { name: "test-client", version: "1.0.0" }
                                              })
 
-      response = make_request("POST", "/mcp", body: init_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: init_request)
       expect(response.code).to eq("200")
+      new_session_id = response["Mcp-Session-Id"]
 
-      # Now we can make other requests
+      # Now we can make requests with the new session
       list_request = create_json_rpc_request("tools/list", {})
-      response = make_request("POST", "/mcp", body: list_request, session_id: session_id)
+      response = make_request("POST", "/mcp", body: list_request, session_id: new_session_id)
       expect(response.code).to eq("200")
     end
   end

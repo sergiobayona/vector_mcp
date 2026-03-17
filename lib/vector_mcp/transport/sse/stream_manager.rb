@@ -65,7 +65,7 @@ module VectorMCP
                 sse_data = format_sse_event("message", json_message)
                 yielder << sse_data
 
-                logger.debug { "Streamed message to client #{client_conn.session_id}: #{json_message}" }
+                logger.debug { "Streamed message to client #{client_conn.session_id}: #{VectorMCP::LogFilter.filter_string(json_message)}" }
               rescue StandardError => e
                 logger.error { "Error streaming message to client #{client_conn.session_id}: #{e.message}" }
                 break

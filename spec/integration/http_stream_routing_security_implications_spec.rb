@@ -117,11 +117,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     context "Healthcare Privacy Protection" do
       it "verifies HIPAA compliance through proper routing" do
         # Simulate doctor and patient portal clients
-        doctor_session = "doctor-portal-#{SecureRandom.hex(4)}"
-        patient_session = "patient-portal-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, doctor_session)
-        initialize_mcp_session(base_url, patient_session)
+        doctor_session = initialize_mcp_session(base_url)
+        patient_session = initialize_mcp_session(base_url)
 
         doctor_client = StreamingTestHelpers::MockStreamingClient.new(doctor_session, base_url)
         patient_client = StreamingTestHelpers::MockStreamingClient.new(patient_session, base_url)
@@ -186,11 +183,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     context "Financial Services Security" do
       it "verifies financial data isolation between customer accounts" do
         # Simulate two banking customers
-        customer_a_session = "bank-customer-a-#{SecureRandom.hex(4)}"
-        customer_b_session = "bank-customer-b-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, customer_a_session)
-        initialize_mcp_session(base_url, customer_b_session)
+        customer_a_session = initialize_mcp_session(base_url)
+        customer_b_session = initialize_mcp_session(base_url)
 
         customer_a_client = StreamingTestHelpers::MockStreamingClient.new(customer_a_session, base_url)
         customer_b_client = StreamingTestHelpers::MockStreamingClient.new(customer_b_session, base_url)
@@ -265,11 +259,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     context "Legal Services Privilege Protection" do
       it "verifies attorney-client privilege protection" do
         # Simulate law firm with multiple attorneys
-        attorney1_session = "attorney-smith-#{SecureRandom.hex(4)}"
-        attorney2_session = "attorney-jones-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, attorney1_session)
-        initialize_mcp_session(base_url, attorney2_session)
+        attorney1_session = initialize_mcp_session(base_url)
+        attorney2_session = initialize_mcp_session(base_url)
 
         attorney1_client = StreamingTestHelpers::MockStreamingClient.new(attorney1_session, base_url)
         attorney2_client = StreamingTestHelpers::MockStreamingClient.new(attorney2_session, base_url)
@@ -345,11 +336,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     context "Government Classified Information Security" do
       it "verifies classified data protection between security clearance levels" do
         # Simulate government clients with different clearance levels
-        secret_cleared_session = "secret-clearance-#{SecureRandom.hex(4)}"
-        top_secret_cleared_session = "top-secret-clearance-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, secret_cleared_session)
-        initialize_mcp_session(base_url, top_secret_cleared_session)
+        secret_cleared_session = initialize_mcp_session(base_url)
+        top_secret_cleared_session = initialize_mcp_session(base_url)
 
         secret_client = StreamingTestHelpers::MockStreamingClient.new(secret_cleared_session, base_url)
         top_secret_client = StreamingTestHelpers::MockStreamingClient.new(top_secret_cleared_session, base_url)
@@ -425,13 +413,9 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
     context "Critical Alert Proper Routing" do
       it "verifies critical system alerts are properly routed" do
         # Simulate monitoring and operations clients
-        monitoring_session = "monitoring-system-#{SecureRandom.hex(4)}"
-        ops_team_session = "ops-team-#{SecureRandom.hex(4)}"
-        dev_team_session = "dev-team-#{SecureRandom.hex(4)}"
-
-        initialize_mcp_session(base_url, monitoring_session)
-        initialize_mcp_session(base_url, ops_team_session)
-        initialize_mcp_session(base_url, dev_team_session)
+        monitoring_session = initialize_mcp_session(base_url)
+        ops_team_session = initialize_mcp_session(base_url)
+        dev_team_session = initialize_mcp_session(base_url)
 
         monitoring_client = StreamingTestHelpers::MockStreamingClient.new(monitoring_session, base_url)
         ops_client = StreamingTestHelpers::MockStreamingClient.new(ops_team_session, base_url)
@@ -517,8 +501,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
       # Create multiple clients
       num_clients.times do |i|
-        session_id = "secure-client-#{i}-#{SecureRandom.hex(4)}"
-        initialize_mcp_session(base_url, session_id)
+        session_id = initialize_mcp_session(base_url)
 
         client = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
         client.set_sampling_response("sampling/createMessage", "CLIENT_#{i}_SECURE_RESPONSE")

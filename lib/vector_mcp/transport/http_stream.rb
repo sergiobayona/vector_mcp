@@ -330,28 +330,122 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def handle_post_request(env)
+        unless valid_post_accept?(env)
+          logger.warn { "POST request with unsupported Accept header: #{env["HTTP_ACCEPT"]}" }
+          return not_acceptable_response("Not Acceptable: POST requires Accept: application/json")
+        end
+
         session_id = extract_session_id(env)
-        session = @session_manager.get_or_create_session(session_id, env)
-
         request_body = read_request_body(env)
-        message = parse_json_message(request_body)
+        parsed = parse_json_message(request_body)
 
-        # Check if this is a response to a server-initiated request
+        session = resolve_session_for_post(session_id, parsed, env)
+        return session if session.is_a?(Array) # Rack error response
+
+        if parsed.is_a?(Array)
+          handle_batch_request(parsed, session)
+        else
+          handle_single_request(parsed, session, env)
+        end
+      rescue JSON::ParserError => e
+        json_error_response(nil, -32_700, "Parse error", { details: e.message })
+      end
+
+      # Handles a single JSON-RPC message from a POST request.
+      #
+      # @param message [Hash] Parsed JSON-RPC message
+      # @param session [Session] The resolved session
+      # @param env [Hash] The Rack environment
+      # @return [Array] Rack response triplet
+      def handle_single_request(message, session, env)
         if outgoing_response?(message)
           handle_outgoing_response(message)
-          # For responses, return 202 Accepted with no body
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
         result = @server.handle_message(message, session.context, session.id)
-
-        # Set session ID header in response
-        headers = { "Mcp-Session-Id" => session.id }
-        json_rpc_response(result, message["id"], headers)
+        build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
-        json_error_response(e.request_id, e.code, e.message, e.details)
-      rescue JSON::ParserError => e
-        json_error_response(nil, -32_700, "Parse error", { details: e.message })
+        build_protocol_error_response(env, e, session_id: session.id)
+      end
+
+      # Handles a batch of JSON-RPC messages per JSON-RPC 2.0 spec.
+      #
+      # @param messages [Array] Array of parsed JSON-RPC messages
+      # @param session [Session] The resolved session
+      # @return [Array] Rack response triplet
+      def handle_batch_request(messages, session)
+        return json_error_response(nil, -32_600, "Invalid Request", { details: "Empty batch" }) if messages.empty?
+
+        responses = messages.filter_map do |message|
+          next batch_invalid_item_error unless message.is_a?(Hash)
+
+          process_batch_item(message, session)
+        end
+
+        return [204, { "Mcp-Session-Id" => session.id }, []] if responses.empty?
+
+        headers = { "Content-Type" => "application/json", "Mcp-Session-Id" => session.id }
+        [200, headers, [responses.to_json]]
+      end
+
+      # Processes a single item within a batch request.
+      #
+      # @param message [Hash] A single JSON-RPC message
+      # @param session [Session] The resolved session
+      # @return [Hash, nil] Response hash or nil for notifications/outgoing responses
+      def process_batch_item(message, session)
+        if outgoing_response?(message)
+          handle_outgoing_response(message)
+          return nil
+        end
+
+        result = @server.handle_message(message, session.context, session.id)
+        return nil if result.nil? && message["id"].nil?
+
+        { jsonrpc: "2.0", id: message["id"], result: result }
+      rescue VectorMCP::ProtocolError => e
+        { jsonrpc: "2.0", id: e.request_id, error: { code: e.code, message: e.message, data: e.details } }
+      rescue StandardError => e
+        { jsonrpc: "2.0", id: message["id"],
+          error: { code: -32_603, message: "Internal error", data: { details: e.message } } }
+      end
+
+      # Returns an error object for non-Hash items in a batch.
+      #
+      # @return [Hash] JSON-RPC error object
+      def batch_invalid_item_error
+        { jsonrpc: "2.0", id: nil, error: { code: -32_600, message: "Invalid Request" } }
+      end
+
+      # Resolves or creates the session for a POST request following MCP spec rules:
+      # - session_id present and known  → return existing session (updating request context)
+      # - session_id present but unknown/expired → 404 Not Found
+      # - no session_id + initialize request → create new session
+      # - no session_id + other request → 400 Bad Request
+      #
+      # @param session_id [String, nil] Client-supplied Mcp-Session-Id header value
+      # @param message [Hash, Array] Parsed JSON-RPC message or batch array
+      # @param env [Hash] Rack environment
+      # @return [Session, Array] Session object or Rack error response triplet
+      def resolve_session_for_post(session_id, message, env)
+        first_message = message.is_a?(Array) ? message.first : message
+        is_initialize = first_message.is_a?(Hash) && first_message["method"] == "initialize"
+
+        if session_id
+          session = @session_manager.get_session(session_id)
+          return not_found_response("Unknown or expired session") unless session
+
+          if env
+            request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+            session.context.request_context = request_context
+          end
+          session
+        elsif is_initialize
+          @session_manager.create_session(nil, env)
+        else
+          bad_request_response("Missing Mcp-Session-Id header")
+        end
       end
 
       # Handles GET requests (SSE streaming)
@@ -359,6 +453,11 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def handle_get_request(env)
+        unless valid_get_accept?(env)
+          logger.warn { "GET request with unsupported Accept header: #{env["HTTP_ACCEPT"]}" }
+          return not_acceptable_response("Not Acceptable: GET requires Accept: text/event-stream")
+        end
+
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
@@ -469,8 +568,73 @@ module VectorMCP
         [400, { "Content-Type" => "application/json" }, [response.to_json]]
       end
 
-      def not_found_response
-        [404, { "Content-Type" => "text/plain" }, ["Not Found"]]
+      def build_rpc_response(env, result, request_id, session_id)
+        headers = { "Mcp-Session-Id" => session_id }
+        if client_accepts_sse?(env)
+          sse_rpc_response(result, request_id, headers, session_id: session_id)
+        else
+          json_rpc_response(result, request_id, headers)
+        end
+      end
+
+      def build_protocol_error_response(env, error, session_id: nil)
+        if client_accepts_sse?(env)
+          sse_error_response(error.request_id, error.code, error.message, error.details, session_id: session_id)
+        else
+          json_error_response(error.request_id, error.code, error.message, error.details)
+        end
+      end
+
+      def client_accepts_sse?(env)
+        accept = env["HTTP_ACCEPT"] || ""
+        accept.include?("text/event-stream")
+      end
+
+      def format_sse_event(data, type, event_id)
+        lines = []
+        lines << "id: #{event_id}"
+        lines << "event: #{type}" if type
+        lines << "data: #{data}"
+        lines << ""
+        "#{lines.join("\n")}\n"
+      end
+
+      def sse_rpc_response(result, request_id, headers = {}, session_id: nil)
+        response = { jsonrpc: "2.0", id: request_id, result: result }
+        event_data = response.to_json
+
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
+        sse_event = format_sse_event(event_data, "message", event_id)
+
+        response_headers = {
+          "Content-Type" => "text/event-stream",
+          "Cache-Control" => "no-cache",
+          "Connection" => "keep-alive",
+          "X-Accel-Buffering" => "no"
+        }.merge(headers)
+
+        [200, response_headers, [sse_event]]
+      end
+
+      def sse_error_response(id, code, err_message, data = nil, session_id: nil)
+        error_obj = { code: code, message: err_message }
+        error_obj[:data] = data if data
+        response = { jsonrpc: "2.0", id: id, error: error_obj }
+        event_data = response.to_json
+
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
+        sse_event = format_sse_event(event_data, "message", event_id)
+
+        response_headers = {
+          "Content-Type" => "text/event-stream",
+          "Cache-Control" => "no-cache"
+        }
+
+        [200, response_headers, [sse_event]]
+      end
+
+      def not_found_response(message = "Not Found")
+        [404, { "Content-Type" => "text/plain" }, [message]]
       end
 
       def bad_request_response(message = "Bad Request")
@@ -484,6 +648,24 @@ module VectorMCP
       def method_not_allowed_response(allowed_methods)
         [405, { "Content-Type" => "text/plain", "Allow" => allowed_methods.join(", ") },
          ["Method Not Allowed"]]
+      end
+
+      def not_acceptable_response(message = "Not Acceptable")
+        [406, { "Content-Type" => "text/plain" }, [message]]
+      end
+
+      def valid_post_accept?(env)
+        accept = env["HTTP_ACCEPT"]
+        return true if accept.nil? || accept.strip.empty?
+
+        accept.include?("application/json") || accept.include?("*/*")
+      end
+
+      def valid_get_accept?(env)
+        accept = env["HTTP_ACCEPT"]
+        return true if accept.nil? || accept.strip.empty?
+
+        accept.include?("text/event-stream") || accept.include?("*/*")
       end
 
       # Validates the Origin header for security
