@@ -330,6 +330,11 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def handle_post_request(env)
+        unless valid_post_accept?(env)
+          logger.warn { "POST request with unsupported Accept header: #{env["HTTP_ACCEPT"]}" }
+          return not_acceptable_response("Not Acceptable: POST requires Accept: application/json")
+        end
+
         session_id = extract_session_id(env)
         request_body = read_request_body(env)
         parsed = parse_json_message(request_body)
@@ -448,6 +453,11 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def handle_get_request(env)
+        unless valid_get_accept?(env)
+          logger.warn { "GET request with unsupported Accept header: #{env["HTTP_ACCEPT"]}" }
+          return not_acceptable_response("Not Acceptable: GET requires Accept: text/event-stream")
+        end
+
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
 
@@ -638,6 +648,24 @@ module VectorMCP
       def method_not_allowed_response(allowed_methods)
         [405, { "Content-Type" => "text/plain", "Allow" => allowed_methods.join(", ") },
          ["Method Not Allowed"]]
+      end
+
+      def not_acceptable_response(message = "Not Acceptable")
+        [406, { "Content-Type" => "text/plain" }, [message]]
+      end
+
+      def valid_post_accept?(env)
+        accept = env["HTTP_ACCEPT"]
+        return true if accept.nil? || accept.strip.empty?
+
+        accept.include?("application/json") || accept.include?("*/*")
+      end
+
+      def valid_get_accept?(env)
+        accept = env["HTTP_ACCEPT"]
+        return true if accept.nil? || accept.strip.empty?
+
+        accept.include?("text/event-stream") || accept.include?("*/*")
       end
 
       # Validates the Origin header for security

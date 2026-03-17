@@ -607,8 +607,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
 
       begin
         response = http.request(request)
-        # Should handle gracefully - may return 400 or other status
-        expect(%w[200 400 404]).to include(response.code)
+        # Should handle gracefully - 406 for wrong Accept, or 400/404 for other reasons
+        expect(%w[200 400 404 406]).to include(response.code)
       rescue Net::ReadTimeout
         # May still timeout depending on implementation
         expect(true).to be true

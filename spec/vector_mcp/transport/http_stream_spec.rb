@@ -420,6 +420,48 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(response["result"]).to eq("success")
           end
         end
+
+        context "Accept header validation on POST" do
+          it "accepts application/json, text/event-stream" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json",
+                                     "HTTP_ACCEPT" => "application/json, text/event-stream")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "accepts application/json alone" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json",
+                                     "HTTP_ACCEPT" => "application/json")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "accepts */* wildcard" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json",
+                                     "HTTP_ACCEPT" => "*/*")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "succeeds when no Accept header is present (lenient)" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "returns 406 for unsupported Accept header" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json",
+                                     "HTTP_ACCEPT" => "text/html")
+
+            expect(last_response.status).to eq(406)
+            expect(last_response.body).to include("Not Acceptable")
+          end
+        end
       end
 
       describe "GET requests (SSE streaming)" do
@@ -444,6 +486,39 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           get "/mcp", {}, valid_headers
 
           expect(last_response.status).to eq(200)
+        end
+
+        context "Accept header validation on GET" do
+          it "accepts text/event-stream" do
+            expect(transport.stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
+
+            get "/mcp", {}, valid_headers.merge("HTTP_ACCEPT" => "text/event-stream")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "accepts */* wildcard" do
+            expect(transport.stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
+
+            get "/mcp", {}, valid_headers.merge("HTTP_ACCEPT" => "*/*")
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "succeeds when no Accept header is present (lenient)" do
+            expect(transport.stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
+
+            get "/mcp", {}, valid_headers
+
+            expect(last_response.status).to eq(200)
+          end
+
+          it "returns 406 for unsupported Accept header" do
+            get "/mcp", {}, valid_headers.merge("HTTP_ACCEPT" => "application/json")
+
+            expect(last_response.status).to eq(406)
+            expect(last_response.body).to include("Not Acceptable")
+          end
         end
       end
 
