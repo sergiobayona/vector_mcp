@@ -109,19 +109,6 @@
           }
         },
         {
-          "name": "ui-design-review",
-          "type": "agent",
-          "parallel": true,
-          "promptType": "skill",
-          "prompt": "prove-ui-design",
-          "model": "sonnet",
-          "ruleFile": ".claude/rules/ui-design.md",
-          "when": {
-            "signal": "done",
-            "fileExists": ".claude/rules/ui-design.md"
-          }
-        },
-        {
           "name": "approach-review",
           "type": "agent",
           "parallel": true,
