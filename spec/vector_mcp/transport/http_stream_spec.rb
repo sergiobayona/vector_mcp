@@ -283,7 +283,25 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
           it "stores the SSE response event in the event store" do
             expect { post "/mcp", json_request.to_json, sse_accept_headers }
-              .to change { transport.event_store.event_count }.by(1)
+              .to change { transport.event_store.event_count }.by(2) # priming event + data event
+          end
+
+          it "sends a priming event before the data event" do
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            events = last_response.body.split("\n\n").reject(&:empty?)
+            expect(events.length).to eq(2)
+
+            # First event: priming (event ID + empty data)
+            prime_event = events[0]
+            expect(prime_event).to match(/^id: .+/)
+            expect(prime_event).to include("data:")
+            expect(prime_event).not_to include("event:")
+
+            # Second event: actual data
+            data_event = events[1]
+            expect(data_event).to include("event: message")
+            expect(data_event).to match(/^data: \{/)
           end
 
           it "returns SSE-formatted errors when client accepts text/event-stream" do
@@ -299,6 +317,27 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             json_data = JSON.parse(data_line.sub("data: ", ""))
 
             expect(json_data["error"]["code"]).to eq(-32_601)
+          end
+
+          it "includes a priming event before the SSE error event" do
+            protocol_error = VectorMCP::MethodNotFoundError.new("unknown_method", request_id: 1)
+            allow(mock_mcp_server).to receive(:handle_message).and_raise(protocol_error)
+
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            events = last_response.body.split("\n\n").reject(&:empty?)
+            expect(events.length).to eq(2)
+
+            # First event: priming (event ID + empty data)
+            prime_event = events[0]
+            expect(prime_event).to match(/^id: .+/)
+            expect(prime_event).to include("data:")
+            expect(prime_event).not_to include("event:")
+
+            # Second event: error data
+            error_event = events[1]
+            expect(error_event).to include("event: message")
+            expect(error_event).to match(/data: .*error/)
           end
 
           it "returns JSON-formatted errors when client does not accept SSE" do
@@ -418,6 +457,45 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(response).to be_a(Hash)
             expect(response["id"]).to eq(1)
             expect(response["result"]).to eq("success")
+          end
+        end
+
+        context "single notification requests" do
+          it "returns 202 Accepted with empty body for notifications" do
+            notification = { "jsonrpc" => "2.0", "method" => "initialized" }
+            allow(mock_mcp_server).to receive(:handle_message).and_return(nil)
+
+            post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(202)
+            expect(last_response.body).to be_empty
+          end
+
+          it "includes Mcp-Session-Id header on 202 responses" do
+            notification = { "jsonrpc" => "2.0", "method" => "notifications/cancelled", "params" => {} }
+            allow(mock_mcp_server).to receive(:handle_message).and_return(nil)
+
+            post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(202)
+            expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
+          end
+
+          it "still calls the notification handler" do
+            notification = { "jsonrpc" => "2.0", "method" => "initialized" }
+            expect(mock_mcp_server).to receive(:handle_message).with(notification, mock_session_context, session_id).and_return(nil)
+
+            post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(202)
+          end
+
+          it "distinguishes notifications from requests (requests still return 200)" do
+            request = { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }
+
+            post "/mcp", request.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(200)
           end
         end
 
@@ -546,6 +624,79 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         end
       end
 
+      describe "MCP-Protocol-Version header validation" do
+        let(:request_body) { { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" } }
+        let(:post_headers) { valid_headers.merge("CONTENT_TYPE" => "application/json") }
+
+        it "allows POST requests without the header (backwards compatibility)" do
+          post "/mcp", request_body.to_json, post_headers
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "allows POST requests with a supported protocol version" do
+          post "/mcp", request_body.to_json,
+               post_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "2025-03-26")
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "allows POST requests with the backwards-compatible 2024-11-05 version" do
+          post "/mcp", request_body.to_json,
+               post_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "2024-11-05")
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "rejects POST requests with an unsupported protocol version" do
+          post "/mcp", request_body.to_json,
+               post_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "9999-01-01")
+
+          expect(last_response.status).to eq(400)
+          expect(last_response.body).to include("Unsupported MCP-Protocol-Version")
+        end
+
+        it "allows initialize requests without the header" do
+          init_request = { "jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => {} }
+          new_session = VectorMCP::Transport::HttpStream::SessionManager::Session.new(
+            "new-session-456", mock_session_context, Time.now, Time.now, nil
+          )
+          allow(transport.session_manager).to receive(:create_session).and_return(new_session)
+
+          post "/mcp", init_request.to_json, { "CONTENT_TYPE" => "application/json" }
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "skips validation for initialize requests even with bad version" do
+          init_request = { "jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => {} }
+          new_session = VectorMCP::Transport::HttpStream::SessionManager::Session.new(
+            "new-session-456", mock_session_context, Time.now, Time.now, nil
+          )
+          allow(transport.session_manager).to receive(:create_session).and_return(new_session)
+
+          post "/mcp", init_request.to_json,
+               { "CONTENT_TYPE" => "application/json", "HTTP_MCP_PROTOCOL_VERSION" => "9999-01-01" }
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "rejects GET requests with an unsupported protocol version" do
+          get "/mcp", {}, valid_headers.merge("HTTP_ACCEPT" => "text/event-stream",
+                                              "HTTP_MCP_PROTOCOL_VERSION" => "9999-01-01")
+
+          expect(last_response.status).to eq(400)
+          expect(last_response.body).to include("Unsupported MCP-Protocol-Version")
+        end
+
+        it "rejects DELETE requests with an unsupported protocol version" do
+          delete "/mcp", {}, valid_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "9999-01-01")
+
+          expect(last_response.status).to eq(400)
+          expect(last_response.body).to include("Unsupported MCP-Protocol-Version")
+        end
+      end
+
       describe "unsupported HTTP methods" do
         it "returns 405 Method Not Allowed" do
           put "/mcp", {}, valid_headers
@@ -562,21 +713,21 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
         context "with default origins (localhost only)" do
           it "allows requests without Origin header" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
             expect(last_response.status).to eq(200)
           end
 
           it "allows requests from localhost origins" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "http://localhost:3000")
 
             expect(last_response.status).to eq(200)
           end
 
           it "allows requests from 127.0.0.1 origins" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "http://127.0.0.1:8080")
 
             expect(last_response.status).to eq(200)
@@ -603,7 +754,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           end
 
           it "allows requests from any origin" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://anywhere.com")
 
             expect(last_response.status).to eq(200)
@@ -620,14 +771,14 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           end
 
           it "allows requests without Origin header" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json")
 
             expect(last_response.status).to eq(200)
           end
 
           it "allows requests from allowed origins" do
-            post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
+            post "/mcp", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://example.com")
 
             expect(last_response.status).to eq(200)

@@ -29,6 +29,9 @@ module VectorMCP
           end
         end
 
+        # Default reconnection time in milliseconds sent before intentional disconnections.
+        DEFAULT_RETRY_MS = 5000
+
         # Initializes a new stream handler.
         #
         # @param transport [HttpStream] The parent transport instance
@@ -162,18 +165,9 @@ module VectorMCP
         # @param last_event_id [String, nil] The last event ID for resumability
         # @return [void]
         def stream_to_client(session, yielder, last_event_id)
-          # Send initial connection event
-          connection_event = {
-            jsonrpc: "2.0",
-            method: "connection/established",
-            params: {
-              session_id: session.id,
-              timestamp: Time.now.iso8601
-            }
-          }
-
-          event_id = @transport.event_store.store_event(connection_event.to_json, "connection", session_id: session.id)
-          yielder << format_sse_event(connection_event.to_json, "connection", event_id)
+          # SSE priming event per MCP spec: event ID + empty data field
+          prime_event_id = @transport.event_store.store_event("", nil, session_id: session.id)
+          yielder << "id: #{prime_event_id}\ndata:\n\n"
 
           # Replay missed events if resuming
           replay_events(yielder, last_event_id, session) if last_event_id
@@ -215,7 +209,9 @@ module VectorMCP
 
             # Check if connection has been alive too long
             if Time.now - start_time > max_duration
-              logger.debug("Connection for #{session.id} reached maximum duration, closing")
+              logger.debug("Connection for #{session.id} reached maximum duration, sending retry guidance and closing")
+              # Send retry field before intentional disconnect per MCP spec
+              yielder << "retry: #{DEFAULT_RETRY_MS}\n\n"
               break
             end
 
@@ -242,10 +238,11 @@ module VectorMCP
         # @param type [String] The event type
         # @param event_id [String] The event ID
         # @return [String] Formatted SSE event
-        def format_sse_event(data, type, event_id)
+        def format_sse_event(data, type, event_id, retry_ms: nil)
           lines = []
-          lines << "id: #{event_id}"
+          lines << "id: #{event_id}" if event_id
           lines << "event: #{type}" if type
+          lines << "retry: #{retry_ms}" if retry_ms
           lines << "data: #{data}"
           lines << ""
           "#{lines.join("\n")}\n"

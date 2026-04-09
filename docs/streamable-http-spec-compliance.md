@@ -34,15 +34,21 @@
 
 ## Executive Summary
 
-This document audits VectorMCP's Streamable HTTP Transport implementation against the MCP specification version 2025-11-25. The audit identified **13 findings**: 4 missing implementations, 5 incorrect interpretations, and 4 potential issues.
+This document audits VectorMCP's Streamable HTTP Transport implementation against the MCP specification version 2025-11-25. The audit identified **13 findings**: 4 missing implementations (now resolved), 5 incorrect interpretations, and 4 potential issues (1 now resolved).
 
-**4 findings are HIGH severity** (MUST-level spec violations):
-1. The `MCP-Protocol-Version` header is completely unimplemented.
-2. Client notifications incorrectly return HTTP 200 instead of 202.
-3. Batch JSON-RPC support contradicts the spec's single-message requirement.
-4. The `broadcast_message` API sends the same message to multiple streams.
+**2 remaining HIGH severity** (MUST-level spec violations):
+1. Batch JSON-RPC support contradicts the spec's single-message requirement.
+2. The `broadcast_message` API sends the same message to multiple streams.
 
-The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, and outgoing response detection.
+**Resolved since initial audit (2026-04-09):**
+1. ~~The `MCP-Protocol-Version` header is completely unimplemented.~~ **FIXED** -- Header validation added to POST, GET, and DELETE handlers. Unsupported versions return 400. Missing header assumes `2025-03-26` for backwards compatibility.
+2. ~~Client notifications incorrectly return HTTP 200 instead of 202.~~ **FIXED** -- Notifications (method + no id) now return 202 Accepted with empty body.
+3. ~~No SSE priming event with empty data.~~ **FIXED** -- Priming event (event ID + empty data) sent before all SSE streams (GET and POST).
+4. ~~No SSE `retry` field support.~~ **FIXED** -- `format_sse_event` supports `retry_ms:` parameter. `keep_alive_loop` sends `retry: 5000` before intentional disconnections.
+5. ~~Protocol version hardcoded to `2024-11-05`.~~ **FIXED** -- Updated to `2025-03-26` with `SUPPORTED_PROTOCOL_VERSIONS` constant.
+6. ~~Non-standard `connection/established` SSE event.~~ **FIXED** -- Replaced with spec-compliant empty-data priming event.
+
+The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, outgoing response detection, protocol version header validation, notification responses, SSE priming, and SSE retry guidance.
 
 ---
 
@@ -67,21 +73,21 @@ Key requirements include:
 
 ## Findings Summary
 
-| # | Finding | Category | Severity | Spec Level |
-|---|---------|----------|----------|-----------|
-| 1 | `MCP-Protocol-Version` header not implemented | Missing | **HIGH** | MUST |
-| 2 | Notifications return 200 instead of 202 | Missing | **HIGH** | MUST |
-| 3 | No SSE priming event with empty data | Missing | MEDIUM | SHOULD |
-| 4 | No SSE `retry` field support | Missing | MEDIUM | SHOULD |
-| 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST |
-| 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST |
-| 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) |
-| 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST |
-| 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST |
-| 10 | Protocol version stuck at `2024-11-05` | Potential | MEDIUM | -- |
-| 11 | Non-standard SSE events and JSON-RPC methods | Potential | LOW | -- |
-| 12 | POST SSE is single-event, no interim messages | Potential | LOW | MAY |
-| 13 | Origin error uses plain text instead of JSON-RPC error | Potential | LOW | MAY |
+| # | Finding | Category | Severity | Spec Level | Status |
+|---|---------|----------|----------|-----------|--------|
+| 1 | `MCP-Protocol-Version` header not implemented | Missing | **HIGH** | MUST | **FIXED** |
+| 2 | Notifications return 200 instead of 202 | Missing | **HIGH** | MUST | **FIXED** |
+| 3 | No SSE priming event with empty data | Missing | MEDIUM | SHOULD | **FIXED** |
+| 4 | No SSE `retry` field support | Missing | MEDIUM | SHOULD | **FIXED** |
+| 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | Open |
+| 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | Open |
+| 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | Open |
+| 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | Open |
+| 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST | Open |
+| 10 | Protocol version stuck at `2024-11-05` | Potential | MEDIUM | -- | **FIXED** |
+| 11 | Non-standard SSE events and JSON-RPC methods | Potential | LOW | -- | Partial |
+| 12 | POST SSE is single-event, no interim messages | Potential | LOW | MAY | Open |
+| 13 | Origin error uses plain text instead of JSON-RPC error | Potential | LOW | MAY | Open |
 
 ---
 
@@ -89,7 +95,7 @@ Key requirements include:
 
 ### 1. MCP-Protocol-Version Header Not Implemented
 
-**Severity:** HIGH | **Spec Level:** MUST
+**Severity:** HIGH | **Spec Level:** MUST | **Status: FIXED**
 
 #### Spec Reference
 
@@ -108,46 +114,26 @@ The full normative text from the specification:
 >
 > If the server receives a request with an invalid or unsupported `MCP-Protocol-Version`, it **MUST** respond with `400 Bad Request`.
 
-#### Current Behavior
+#### Resolution
 
-No references to `MCP-Protocol-Version` or `HTTP_MCP_PROTOCOL_VERSION` exist anywhere in the codebase. The server never reads, validates, or acts on this header.
+**Fixed in commit on 2026-04-09.** Implementation:
 
-#### Impact
+- `PROTOCOL_VERSION` updated to `"2025-03-26"` and `SUPPORTED_PROTOCOL_VERSIONS = %w[2025-03-26 2024-11-05]` added to `VectorMCP::Server`
+- `validate_protocol_version_header(env)` added to `HttpStream` -- returns nil if valid, 400 Rack response if unsupported
+- Validation integrated into `handle_post_request` (skipped for `initialize`), `handle_get_request`, and `handle_delete_request`
+- Missing header is allowed for backwards compatibility (assumes `2025-03-26` per spec)
+- 7 unit tests added covering valid, unsupported, missing, and initialize-bypass scenarios
 
-- The server cannot enforce protocol version negotiation.
-- A client sending an unsupported protocol version will not be rejected.
-- No backwards-compatibility fallback to `2025-03-26` exists.
+#### Files Changed
 
-#### Suggested Fix
-
-Add protocol version validation in the POST and GET request handlers:
-
-```ruby
-def validate_protocol_version(env, session_id)
-  version = env["HTTP_MCP_PROTOCOL_VERSION"]
-
-  if version.nil?
-    # Backwards compatibility: assume 2025-03-26 if not present
-    return "2025-03-26"
-  end
-
-  unless supported_protocol_versions.include?(version)
-    return bad_request_response("Unsupported MCP-Protocol-Version: #{version}")
-  end
-
-  version
-end
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream.rb` — Add validation in `handle_post_request` and `handle_get_request`
+- `lib/vector_mcp/server.rb` — Updated `PROTOCOL_VERSION`, added `SUPPORTED_PROTOCOL_VERSIONS`
+- `lib/vector_mcp/transport/http_stream.rb` — Added `validate_protocol_version_header`, integrated into all 3 handlers
 
 ---
 
 ### 2. Notifications Return Wrong HTTP Status
 
-**Severity:** HIGH | **Spec Level:** MUST
+**Severity:** HIGH | **Spec Level:** MUST | **Status: FIXED**
 
 #### Spec Reference
 
@@ -183,46 +169,25 @@ def handle_single_request(message, session, env)
 end
 ```
 
-Outgoing responses (client responses to server-initiated requests) correctly return 202. However, **notifications** (messages with a `method` but no `id`) fall through to `build_rpc_response`, which returns HTTP 200 with a JSON body: `{jsonrpc: "2.0", id: null, result: null}`.
+#### Resolution
 
-This affects all client notifications including:
-- `initialized`
-- `$/cancelRequest`
-- `notifications/cancelled`
+**Fixed in commit on 2026-04-09.** Implementation:
 
-#### Impact
+- Added notification detection in `handle_single_request`: messages with `method` and no `id` key now return 202 Accepted with empty body
+- The notification handler is still called via `@server.handle_message` before returning 202
+- Uses `!message.key?("id")` for precise detection (absence of key, not nil value)
+- `Mcp-Session-Id` header is still included on 202 responses
+- 4 unit tests added covering 202 response, header presence, handler execution, and request vs notification distinction
 
-Every client notification receives a malformed 200 response instead of the required 202 empty response.
+#### Files Changed
 
-#### Suggested Fix
-
-```ruby
-def handle_single_request(message, session, env)
-  if outgoing_response?(message)
-    handle_outgoing_response(message)
-    return [202, { "Mcp-Session-Id" => session.id }, []]
-  end
-
-  # Check if this is a notification (has method, no id)
-  if message["method"] && !message["id"]
-    @server.handle_message(message, session.context, session.id)
-    return [202, { "Mcp-Session-Id" => session.id }, []]
-  end
-
-  result = @server.handle_message(message, session.context, session.id)
-  build_rpc_response(env, result, message["id"], session.id)
-end
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream.rb` — Modify `handle_single_request`
+- `lib/vector_mcp/transport/http_stream.rb` — Modified `handle_single_request`
 
 ---
 
 ### 3. SSE Priming Event Missing
 
-**Severity:** MEDIUM | **Spec Level:** SHOULD
+**Severity:** MEDIUM | **Spec Level:** SHOULD | **Status: FIXED**
 
 #### Spec Reference
 
@@ -241,34 +206,25 @@ This requirement applies to SSE streams initiated from both POST responses (item
 
 #### Current Behavior
 
-**POST SSE responses** (`sse_rpc_response` at `lib/vector_mcp/transport/http_stream.rb:613-628`): The actual response data is sent immediately with no priming event.
+#### Resolution
 
-**GET SSE streams** (`stream_to_client` at `lib/vector_mcp/transport/http_stream/stream_handler.rb:164-183`): A `connection/established` event is sent with a full JSON payload, not an empty data field.
+**Fixed in commit on 2026-04-09.** Implementation:
 
-#### Impact
+- **GET SSE streams**: Replaced `connection/established` JSON-RPC notification with spec-compliant priming event (`id: <event_id>\ndata:\n\n`). The priming event is stored in the event store for resumability.
+- **POST SSE responses**: `sse_rpc_response` and `sse_error_response` now prepend a priming event before the actual data event in the response body.
+- Priming events use `nil` for event type (no `event:` line) so they fire the default `onmessage` handler in EventSource.
+- 5 unit tests added across stream_handler_spec and http_stream_spec.
 
-Clients cannot use the initial event ID for SSE reconnection priming as the spec intends. If a disconnect occurs before the first real message, the client has no `Last-Event-ID` to resume from.
+#### Files Changed
 
-#### Suggested Fix
-
-Send a priming event before any data events:
-
-```ruby
-# SSE priming event per spec: event ID + empty data
-event_id = @transport.event_store.store_event("", "prime", session_id: session.id)
-yielder << "id: #{event_id}\ndata:\n\n"
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream.rb` — Modify `sse_rpc_response`
-- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Modify `stream_to_client`
+- `lib/vector_mcp/transport/http_stream.rb` — Modified `sse_rpc_response` and `sse_error_response`
+- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Modified `stream_to_client`
 
 ---
 
 ### 4. SSE `retry` Field Never Sent
 
-**Severity:** MEDIUM | **Spec Level:** SHOULD
+**Severity:** MEDIUM | **Spec Level:** SHOULD | **Status: FIXED**
 
 #### Spec Reference
 
@@ -289,46 +245,19 @@ The `retry` field is a standard SSE mechanism defined in the [WHATWG HTML Living
 
 #### Current Behavior
 
-The `format_sse_event` method (`lib/vector_mcp/transport/http_stream/stream_handler.rb:245-252`) has no support for the SSE `retry:` field. When `keep_alive_loop` closes after 5 minutes (`stream_handler.rb:217-219`), no retry guidance is sent.
+#### Resolution
 
-```ruby
-def format_sse_event(data, type, event_id)
-  lines = []
-  lines << "id: #{event_id}"
-  lines << "event: #{type}" if type
-  lines << "data: #{data}"
-  lines << ""
-  "#{lines.join("\n")}\n"
-end
-```
+**Fixed in commit on 2026-04-09.** Implementation:
 
-#### Impact
+- Added `retry_ms:` keyword argument to both `format_sse_event` methods (in `stream_handler.rb` and `http_stream.rb`). When provided, emits `retry: <ms>` line in the SSE event.
+- Added `DEFAULT_RETRY_MS = 5000` constant to `StreamHandler`.
+- `keep_alive_loop` sends `retry: 5000\n\n` before breaking on max duration (5 minutes), guiding clients to reconnect after 5 seconds.
+- 2 unit tests added for `format_sse_event` with and without `retry_ms`.
 
-Clients have no server-provided guidance on reconnection timing. They may reconnect too aggressively or not at all.
+#### Files Changed
 
-#### Suggested Fix
-
-Add `retry` field support and send it before intentional disconnections:
-
-```ruby
-def format_sse_event(data, type, event_id, retry_ms: nil)
-  lines = []
-  lines << "id: #{event_id}" if event_id
-  lines << "event: #{type}" if type
-  lines << "retry: #{retry_ms}" if retry_ms
-  lines << "data: #{data}"
-  lines << ""
-  "#{lines.join("\n")}\n"
-end
-
-# In keep_alive_loop, before breaking on max duration:
-yielder << "retry: 5000\n\n"
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Modify `format_sse_event` and `keep_alive_loop`
-- `lib/vector_mcp/transport/http_stream.rb` — Modify `format_sse_event` (duplicate definition)
+- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Added `DEFAULT_RETRY_MS`, updated `format_sse_event` and `keep_alive_loop`
+- `lib/vector_mcp/transport/http_stream.rb` — Updated `format_sse_event`
 
 ---
 
@@ -597,64 +526,32 @@ end
 
 ### 10. Protocol Version Hardcoded to `2024-11-05`
 
-**Severity:** MEDIUM
+**Severity:** MEDIUM | **Status: FIXED**
 
-#### Current Behavior
+#### Resolution
 
-`lib/vector_mcp/server.rb:69`:
-
-```ruby
-PROTOCOL_VERSION = "2024-11-05"
-```
-
-The server advertises protocol version `2024-11-05` in its `InitializeResult`, but the transport implementation targets the `2025-11-25` spec (resumability, session management patterns, etc.).
-
-#### Impact
-
-Clients negotiate the old protocol version and may expect the older HTTP+SSE transport behavior instead of the Streamable HTTP transport. Version mismatch could lead to interoperability issues.
-
-#### Suggested Fix
-
-Update to `"2025-11-25"` or implement multi-version negotiation:
-
-```ruby
-PROTOCOL_VERSION = "2025-11-25"
-SUPPORTED_VERSIONS = ["2025-11-25", "2025-03-26", "2024-11-05"].freeze
-```
+**Fixed as part of Finding #1.** `PROTOCOL_VERSION` updated to `"2025-03-26"` and `SUPPORTED_PROTOCOL_VERSIONS = %w[2025-03-26 2024-11-05]` added. The server now advertises a current protocol version and validates the `MCP-Protocol-Version` header against the supported list.
 
 ---
 
 ### 11. Non-Standard SSE Events and JSON-RPC Methods
 
-**Severity:** LOW
+**Severity:** LOW | **Status: Partially Fixed**
 
 #### Current Behavior
 
-The implementation sends several messages not defined in the MCP spec:
+The `connection/established` event has been replaced with a spec-compliant priming event (Finding #3). The remaining non-standard event is:
 
 | Event | Location | Description |
 |-------|----------|-------------|
-| `connection/established` | `stream_handler.rb:166-173` | Sent on GET SSE open |
 | `heartbeat` | `stream_handler.rb:223-227` | Sent every 30 seconds |
 
-Additionally, SSE events use named `event:` types (`message`, `connection`, `heartbeat`). Standard `EventSource.onmessage` only receives events **without** a named type or with `event: message`. Events with custom types like `event: connection` require explicit `addEventListener("connection", ...)`.
+Additionally, SSE events still use named `event:` types (`message`, `heartbeat`). Standard `EventSource.onmessage` only receives events **without** a named type or with `event: message`. Events with custom types like `event: heartbeat` require explicit `addEventListener("heartbeat", ...)`.
 
-#### Impact
+#### Remaining Work
 
-- Clients strictly parsing MCP messages may not understand these custom methods.
-- Clients using `EventSource.onmessage` would not receive `connection` or `heartbeat` events.
-
-#### Suggested Fix
-
-- Replace `connection/established` with the spec-prescribed empty-data priming event.
 - Use SSE comments (`: heartbeat\n\n`) instead of JSON-RPC notifications for keep-alive.
-- Remove the `event:` field from data messages so they arrive on the default `onmessage` handler:
-
-```ruby
-def format_sse_event(data, event_id)
-  "id: #{event_id}\ndata: #{data}\n\n"
-end
-```
+- Consider removing the `event:` field from data messages so they arrive on the default `onmessage` handler.
 
 ---
 
@@ -734,6 +631,11 @@ The following areas correctly implement the specification:
 | GET Accept header validation | **Pass** | Requires `text/event-stream` or `*/*` |
 | GET returns SSE stream | **Pass** | Returns `text/event-stream` content type with streaming body |
 | Session expiry cleanup | **Pass** | Automatic cleanup via `Concurrent::TimerTask` every 60 seconds |
+| MCP-Protocol-Version header | **Pass** | Validated on POST (except initialize), GET, and DELETE. Unsupported versions return 400. Missing header assumes `2025-03-26`. |
+| Notification 202 response | **Pass** | Notifications (method + no id) return 202 Accepted with empty body |
+| SSE priming event | **Pass** | Priming event (event ID + empty data) sent before all SSE streams (GET and POST) |
+| SSE retry field | **Pass** | `retry: 5000` sent before intentional disconnections in `keep_alive_loop` |
+| Protocol version negotiation | **Pass** | Server advertises `2025-03-26`, supports `2024-11-05` for backwards compatibility |
 
 ---
 
@@ -741,28 +643,28 @@ The following areas correctly implement the specification:
 
 ### Immediate (MUST violations)
 
-| # | Fix | Effort |
-|---|-----|--------|
-| 2 | Return 202 for notifications in `handle_single_request` | Small |
-| 1 | Add `MCP-Protocol-Version` header validation | Medium |
-| 6 | Remove or fix `broadcast_message` / `broadcast_notification` | Medium |
-| 5 | Reject or gate batch requests | Small |
+| # | Fix | Effort | Status |
+|---|-----|--------|--------|
+| 2 | Return 202 for notifications in `handle_single_request` | Small | **DONE** |
+| 1 | Add `MCP-Protocol-Version` header validation | Medium | **DONE** |
+| 6 | Remove or fix `broadcast_message` / `broadcast_notification` | Medium | Open |
+| 5 | Reject or gate batch requests | Small | Open |
 
 ### Short-term (SHOULD violations and MUST-adjacent)
 
-| # | Fix | Effort |
-|---|-----|--------|
-| 9 | Track stream origin (POST vs GET) in `StreamingConnection` | Medium |
-| 8 | Add stream ID to events and filter replay by stream | Medium |
-| 3 | Add SSE priming event with empty data field | Small |
-| 4 | Add SSE `retry` field support | Small |
-| 7 | Tighten POST Accept validation | Small |
+| # | Fix | Effort | Status |
+|---|-----|--------|--------|
+| 9 | Track stream origin (POST vs GET) in `StreamingConnection` | Medium | Open |
+| 8 | Add stream ID to events and filter replay by stream | Medium | Open |
+| 3 | Add SSE priming event with empty data field | Small | **DONE** |
+| 4 | Add SSE `retry` field support | Small | **DONE** |
+| 7 | Tighten POST Accept validation | Small | Open |
 
 ### Later (low severity, nice-to-have)
 
-| # | Fix | Effort |
-|---|-----|--------|
-| 10 | Update `PROTOCOL_VERSION` constant | Small |
-| 11 | Replace custom SSE events with spec-compliant patterns | Medium |
-| 12 | Support long-lived POST SSE streams | Large |
-| 13 | Return JSON-RPC error on 403 | Small |
+| # | Fix | Effort | Status |
+|---|-----|--------|--------|
+| 10 | Update `PROTOCOL_VERSION` constant | Small | **DONE** |
+| 11 | Replace custom SSE events with spec-compliant patterns | Medium | Partial |
+| 12 | Support long-lived POST SSE streams | Large | Open |
+| 13 | Return JSON-RPC error on 403 | Small | Open |

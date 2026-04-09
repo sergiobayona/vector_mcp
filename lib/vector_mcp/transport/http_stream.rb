@@ -353,6 +353,14 @@ module VectorMCP
         session = resolve_session_for_post(session_id, parsed, env)
         return session if session.is_a?(Array) # Rack error response
 
+        # Validate MCP-Protocol-Version header (skip for initialize requests)
+        first_message = parsed.is_a?(Array) ? parsed.first : parsed
+        is_initialize = first_message.is_a?(Hash) && first_message["method"] == "initialize"
+        unless is_initialize
+          version_error = validate_protocol_version_header(env)
+          return version_error if version_error
+        end
+
         if parsed.is_a?(Array)
           handle_batch_request(parsed, session)
         else
@@ -371,6 +379,12 @@ module VectorMCP
       def handle_single_request(message, session, env)
         if outgoing_response?(message)
           handle_outgoing_response(message)
+          return [202, { "Mcp-Session-Id" => session.id }, []]
+        end
+
+        # Notifications: has method, no id -> 202 Accepted with no body (MCP spec requirement)
+        if message["method"] && !message.key?("id")
+          @server.handle_message(message, session.context, session.id)
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
@@ -475,6 +489,9 @@ module VectorMCP
         session = @session_manager.get_or_create_session(session_id, env)
         return not_found_response unless session
 
+        version_error = validate_protocol_version_header(env)
+        return version_error if version_error
+
         @stream_handler.handle_streaming_request(env, session)
       end
 
@@ -485,6 +502,9 @@ module VectorMCP
       def handle_delete_request(env)
         session_id = extract_session_id(env)
         return bad_request_response("Missing Mcp-Session-Id header") unless session_id
+
+        version_error = validate_protocol_version_header(env)
+        return version_error if version_error
 
         success = @session_manager.terminate_session(session_id)
         if success
@@ -601,10 +621,11 @@ module VectorMCP
         accept.include?("text/event-stream")
       end
 
-      def format_sse_event(data, type, event_id)
+      def format_sse_event(data, type, event_id, retry_ms: nil)
         lines = []
-        lines << "id: #{event_id}"
+        lines << "id: #{event_id}" if event_id
         lines << "event: #{type}" if type
+        lines << "retry: #{retry_ms}" if retry_ms
         lines << "data: #{data}"
         lines << ""
         "#{lines.join("\n")}\n"
@@ -614,6 +635,11 @@ module VectorMCP
         response = { jsonrpc: "2.0", id: request_id, result: result }
         event_data = response.to_json
 
+        # Priming event per MCP spec: event ID + empty data field
+        prime_event_id = @event_store.store_event("", nil, session_id: session_id)
+        prime_event = "id: #{prime_event_id}\ndata:\n\n"
+
+        # Actual response event
         event_id = @event_store.store_event(event_data, "message", session_id: session_id)
         sse_event = format_sse_event(event_data, "message", event_id)
 
@@ -624,7 +650,7 @@ module VectorMCP
           "X-Accel-Buffering" => "no"
         }.merge(headers)
 
-        [200, response_headers, [sse_event]]
+        [200, response_headers, [prime_event, sse_event]]
       end
 
       def sse_error_response(id, code, err_message, data = nil, session_id: nil)
@@ -632,6 +658,10 @@ module VectorMCP
         error_obj[:data] = data if data
         response = { jsonrpc: "2.0", id: id, error: error_obj }
         event_data = response.to_json
+
+        # Priming event per MCP spec
+        prime_event_id = @event_store.store_event("", nil, session_id: session_id)
+        prime_event = "id: #{prime_event_id}\ndata:\n\n"
 
         event_id = @event_store.store_event(event_data, "message", session_id: session_id)
         sse_event = format_sse_event(event_data, "message", event_id)
@@ -641,7 +671,7 @@ module VectorMCP
           "Cache-Control" => "no-cache"
         }
 
-        [200, response_headers, [sse_event]]
+        [200, response_headers, [prime_event, sse_event]]
       end
 
       def not_found_response(message = "Not Found")
@@ -663,6 +693,19 @@ module VectorMCP
 
       def not_acceptable_response(message = "Not Acceptable")
         [406, { "Content-Type" => "text/plain" }, [message]]
+      end
+
+      # Validates the MCP-Protocol-Version header per spec.
+      # Returns nil if valid, or a 400 Rack response if unsupported.
+      def validate_protocol_version_header(env)
+        version = env["HTTP_MCP_PROTOCOL_VERSION"]
+        return nil if version.nil? # Backwards compatibility: assume 2025-03-26
+
+        unless VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS.include?(version)
+          return bad_request_response("Unsupported MCP-Protocol-Version: #{version}")
+        end
+
+        nil
       end
 
       def valid_post_accept?(env)

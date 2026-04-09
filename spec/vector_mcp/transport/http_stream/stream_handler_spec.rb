@@ -272,6 +272,35 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
     end
 
+    describe "#stream_to_client" do
+      let(:yielder) { instance_double(Enumerator::Yielder) }
+
+      before do
+        allow(yielder).to receive(:<<)
+        allow(mock_event_store).to receive(:store_event).and_return("prime-event-id")
+        # Stub keep_alive_loop to avoid infinite loop in tests
+        allow(stream_handler).to receive(:keep_alive_loop)
+      end
+
+      it "sends a priming event with event ID and empty data as the first event" do
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+
+        expect(yielder).to have_received(:<<).with("id: prime-event-id\ndata:\n\n").ordered
+      end
+
+      it "stores the priming event in the event store" do
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+
+        expect(mock_event_store).to have_received(:store_event).with("", nil, session_id: session_id)
+      end
+
+      it "does not send a connection/established event" do
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+
+        expect(yielder).not_to have_received(:<<).with(%r{connection/established})
+      end
+    end
+
     describe "#build_sse_headers" do
       it "builds proper SSE headers" do
         headers = stream_handler.send(:build_sse_headers)
@@ -305,6 +334,19 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         result = stream_handler.send(:format_sse_event, multiline_data, "message", "event-123")
 
         expect(result).to eq("id: event-123\nevent: message\ndata: #{multiline_data}\n\n")
+      end
+
+      it "omits retry field when retry_ms is nil" do
+        result = stream_handler.send(:format_sse_event, "test data", "message", "event-123")
+
+        expect(result).not_to include("retry:")
+      end
+
+      it "includes retry field when retry_ms is provided" do
+        result = stream_handler.send(:format_sse_event, "test data", "message", "event-123", retry_ms: 5000)
+
+        expect(result).to include("retry: 5000")
+        expect(result).to eq("id: event-123\nevent: message\nretry: 5000\ndata: test data\n\n")
       end
     end
 
@@ -387,8 +429,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         end
       end
 
-      it "sends initial connection established event" do
-        expect(mock_event_store).to receive(:store_event).with(anything, "connection", session_id: session_id)
+      it "sends SSE priming event with empty data" do
+        expect(mock_event_store).to receive(:store_event).with("", nil, session_id: session_id)
 
         enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
         # Execute the enumerator block to trigger the setup
