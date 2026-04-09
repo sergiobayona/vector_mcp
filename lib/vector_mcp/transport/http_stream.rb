@@ -318,10 +318,26 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [Array] Rack response triplet
       def route_request(path, method, env)
+        return route_mounted_request(path, method, env) if @mounted
+
+        # Standalone mode: unchanged behavior
         return handle_health_check if path == "/"
         return not_found_response unless path == @path_prefix
 
-        # Validate origin for security (MCP specification requirement)
+        validate_and_dispatch(method, env)
+      end
+
+      # Routes requests when mounted inside another Rack app (e.g., Rails).
+      # PATH_INFO is relative to the mount point: "/" = MCP endpoint, "/health" = health check.
+      def route_mounted_request(path, method, env)
+        return handle_health_check if path == "/health"
+        return not_found_response unless ["", "/"].include?(path)
+
+        validate_and_dispatch(method, env)
+      end
+
+      # Validates origin and dispatches to the appropriate handler by HTTP method.
+      def validate_and_dispatch(method, env)
         return forbidden_response("Origin not allowed") unless valid_origin?(env)
 
         case method
@@ -937,6 +953,7 @@ module VectorMCP
         @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
         @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
         @allowed_origins = options[:allowed_origins] || DEFAULT_ALLOWED_ORIGINS
+        @mounted = options.fetch(:mounted, false)
 
         warn_on_permissive_origins if @allowed_origins.include?("*")
       end

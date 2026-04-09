@@ -1233,4 +1233,89 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       end
     end
   end
+
+  context "when mounted (mounted: true)" do
+    let(:mounted_transport) { described_class.new(mock_mcp_server, mounted: true) }
+    let(:app) { mounted_transport }
+
+    let(:session_id) { "test-session-123" }
+    let(:valid_headers) { { "HTTP_MCP_SESSION_ID" => session_id } }
+
+    before do
+      allow(mounted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
+      allow(mounted_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
+      allow(mounted_transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
+      allow(mock_session_context).to receive(:request_context=)
+    end
+
+    describe "MCP endpoint at root path" do
+      it "routes POST / to the MCP endpoint" do
+        post "/", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
+             valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+        expect(last_response.status).to eq(200)
+        response_data = JSON.parse(last_response.body)
+        expect(response_data["result"]).to eq("success")
+      end
+
+      it "routes GET / to SSE streaming (not health check)" do
+        expect(mounted_transport.stream_handler).to receive(:handle_streaming_request).and_return([200, {}, []])
+
+        get "/", {}, valid_headers
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "routes DELETE / to session termination" do
+        delete "/", {}, valid_headers
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "does not return health check text at /" do
+        post "/", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
+             valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+        expect(last_response.body).not_to include("VectorMCP HttpStream Server OK")
+      end
+    end
+
+    describe "health check at /health" do
+      it "returns 200 with OK body" do
+        get "/health"
+
+        expect(last_response.status).to eq(200)
+        expect(last_response.body).to eq("VectorMCP HttpStream Server OK")
+      end
+    end
+
+    describe "unknown sub-paths" do
+      it "returns 404 for /foo" do
+        get "/foo"
+
+        expect(last_response.status).to eq(404)
+      end
+
+      it "returns 404 for /mcp" do
+        get "/mcp"
+
+        expect(last_response.status).to eq(404)
+      end
+    end
+
+    describe "origin validation" do
+      it "still validates origins on MCP requests" do
+        post "/", { "jsonrpc" => "2.0", "id" => 1, "method" => "ping" }.to_json,
+             valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
+
+        expect(last_response.status).to eq(403)
+      end
+    end
+
+    describe "#stop without Puma" do
+      it "cleans up sessions without raising" do
+        expect { mounted_transport.stop }.not_to raise_error
+      end
+    end
+  end
 end

@@ -799,6 +799,45 @@ RSpec.describe VectorMCP::Server do
     end
   end
 
+  describe "#rack_app" do
+    it "returns an object that responds to #call" do
+      app = server.rack_app
+      expect(app).to respond_to(:call)
+    ensure
+      app&.stop
+    end
+
+    it "sets server.transport to the returned instance" do
+      app = server.rack_app
+      expect(server.transport).to eq(app)
+    ensure
+      app&.stop
+    end
+
+    it "passes options through to the transport" do
+      app = server.rack_app(allowed_origins: ["https://example.com"])
+      expect(app).to be_a(VectorMCP::Transport::HttpStream)
+    ensure
+      app&.stop
+    end
+
+    it "does not start Puma or block" do
+      app = nil
+      # rack_app should return immediately, not block
+      Timeout.timeout(2) do
+        app = server.rack_app
+      end
+      expect(app).not_to be_nil
+    ensure
+      app&.stop
+    end
+
+    it "the returned app can be stopped without error" do
+      app = server.rack_app
+      expect { app.stop }.not_to raise_error
+    end
+  end
+
   describe "#handle_request error wrapping" do
     let(:request_id) { "wrap-1" }
     let(:method_name) { "failing_not_found" }

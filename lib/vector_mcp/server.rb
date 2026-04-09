@@ -163,6 +163,26 @@ module VectorMCP
       active_transport.run
     end
 
+    # Returns the MCP server as a Rack application suitable for mounting inside
+    # another Rack-based framework (e.g., Rails, Sinatra).
+    #
+    # Unlike {#run}, this method does NOT start its own HTTP server or block.
+    # The returned object responds to `#call(env)` and can be mounted directly:
+    #
+    #   # config/routes.rb (Rails)
+    #   mount MCP_APP => "/mcp"
+    #
+    # Call `server.transport.stop` on application shutdown to clean up resources.
+    #
+    # @param options [Hash] Transport options (e.g., :session_timeout, :event_retention, :allowed_origins)
+    # @return [VectorMCP::Transport::HttpStream] A Rack-compatible app
+    def rack_app(**options)
+      require_relative "transport/http_stream"
+      active_transport = VectorMCP::Transport::HttpStream.new(self, mounted: true, **options)
+      self.transport = active_transport
+      active_transport
+    end
+
     # --- Security Configuration ---
 
     # Enable authentication with specified strategy and configuration
