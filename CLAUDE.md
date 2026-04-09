@@ -38,8 +38,6 @@ rake doc           # Alias for yard (outputs to doc/ directory)
 
 ```bash
 # Getting Started Examples
-ruby examples/getting_started/minimal_server.rb          # Simplest MCP server
-ruby examples/getting_started/basic_http_server.rb       # Web-based integration (deprecated SSE)
 ruby examples/getting_started/basic_http_stream_server.rb # MCP-compliant HTTP streaming
 
 # Core Features Examples
@@ -86,11 +84,6 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
     - `HttpStream::SessionManager`: Thread-safe session lifecycle management
     - `HttpStream::EventStore`: Event storage for resumable connections
     - `HttpStream::StreamHandler`: Server-Sent Events streaming with resumability
-  - `Sse` (`lib/vector_mcp/transport/sse.rb`): **DEPRECATED** - Server-Sent Events over HTTP (deprecated as of MCP spec 2024-11-05)
-    - `SSE::StreamManager`: Server-Sent Events streaming management
-    - `SSE::ClientConnection`: Individual client connection handling
-    - `SSE::MessageHandler`: SSE-specific message processing
-  - **Note**: SSE Transport deprecated in favor of HTTP Stream Transport per MCP specification 2024-11-05
 - **Handlers** (`lib/vector_mcp/handlers/`): Request processing logic with authorization checks
 - **Sampling** (`lib/vector_mcp/sampling/`): Server-initiated LLM requests with streaming support
 - **Definitions** (`lib/vector_mcp/definitions.rb`): Tool, Resource, and Prompt definitions with image support
@@ -112,19 +105,6 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 - **Middleware**: Pluggable hooks for custom behavior around all MCP operations
 
 ### Request Flow
-
-**SSE Transport (DEPRECATED):**
-⚠️ **Note**: SSE Transport is deprecated as of MCP specification 2024-11-05. Use HTTP Stream Transport instead.
-
-1. Client establishes SSE connection (`GET /sse`)
-2. Server sends session info and message endpoint URL
-3. Client sends JSON-RPC requests (`POST /message?session_id=<id>`) with authentication headers
-4. Security middleware validates authentication (API key, JWT, or custom)
-5. Authorization policies checked for tool/resource access
-6. Structured logging tracks all security and transport events
-7. Server processes requests and sends responses via SSE stream
-8. Handlers dispatch to registered tools/resources/prompts with authenticated session context
-9. All responses formatted according to MCP specification
 
 **HTTP Stream Transport (Recommended):**
 1. Client sends JSON-RPC requests (`POST /mcp`) with `Mcp-Session-Id` header
@@ -167,7 +147,7 @@ Use VectorMCP-specific error classes:
 - Use RSpec for behavior-driven testing
 - Test coverage tracked with SimpleCov (coverage/ directory)
 - Ensure rubocop passes with `rake rubocop`
-- New test categories: logging, image processing, SSE components
+- New test categories: logging, image processing, middleware
 
 ### Dependencies
 
@@ -355,7 +335,7 @@ end
 
 **Comprehensive Test Coverage:**
 - 80+ authentication strategy tests covering all scenarios
-- Transport security integration tests for SSE and HTTP stream
+- Transport security integration tests for HTTP stream
 - Authorization policy tests with edge cases
 - Error handling and attack scenario validation
 - Performance and concurrency security tests
@@ -565,7 +545,7 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 **Core Functionality:**
 - Protocol implementation and JSON-RPC handling
 - Tool/resource/prompt registration and execution
-- Transport layer functionality (SSE, HTTP stream)
+- Transport layer functionality (HTTP stream)
 
 **Security:**
 - Authentication strategy testing
@@ -616,5 +596,5 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 3. **Quality**: Ensure `bundle exec rubocop` passes
 4. **Logging**: Use `VectorMCP.logger_for(component)` for component-specific logging
 5. **Security**: Test with `examples/core_features/authentication.rb` for security scenarios
-6. **Transport**: Use HTTP Stream Transport (recommended) per MCP spec 2024-11-05; SSE Transport is deprecated
+6. **Transport**: Use HTTP Stream Transport (recommended) per MCP spec 2024-11-05
 7. **Documentation**: Update YARD docs and run `rake yard`

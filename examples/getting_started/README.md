@@ -6,7 +6,7 @@ Welcome to VectorMCP! This section contains simple, beginner-friendly examples t
 
 - **MCP Protocol Basics**: Understanding JSON-RPC communication
 - **Server Setup**: Creating and configuring MCP servers
-- **Transport Options**: Using HTTP Stream and HTTP/SSE transports
+- **Transport Options**: Using HTTP Stream and Stdio transports
 - **Tool Registration**: Adding functions that LLMs can call
 - **Resource Serving**: Providing data to LLM clients
 
@@ -14,45 +14,23 @@ Welcome to VectorMCP! This section contains simple, beginner-friendly examples t
 
 ## 📚 Examples Overview
 
-### 1. [`minimal_server.rb`](./minimal_server.rb) ⭐ **START HERE**
-**The simplest possible MCP server in just a few lines of code**
+### 1. [`basic_http_stream_server.rb`](./basic_http_stream_server.rb) ⭐ **START HERE**
+**MCP-compliant HTTP streaming server**
 
 ```bash
-ruby examples/getting_started/minimal_server.rb
-```
-
-**What it demonstrates:**
-- Basic server creation and configuration
-- Simple tool registration with echo functionality
-- JSON-RPC message handling
-- Minimal error handling
-
-**Perfect for:** First-time users who want to see MCP in action immediately
-
----
-
-### 2. [`basic_http_server.rb`](./basic_http_server.rb)
-**Web-based integration using HTTP and Server-Sent Events**
-
-```bash
-ruby examples/getting_started/basic_http_server.rb
+ruby examples/getting_started/basic_http_stream_server.rb
 # Server runs on http://localhost:8080
 ```
 
 **What it demonstrates:**
-- HTTP/SSE transport for web integration
-- Real-time bidirectional communication
-- Session management
+- HTTP Stream transport for web integration
+- Real-time bidirectional communication using Server-Sent Events streaming
+- Session management with `Mcp-Session-Id` headers
 - CORS support for browser clients
 - Multiple concurrent client handling
+- Resumable connections with `Last-Event-ID` support
 
 **Perfect for:** Web applications, browser integration, dashboard tools
-
-**Client connection:**
-```javascript
-// Connect from browser or web app
-const eventSource = new EventSource('http://localhost:8080/sse');
-```
 
 ---
 
@@ -65,16 +43,11 @@ const eventSource = new EventSource('http://localhost:8080/sse');
 ruby examples/getting_started/basic_http_stream_server.rb
 ```
 
-**HTTP/SSE** (deprecated):
-```bash
-ruby examples/getting_started/basic_http_server.rb
-```
-
 ### 2. Test Your Server
 
 ```bash
 # In another terminal
-ruby examples/core_features/cli_client.rb http://localhost:8080/sse
+ruby examples/core_features/cli_client.rb http://localhost:8080/mcp
 ```
 
 ### 3. Extend Your Server
@@ -143,7 +116,7 @@ Once you've mastered these basics:
 
 ## 💡 Pro Tips
 
-- **Start minimal**: Use `minimal_server.rb` to understand core concepts
+- **Start minimal**: Use `basic_http_stream_server.rb` to understand core concepts
 - **Add validation**: Always include input schemas for security
 - **Use HTTP Stream transport**: The default and recommended transport for all use cases
 - **Test early**: Use the CLI client to verify your server works
@@ -154,10 +127,10 @@ Once you've mastered these basics:
 ## 🤔 Common Questions
 
 **Q: Which transport should I use?**
-A: HTTP Stream is the default and recommended transport for all use cases. HTTP/SSE is available but deprecated.
+A: HTTP Stream is the default and recommended transport for web-based use cases. Stdio is available for command-line integrations.
 
 **Q: How do I test my server?**
-A: Use the CLI client: `ruby examples/core_features/cli_client.rb http://localhost:8080/sse`
+A: Use the CLI client: `ruby examples/core_features/cli_client.rb http://localhost:8080/mcp`
 
 **Q: Can I add custom tools?**
 A: Yes! Follow the patterns in these examples to register your own functions.
@@ -170,4 +143,4 @@ A: Use try/catch blocks in your tool handlers and return appropriate error messa
 
 ---
 
-Ready to build something amazing? Start with `minimal_server.rb` and work your way up! 🎉
+Ready to build something amazing? Start with `basic_http_stream_server.rb` and work your way up! 🎉

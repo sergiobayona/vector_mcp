@@ -33,8 +33,7 @@ Practical implementations for common scenarios like file operations and data pro
 ```
 examples/
 ├── 🚀 getting_started/          # Start here for new users
-│   ├── minimal_server.rb        # Simplest possible MCP server
-│   └── basic_http_server.rb     # Web-based integration
+│   └── basic_http_stream_server.rb # MCP-compliant HTTP streaming
 │
 ├── 🔧 core_features/            # VectorMCP capabilities
 │   ├── input_validation.rb      # Schema and runtime validation
@@ -66,17 +65,14 @@ bundle install
 
 ### 2. Run Your First Server
 ```bash
-# Minimal example (5 lines of code)
-ruby examples/getting_started/minimal_server.rb
-
-# Or web-based integration  
-ruby examples/getting_started/basic_http_server.rb
+# HTTP streaming server
+ruby examples/getting_started/basic_http_stream_server.rb
 ```
 
 ### 3. Connect a Client
 ```bash
 # In another terminal
-ruby examples/core_features/cli_client.rb http://localhost:8080/sse
+ruby examples/core_features/cli_client.rb http://localhost:8080/mcp
 ```
 
 ---
@@ -86,7 +82,6 @@ ruby examples/core_features/cli_client.rb http://localhost:8080/sse
 | Transport | Best For | Example |
 |-----------|----------|---------|
 | **HTTP Stream** | Web apps, browsers, dashboards, CLI tools | `basic_http_stream_server.rb` |
-| **HTTP/SSE** | Legacy web integrations (deprecated) | `basic_http_server.rb` |
 
 ---
 
@@ -105,8 +100,7 @@ All examples demonstrate VectorMCP's security-first approach:
 ## 📖 Learning Path Recommendations
 
 ### Beginner Journey
-1. **Start**: `getting_started/minimal_server.rb`
-2. **Expand**: `getting_started/basic_http_server.rb`
+1. **Start**: `getting_started/basic_http_stream_server.rb`
 3. **Secure**: `core_features/authentication.rb`
 4. **Validate**: `core_features/input_validation.rb`
 
@@ -139,7 +133,7 @@ ruby examples/logging/structured_logging.rb | jq .
 ## 🌟 Featured Examples
 
 ### 🎯 Most Popular
-- **`getting_started/minimal_server.rb`** - Learn MCP basics in 5 minutes
+- **`getting_started/basic_http_stream_server.rb`** - Learn MCP basics in 5 minutes
 - **`core_features/authentication.rb`** - Production security patterns
 - **`logging/structured_logging.rb`** - Production observability
 

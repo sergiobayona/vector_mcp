@@ -50,7 +50,7 @@ RSpec.describe VectorMCP::RequestContext do
         params: { "id" => "123" },
         method: "GET",
         path: "/users",
-        transport_metadata: { transport_type: "sse" }
+        transport_metadata: { transport_type: "http_stream" }
       )
 
       expected = {
@@ -58,7 +58,7 @@ RSpec.describe VectorMCP::RequestContext do
         params: { "id" => "123" },
         method: "GET",
         path: "/users",
-        transport_metadata: { "transport_type" => "sse" }
+        transport_metadata: { "transport_type" => "http_stream" }
       }
 
       expect(context.to_h).to eq(expected)

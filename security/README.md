@@ -124,8 +124,8 @@ Authorization: Bearer my-secret-key
 
 **Query Parameters:**
 ```
-GET /sse?api_key=my-secret-key
-POST /message?session_id=123&api_key=my-secret-key
+GET /mcp?api_key=my-secret-key
+POST /mcp?api_key=my-secret-key
 ```
 
 ### JWT Token Authentication
@@ -303,22 +303,22 @@ end
 
 ## Transport Integration
 
-### SSE Transport
+### HTTP Stream Transport
 
 Full HTTP header and query parameter support:
 
 ```ruby
 server.enable_authentication!(strategy: :api_key, keys: ["key123"])
-server.run(transport: :sse, host: "localhost", port: 3000)
+server.run(transport: :http_stream, host: "localhost", port: 3000)
 ```
 
 **Client Connection:**
 ```bash
 # Connect with API key in header
-curl -H "X-API-Key: key123" http://localhost:3000/sse
+curl -H "X-API-Key: key123" -H "Content-Type: application/json" http://localhost:3000/mcp
 
 # Or in query parameter
-curl http://localhost:3000/sse?api_key=key123
+curl http://localhost:3000/mcp?api_key=key123
 ```
 
 ## Advanced Features

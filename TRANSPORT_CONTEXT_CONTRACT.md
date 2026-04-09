@@ -66,7 +66,7 @@ context_data = {
 
 ## Transport-Specific Implementation Guidelines
 
-### HTTP-Based Transports (SSE, HTTP Stream)
+### HTTP-Based Transports (HTTP Stream)
 
 For HTTP-based transports, use the convenience method:
 
@@ -160,21 +160,6 @@ class VectorMCP::Transport::HttpStream
   def create_session_with_context(rack_env, session_id)
     context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
     VectorMCP::Session.new(@server, self, id: session_id, request_context: context)
-  end
-end
-```
-
-### SSE Transport
-```ruby
-class VectorMCP::Transport::SSE
-  def handle_message(rack_env, session_id)
-    session = @session_manager.get_session(session_id)
-    if session.nil?
-      context = VectorMCP::RequestContext.from_rack_env(rack_env, "sse")
-      session = VectorMCP::Session.new(@server, self, id: session_id, request_context: context)
-      @session_manager.add_session(session)
-    end
-    # ... handle message
   end
 end
 ```

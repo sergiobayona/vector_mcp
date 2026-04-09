@@ -21,9 +21,7 @@ RSpec.describe "Transport Security Integration" do
     end
   end
 
-  describe "SSE Transport Security" do
-    let(:transport) { VectorMCP::Transport::Sse.new(server) }
-
+  describe "HTTP Transport Security" do
     before do
       server.enable_authentication!(strategy: :api_key, keys: %w[valid-api-key admin-key])
       server.enable_authorization! do

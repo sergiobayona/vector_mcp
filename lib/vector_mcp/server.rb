@@ -5,7 +5,6 @@ require "logger"
 require_relative "definitions"
 require_relative "session"
 require_relative "errors"
-# require_relative "transport/sse" # Load on demand to avoid async dependencies
 require_relative "handlers/core" # Default handlers
 require_relative "util" # Needed if not using Handlers::Core
 require_relative "server/registry"
@@ -25,7 +24,7 @@ module VectorMCP
   # It manages tools, resources, prompts, and handles the MCP message lifecycle.
   #
   # A server instance is typically initialized, configured with capabilities (tools,
-  # resources, prompts), and then run with a chosen transport mechanism (e.g., HttpStream, SSE).
+  # resources, prompts), and then run with a chosen transport mechanism (e.g., HttpStream).
   #
   # @example Creating and running a simple server
   #   server = VectorMCP::Server.new(name: "MySimpleServer", version: "1.0")
@@ -133,27 +132,15 @@ module VectorMCP
 
     # Runs the server using the specified transport mechanism.
     #
-    # @param transport [:sse, :http_stream, VectorMCP::Transport::Base] The transport to use.
-    #   Can be a symbol (`:sse`, `:http_stream`) or an initialized transport instance.
-    #   If a symbol is provided, the method will instantiate the corresponding transport class.
-    #   If `:sse` is chosen, it uses Puma as the HTTP server (deprecated).
-    #   If `:http_stream` is chosen, it uses the MCP-compliant streamable HTTP transport (recommended).
-    # @param options [Hash] Transport-specific options (e.g., `:host`, `:port` for HTTP transports).
+    # @param transport [:http_stream, VectorMCP::Transport::Base] The transport to use.
+    #   Can be the symbol `:http_stream` or an initialized transport instance.
+    #   If `:http_stream` is provided, the method will instantiate the MCP-compliant streamable HTTP transport.
+    # @param options [Hash] Transport-specific options (e.g., `:host`, `:port`).
     #   These are passed to the transport's constructor if a symbol is provided for `transport`.
     # @return [void]
     # @raise [ArgumentError] if an unsupported transport symbol is given.
-    # @raise [NotImplementedError] if `:sse` transport is specified (currently a placeholder).
     def run(transport: :http_stream, **options)
       active_transport = case transport
-                         when :sse
-                           begin
-                             require_relative "transport/sse"
-                             logger.warn("SSE transport is deprecated. Please use :http_stream instead.")
-                             VectorMCP::Transport::SSE.new(self, **options)
-                           rescue LoadError => e
-                             logger.fatal("SSE transport requires additional dependencies.")
-                             raise NotImplementedError, "SSE transport dependencies not available: #{e.message}"
-                           end
                          when :http_stream
                            begin
                              require_relative "transport/http_stream"
@@ -344,7 +331,7 @@ module VectorMCP
 
   module Transport
     # Dummy base class placeholder used only for argument validation in tests.
-    # Real transport classes (e.g., HttpStream, SSE) are separate concrete classes.
+    # Real transport classes (e.g., HttpStream) are separate concrete classes.
     class Base # :nodoc:
     end
   end

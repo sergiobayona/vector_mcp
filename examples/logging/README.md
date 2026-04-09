@@ -32,7 +32,7 @@ ruby examples/logging/basic_logging.rb
 ```ruby
 # Component-specific loggers
 server_logger = VectorMCP.logger_for("server")
-transport_logger = VectorMCP.logger_for("transport.sse")
+transport_logger = VectorMCP.logger_for("transport.http_stream")
 security_logger = VectorMCP.logger_for("security.auth")
 
 # Structured context
@@ -88,7 +88,7 @@ VectorMCP.configure_logging do
   format "json"
   output "console"
   component "security.auth", level: "DEBUG"
-  component "transport.sse", level: "WARN"
+  component "transport.http_stream", level: "WARN"
 end
 ```
 
@@ -185,8 +185,7 @@ analyzer.tool_usage
 VectorMCP Logger
 ├── server.*              # Core server operations
 ├── transport.*           # Communication layers
-│   ├── transport.http_stream  # HTTP Stream transport (recommended)
-│   └── transport.sse          # SSE transport (deprecated)
+│   └── transport.http_stream  # HTTP Stream transport
 ├── security.*           # Security operations
 │   ├── security.auth    # Authentication
 │   └── security.authz   # Authorization
@@ -255,7 +254,7 @@ logging:
   components:
     security.auth:
       level: DEBUG
-    transport.sse:
+    transport.http_stream:
       level: WARN
 ```
 
@@ -268,7 +267,7 @@ VectorMCP.configure_logging do
   file_path "/var/log/vectormcp.log"
   
   component "security.auth", level: "DEBUG"
-  component "transport.sse", level: "WARN"
+  component "transport.http_stream", level: "WARN"
   
   console colorize: false, include_timestamp: true
 end

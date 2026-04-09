@@ -2,9 +2,13 @@
 
 ### Removed
 
-* **Stdio Transport**: Removed stdio transport support entirely. The `:http_stream` transport is now the default.
+* **Stdio Transport**: Removed stdio transport support entirely.
   - Deleted `lib/vector_mcp/transport/stdio.rb` and `lib/vector_mcp/transport/stdio_session_manager.rb`
   - `Server#run` now defaults to `transport: :http_stream` instead of `transport: :stdio`
+
+* **SSE Transport**: Removed SSE transport support entirely. HttpStream is now the sole transport.
+  - Deleted `lib/vector_mcp/transport/sse.rb`, `lib/vector_mcp/transport/sse_session_manager.rb`, and `lib/vector_mcp/transport/sse/` directory
+  - Removed `:sse` option from `Server#run`; passing `transport: :sse` now raises `ArgumentError`
   - Use `:http_stream` for all server implementations (recommended per MCP spec 2024-11-05)
 
 ## [0.3.4] – 2026-03-17
