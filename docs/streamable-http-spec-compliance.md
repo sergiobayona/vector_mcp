@@ -91,13 +91,22 @@ Key requirements include:
 
 **Severity:** HIGH | **Spec Level:** MUST
 
-#### Spec Requirement
+#### Spec Reference
 
-> The client **MUST** include the `MCP-Protocol-Version: <protocol-version>` HTTP header on all subsequent requests to the MCP server.
+**Section:** Streamable HTTP > Protocol Version Header
+**URL:** https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
 
+The full normative text from the specification:
+
+> If using HTTP, the client **MUST** include the `MCP-Protocol-Version: <protocol-version>` HTTP header on all subsequent requests to the MCP server, allowing the MCP server to respond based on the MCP protocol version.
+>
+> For example: `MCP-Protocol-Version: 2025-11-25`
+>
+> The protocol version sent by the client **SHOULD** be the one [negotiated during initialization](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation).
+>
+> For backwards compatibility, if the server does *not* receive an `MCP-Protocol-Version` header, and has no other way to identify the version - for example, by relying on the protocol version negotiated during initialization - the server **SHOULD** assume protocol version `2025-03-26`.
+>
 > If the server receives a request with an invalid or unsupported `MCP-Protocol-Version`, it **MUST** respond with `400 Bad Request`.
-
-> For backwards compatibility, if the server does not receive an `MCP-Protocol-Version` header [...] the server **SHOULD** assume protocol version `2025-03-26`.
 
 #### Current Behavior
 
@@ -140,10 +149,23 @@ end
 
 **Severity:** HIGH | **Spec Level:** MUST
 
-#### Spec Requirement
+#### Spec Reference
 
-> If the input is a JSON-RPC response or notification:
-> - If the server accepts the input, the server **MUST** return HTTP status code 202 Accepted with no body.
+**Section:** Streamable HTTP > Sending Messages to the Server, item 4
+**URL:** https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#sending-messages-to-the-server
+
+The full normative text from the specification:
+
+> 4\. If the input is a JSON-RPC *response* or *notification*:
+>    * If the server accepts the input, the server **MUST** return HTTP status code 202 Accepted with no body.
+>    * If the server cannot accept the input, it **MUST** return an HTTP error status code (e.g., 400 Bad Request). The HTTP response body **MAY** comprise a JSON-RPC *error response* that has no `id`.
+
+This is also confirmed in the specification's sequence diagram, which shows:
+
+> ```
+> Client->>+Server: POST ... notification/response ...  MCP-Session-Id: 1868a90c...
+> Server->>-Client: 202 Accepted
+> ```
 
 #### Current Behavior
 
@@ -202,9 +224,20 @@ end
 
 **Severity:** MEDIUM | **Spec Level:** SHOULD
 
-#### Spec Requirement
+#### Spec Reference
 
-> The server **SHOULD** immediately send an SSE event consisting of an event ID and an empty `data` field in order to prime the client to reconnect (using that event ID as `Last-Event-ID`).
+**Section:** Streamable HTTP > Sending Messages to the Server, item 6, sub-item 1
+**URL:** https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#sending-messages-to-the-server
+
+The full normative text from the specification:
+
+> 6\. If the server initiates an SSE stream:
+>    * The server **SHOULD** immediately send an SSE event consisting of an event ID and an empty `data` field in order to prime the client to reconnect (using that event ID as `Last-Event-ID`).
+>    * After the server has sent an SSE event with an event ID to the client, the server **MAY** close the *connection* (without terminating the *SSE stream*) at any time in order to avoid holding a long-lived connection. The client **SHOULD** then "poll" the SSE stream by attempting to reconnect.
+
+This requirement applies to SSE streams initiated from both POST responses (item 6) and GET responses. The GET section (Listening for Messages from the Server, item 4) cross-references the same polling behavior:
+
+> If the server closes the *connection* without terminating the *stream*, it **SHOULD** follow the same polling behavior as described for POST requests: sending a `retry` field and allowing the client to reconnect.
 
 #### Current Behavior
 
@@ -237,9 +270,22 @@ yielder << "id: #{event_id}\ndata:\n\n"
 
 **Severity:** MEDIUM | **Spec Level:** SHOULD
 
-#### Spec Requirement
+#### Spec Reference
 
-> If the server does close the connection prior to terminating the SSE stream, it **SHOULD** send an SSE event with a standard `retry` field before closing the connection.
+**Section:** Streamable HTTP > Sending Messages to the Server, item 6, sub-item 3
+**URL:** https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#sending-messages-to-the-server
+
+The full normative text from the specification:
+
+> 6\. If the server initiates an SSE stream:
+>    * [...]
+>    * If the server does close the *connection* prior to terminating the *SSE stream*, it **SHOULD** send an SSE event with a standard [`retry`](https://html.spec.whatwg.org/multipage/server-sent-events.html#:~:text=field%20name%20is%20%22retry%22) field before closing the connection. The client **MUST** respect the `retry` field, waiting the given number of milliseconds before attempting to reconnect.
+
+The same requirement is echoed for GET SSE streams in Listening for Messages from the Server, item 4:
+
+> If the server closes the *connection* without terminating the *stream*, it **SHOULD** follow the same polling behavior as described for POST requests: sending a `retry` field and allowing the client to reconnect.
+
+The `retry` field is a standard SSE mechanism defined in the [WHATWG HTML Living Standard](https://html.spec.whatwg.org/multipage/server-sent-events.html). When present, it sets the EventSource reconnection time in milliseconds.
 
 #### Current Behavior
 
