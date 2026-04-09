@@ -621,9 +621,9 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       it "stops when connection is removed from active connections" do
         stream_handler.instance_variable_get(:@active_connections).delete(session_id)
 
-        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", anything)
-
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
+
+        expect(mock_yielder).not_to have_received(:<<)
       end
     end
   end
