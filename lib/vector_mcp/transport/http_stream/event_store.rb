@@ -17,7 +17,7 @@ module VectorMCP
       # @api private
       class EventStore
         # Event data structure
-        Event = Struct.new(:id, :data, :type, :timestamp, :session_id) do
+        Event = Struct.new(:id, :data, :type, :timestamp, :session_id, :stream_id) do
           def to_sse_format
             lines = []
             lines << "id: #{id}"
@@ -45,12 +45,13 @@ module VectorMCP
         # @param data [String] The event data
         # @param type [String] The event type (optional)
         # @param session_id [String, nil] The session ID to scope this event to
+        # @param stream_id [String, nil] The stream ID to scope this event to
         # @return [String] The generated event ID
-        def store_event(data, type = nil, session_id: nil)
+        def store_event(data, type = nil, session_id: nil, stream_id: nil)
           event_id = generate_event_id
           timestamp = Time.now
 
-          event = Event.new(event_id, data, type, timestamp, session_id)
+          event = Event.new(event_id, data, type, timestamp, session_id, stream_id)
 
           # Add to events array
           @events.push(event)
@@ -74,8 +75,9 @@ module VectorMCP
         #
         # @param last_event_id [String] The last event ID received by client
         # @param session_id [String, nil] Filter events to this session only
+        # @param stream_id [String, nil] Filter events to this stream only
         # @return [Array<Event>] Array of events after the specified ID
-        def get_events_after(last_event_id, session_id: nil)
+        def get_events_after(last_event_id, session_id: nil, stream_id: nil)
           events = if last_event_id.nil?
                      @events.to_a
                    else
@@ -89,6 +91,7 @@ module VectorMCP
                    end
 
           events = events.select { |e| e.session_id == session_id } if session_id
+          events = events.select { |e| e.stream_id == stream_id } if stream_id
           events
         end
 

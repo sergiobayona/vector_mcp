@@ -188,6 +188,55 @@ RSpec.describe VectorMCP::Transport::HttpStream::EventStore do
         expect(events).to be_empty
       end
     end
+
+    context "stream-scoped filtering" do
+      let(:store) { described_class.new(100) }
+
+      before do
+        @get_ids = 3.times.map { |i| store.store_event("get-#{i}", "msg", session_id: "sess-1", stream_id: "stream-get") }
+        @post_ids = 3.times.map { |i| store.store_event("post-#{i}", "msg", session_id: "sess-1", stream_id: "stream-post") }
+      end
+
+      it "returns only events for the specified stream_id" do
+        events = store.get_events_after(nil, session_id: "sess-1", stream_id: "stream-get")
+
+        expect(events.length).to eq(3)
+        expect(events.map(&:data)).to eq(%w[get-0 get-1 get-2])
+      end
+
+      it "does not replay events from a different stream" do
+        events = store.get_events_after(@get_ids.last, session_id: "sess-1", stream_id: "stream-get")
+
+        expect(events).to be_empty
+      end
+
+      it "returns all session events when no stream_id filter is given" do
+        events = store.get_events_after(nil, session_id: "sess-1")
+
+        expect(events.length).to eq(6)
+      end
+
+      it "stores stream_id on events" do
+        events = store.get_events_after(nil)
+        expect(events.first.stream_id).to eq("stream-get")
+        expect(events.last.stream_id).to eq("stream-post")
+      end
+    end
+
+    context "resumability across reconnections" do
+      let(:store) { described_class.new(100) }
+
+      it "replays events by session_id regardless of stream_id (reconnection scenario)" do
+        # Original connection stores events with old stream_id
+        old_ids = 3.times.map { |i| store.store_event("msg-#{i}", "message", session_id: "sess-1", stream_id: "old-stream") }
+
+        # Client reconnects — replay should find events by session only, not stream
+        events = store.get_events_after(nil, session_id: "sess-1")
+
+        expect(events.length).to eq(3)
+        expect(events.map(&:data)).to eq(%w[msg-0 msg-1 msg-2])
+      end
+    end
   end
 
   describe "#event_count" do

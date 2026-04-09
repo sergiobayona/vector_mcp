@@ -18,7 +18,7 @@ module VectorMCP
         attr_reader :transport, :logger
 
         # Streaming connection data structure
-        StreamingConnection = Struct.new(:session, :yielder, :thread, :closed) do
+        StreamingConnection = Struct.new(:session, :yielder, :thread, :closed, :origin, :stream_id) do
           def close
             self.closed = true
             thread&.kill
@@ -26,6 +26,11 @@ module VectorMCP
 
           def closed?
             closed
+          end
+
+          # Returns true if this connection originated from a GET request.
+          def from_get?
+            origin == :get
           end
         end
 
@@ -68,10 +73,18 @@ module VectorMCP
           connection = @active_connections[session.id]
           return false unless connection && !connection.closed?
 
+          # MCP spec: GET streams MUST NOT receive JSON-RPC responses (only notifications and server requests)
+          if connection.from_get? && json_rpc_response?(message)
+            logger.debug("Blocked JSON-RPC response on GET stream for session #{session.id}")
+            return false
+          end
+
           begin
             # Store event for resumability
             event_data = message.to_json
-            event_id = @transport.event_store.store_event(event_data, "message", session_id: session.id)
+            event_id = @transport.event_store.store_event(event_data, "message",
+                                                          session_id: session.id,
+                                                          stream_id: connection.stream_id)
 
             # Send via SSE
             sse_event = format_sse_event(event_data, "message", event_id)
@@ -135,10 +148,13 @@ module VectorMCP
         #
         # @param session [SessionManager::Session] The session
         # @param last_event_id [String, nil] The last event ID for resumability
+        # @param origin [Symbol] The stream origin (:get or :post)
         # @return [Enumerator] SSE stream enumerator
-        def create_sse_stream(session, last_event_id)
+        def create_sse_stream(session, last_event_id, origin: :get)
+          stream_id = "#{session.id}-#{origin}-#{SecureRandom.hex(4)}"
+
           Enumerator.new do |yielder|
-            connection = StreamingConnection.new(session, yielder, nil, false)
+            connection = StreamingConnection.new(session, yielder, nil, false, origin, stream_id)
 
             # Register connection
             @active_connections[session.id] = connection
@@ -146,7 +162,7 @@ module VectorMCP
 
             # Start streaming thread
             connection.thread = Thread.new do
-              stream_to_client(session, yielder, last_event_id)
+              stream_to_client(session, yielder, last_event_id, stream_id)
             rescue StandardError => e
               logger.error("Error in streaming thread for #{session.id}: #{e.message}")
             ensure
@@ -163,26 +179,30 @@ module VectorMCP
         # @param session [SessionManager::Session] The session
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String, nil] The last event ID for resumability
+        # @param stream_id [String] The unique stream identifier
         # @return [void]
-        def stream_to_client(session, yielder, last_event_id)
+        def stream_to_client(session, yielder, last_event_id, stream_id)
           # SSE priming event per MCP spec: event ID + empty data field
-          prime_event_id = @transport.event_store.store_event("", nil, session_id: session.id)
+          prime_event_id = @transport.event_store.store_event("", nil, session_id: session.id, stream_id: stream_id)
           yielder << "id: #{prime_event_id}\ndata:\n\n"
 
-          # Replay missed events if resuming
-          replay_events(yielder, last_event_id, session) if last_event_id
+          # Replay missed events if resuming — scoped to this stream only
+          replay_events(yielder, last_event_id, session, stream_id) if last_event_id
 
           # Send periodic keep-alive events
-          keep_alive_loop(session, yielder)
+          keep_alive_loop(session, yielder, stream_id)
         end
 
         # Replays events after a specific event ID, scoped to the session.
+        # Note: replay filters by session_id only (not stream_id) because resumability
+        # must work across reconnections where the stream_id changes.
         #
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String] The last event ID received by client
         # @param session [SessionManager::Session] The session to filter events for
+        # @param _stream_id [String] Unused — kept for call-site consistency
         # @return [void]
-        def replay_events(yielder, last_event_id, session)
+        def replay_events(yielder, last_event_id, session, _stream_id)
           missed_events = @transport.event_store.get_events_after(last_event_id, session_id: session.id)
 
           logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
@@ -196,8 +216,9 @@ module VectorMCP
         #
         # @param session [SessionManager::Session] The session
         # @param yielder [Enumerator::Yielder] The SSE yielder
+        # @param stream_id [String] The stream ID for event storage
         # @return [void]
-        def keep_alive_loop(session, yielder)
+        def keep_alive_loop(session, yielder, stream_id)
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
 
@@ -223,7 +244,10 @@ module VectorMCP
             }
 
             begin
-              event_id = @transport.event_store.store_event(heartbeat_event.to_json, "heartbeat", session_id: session.id)
+              event_id = @transport.event_store.store_event(
+                heartbeat_event.to_json, "heartbeat",
+                session_id: session.id, stream_id: stream_id
+              )
               yielder << format_sse_event(heartbeat_event.to_json, "heartbeat", event_id)
             rescue StandardError
               logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
@@ -246,6 +270,18 @@ module VectorMCP
           lines << "data: #{data}"
           lines << ""
           "#{lines.join("\n")}\n"
+        end
+
+        # Checks if a message is a JSON-RPC response (has result or error, no method).
+        #
+        # @param message [Hash] The JSON-RPC message
+        # @return [Boolean] True if the message is a response
+        def json_rpc_response?(message)
+          return false unless message.is_a?(Hash)
+
+          (message.key?("result") || message.key?(:result) ||
+           message.key?("error") || message.key?(:error)) &&
+            !message.key?("method") && !message.key?(:method)
         end
 
         # Cleans up a specific connection.

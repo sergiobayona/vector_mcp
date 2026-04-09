@@ -113,6 +113,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     before do
       allow(mock_session).to receive(:streaming?).and_return(true)
       allow(mock_connection).to receive(:closed?).and_return(false)
+      allow(mock_connection).to receive(:from_get?).and_return(false)
+      allow(mock_connection).to receive(:stream_id).and_return("test-stream-id")
       allow(mock_connection).to receive(:yielder).and_return(mock_yielder)
       allow(mock_connection).to receive(:close)
       allow(mock_session_manager).to receive(:remove_streaming_connection)
@@ -129,7 +131,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         result = stream_handler.send_message_to_session(mock_session, message)
 
         expect(result).to be true
-        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message", session_id: session_id)
+        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message", hash_including(session_id: session_id))
         expect(mock_yielder).to have_received(:<<).with(/^id: event-789/)
       end
 
@@ -164,6 +166,83 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         expect(mock_session_manager).to receive(:remove_streaming_connection).with(mock_session)
 
         stream_handler.send_message_to_session(mock_session, message)
+      end
+    end
+
+    context "when connection is from GET (stream origin enforcement)" do
+      let(:get_connection) do
+        VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
+          mock_session, mock_yielder, nil, false, :get
+        )
+      end
+
+      before do
+        allow(get_connection).to receive(:closed?).and_return(false)
+        stream_handler.instance_variable_get(:@active_connections)[session_id] = get_connection
+      end
+
+      it "blocks JSON-RPC responses on GET streams" do
+        response_message = { "jsonrpc" => "2.0", "id" => 1, "result" => { "data" => "test" } }
+
+        result = stream_handler.send_message_to_session(mock_session, response_message)
+
+        expect(result).to be false
+        expect(mock_yielder).not_to have_received(:<<)
+      end
+
+      it "allows notifications on GET streams" do
+        notification = { "jsonrpc" => "2.0", "method" => "notifications/resources/updated", "params" => {} }
+
+        result = stream_handler.send_message_to_session(mock_session, notification)
+
+        expect(result).to be true
+        expect(mock_yielder).to have_received(:<<)
+      end
+
+      it "allows server-initiated requests on GET streams" do
+        server_request = { "jsonrpc" => "2.0", "id" => 1, "method" => "sampling/createMessage", "params" => {} }
+
+        result = stream_handler.send_message_to_session(mock_session, server_request)
+
+        expect(result).to be true
+        expect(mock_yielder).to have_received(:<<)
+      end
+
+      it "blocks JSON-RPC error responses on GET streams" do
+        error_response = { "jsonrpc" => "2.0", "id" => 1, "error" => { "code" => -32_600, "message" => "Invalid" } }
+
+        result = stream_handler.send_message_to_session(mock_session, error_response)
+
+        expect(result).to be false
+        expect(mock_yielder).not_to have_received(:<<)
+      end
+
+      it "blocks symbol-keyed responses on GET streams" do
+        sym_response = { jsonrpc: "2.0", id: 1, result: { data: "test" } }
+
+        result = stream_handler.send_message_to_session(mock_session, sym_response)
+
+        expect(result).to be false
+        expect(mock_yielder).not_to have_received(:<<)
+      end
+    end
+
+    context "when connection is from POST (no restrictions)" do
+      before do
+        post_connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
+          mock_session, mock_yielder, nil, false, :post
+        )
+        allow(post_connection).to receive(:closed?).and_return(false)
+        stream_handler.instance_variable_get(:@active_connections)[session_id] = post_connection
+      end
+
+      it "allows JSON-RPC responses on POST streams" do
+        response_message = { "jsonrpc" => "2.0", "id" => 1, "result" => { "data" => "test" } }
+
+        result = stream_handler.send_message_to_session(mock_session, response_message)
+
+        expect(result).to be true
+        expect(mock_yielder).to have_received(:<<)
       end
     end
 
@@ -274,6 +353,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
     describe "#stream_to_client" do
       let(:yielder) { instance_double(Enumerator::Yielder) }
+      let(:test_stream_id) { "test-session-123-get-abc123" }
 
       before do
         allow(yielder).to receive(:<<)
@@ -283,19 +363,19 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "sends a priming event with event ID and empty data as the first event" do
-        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil, test_stream_id)
 
         expect(yielder).to have_received(:<<).with("id: prime-event-id\ndata:\n\n").ordered
       end
 
-      it "stores the priming event in the event store" do
-        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+      it "stores the priming event in the event store with stream_id" do
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil, test_stream_id)
 
-        expect(mock_event_store).to have_received(:store_event).with("", nil, session_id: session_id)
+        expect(mock_event_store).to have_received(:store_event).with("", nil, session_id: session_id, stream_id: test_stream_id)
       end
 
       it "does not send a connection/established event" do
-        stream_handler.send(:stream_to_client, mock_session, yielder, nil)
+        stream_handler.send(:stream_to_client, mock_session, yielder, nil, test_stream_id)
 
         expect(yielder).not_to have_received(:<<).with(%r{connection/established})
       end
@@ -430,7 +510,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "sends SSE priming event with empty data" do
-        expect(mock_event_store).to receive(:store_event).with("", nil, session_id: session_id)
+        expect(mock_event_store).to receive(:store_event).with("", nil, hash_including(session_id: session_id))
 
         enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
         # Execute the enumerator block to trigger the setup
@@ -458,33 +538,51 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       let(:mock_event1) { instance_double(VectorMCP::Transport::HttpStream::EventStore::Event) }
       let(:mock_event2) { instance_double(VectorMCP::Transport::HttpStream::EventStore::Event) }
       let(:last_event_id) { "event-456" }
+      let(:test_stream_id) { "test-stream-456" }
 
       before do
         allow(mock_event1).to receive(:to_sse_format).and_return("id: event-457\ndata: test1\n\n")
         allow(mock_event2).to receive(:to_sse_format).and_return("id: event-458\ndata: test2\n\n")
-        allow(mock_event_store).to receive(:get_events_after).with(last_event_id, session_id: session_id).and_return([mock_event1, mock_event2])
+        allow(mock_event_store).to receive(:get_events_after)
+          .with(last_event_id, session_id: session_id)
+          .and_return([mock_event1, mock_event2])
       end
 
-      it "replays missed events after Last-Event-ID" do
+      it "replays missed events after Last-Event-ID scoped to session" do
         expect(mock_logger).to receive(:info).with(/Replaying 2 missed events from #{last_event_id}/)
 
-        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session)
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, test_stream_id)
 
         expect(mock_yielder).to have_received(:<<).with("id: event-457\ndata: test1\n\n")
         expect(mock_yielder).to have_received(:<<).with("id: event-458\ndata: test2\n\n")
       end
 
       it "handles empty missed events" do
-        allow(mock_event_store).to receive(:get_events_after).with(last_event_id, session_id: session_id).and_return([])
+        allow(mock_event_store).to receive(:get_events_after)
+          .with(last_event_id, session_id: session_id)
+          .and_return([])
 
         expect(mock_logger).to receive(:info).with(/Replaying 0 missed events/)
 
-        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session)
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, test_stream_id)
+      end
+
+      it "replays events by session_id only, not stream_id (reconnection scenario)" do
+        # When a client reconnects, the new stream has a different stream_id.
+        # replay_events must find events from the OLD stream by session_id only.
+        expect(mock_event_store).to receive(:get_events_after)
+          .with(last_event_id, session_id: session_id)
+          .and_return([mock_event1])
+
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, "completely-new-stream-id")
+
+        expect(mock_yielder).to have_received(:<<).with("id: event-457\ndata: test1\n\n")
       end
     end
 
     describe "heartbeat functionality" do
       let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection) }
+      let(:test_stream_id) { "test-heartbeat-stream" }
 
       before do
         allow(mock_connection).to receive(:closed?).and_return(false, false, true) # Stop after 2 iterations
@@ -492,19 +590,20 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(stream_handler).to receive(:sleep) # Mock sleep to speed up tests
       end
 
-      it "sends periodic heartbeat events" do
-        expect(mock_event_store).to receive(:store_event).with(anything, "heartbeat", session_id: session_id).at_least(:once)
+      it "sends periodic heartbeat events with stream_id" do
+        expect(mock_event_store).to receive(:store_event)
+          .with(anything, "heartbeat", hash_including(session_id: session_id, stream_id: test_stream_id))
+          .at_least(:once)
 
-        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
+        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
       end
 
       it "stops when connection is closed" do
         allow(mock_connection).to receive(:closed?).and_return(true)
 
-        # Should not send heartbeat if connection is closed
-        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", session_id: session_id)
+        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", anything)
 
-        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
+        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
       end
 
       it "handles heartbeat send failures gracefully" do
@@ -512,15 +611,15 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
         expect(mock_logger).to receive(:debug).with(/Heartbeat failed for #{session_id}/)
 
-        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
+        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
       end
 
       it "stops when connection is removed from active connections" do
         stream_handler.instance_variable_get(:@active_connections).delete(session_id)
 
-        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat")
+        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", anything)
 
-        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder)
+        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
       end
     end
   end
@@ -530,15 +629,34 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     let(:mock_yielder) { instance_double(Enumerator::Yielder) }
 
     describe "initialization" do
-      it "creates with all required fields" do
+      it "creates with all required fields including origin" do
         connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
-          mock_session, mock_yielder, mock_thread, false
+          mock_session, mock_yielder, mock_thread, false, :get
         )
 
         expect(connection.session).to eq(mock_session)
         expect(connection.yielder).to eq(mock_yielder)
         expect(connection.thread).to eq(mock_thread)
         expect(connection.closed).to be false
+        expect(connection.origin).to eq(:get)
+      end
+    end
+
+    describe "#from_get?" do
+      it "returns true when origin is :get" do
+        connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
+          mock_session, mock_yielder, mock_thread, false, :get
+        )
+
+        expect(connection.from_get?).to be true
+      end
+
+      it "returns false when origin is :post" do
+        connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
+          mock_session, mock_yielder, mock_thread, false, :post
+        )
+
+        expect(connection.from_get?).to be false
       end
     end
 
@@ -643,6 +761,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       before do
         allow(mock_session).to receive(:streaming?).and_return(true)
         allow(mock_connection).to receive(:closed?).and_return(false)
+        allow(mock_connection).to receive(:from_get?).and_return(false)
+        allow(mock_connection).to receive(:stream_id).and_return("test-stream-id")
         allow(mock_connection).to receive(:yielder).and_return(mock_yielder)
         allow(mock_connection).to receive(:close)
         allow(mock_session_manager).to receive(:remove_streaming_connection)

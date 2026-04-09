@@ -47,6 +47,8 @@ This document audits VectorMCP's Streamable HTTP Transport implementation agains
 6. ~~Non-standard `connection/established` SSE event.~~ **FIXED** -- Replaced with spec-compliant empty-data priming event.
 7. ~~`broadcast_message` sends same message to multiple streams.~~ **FIXED** -- Removed `broadcast_message` and `broadcast_notification` entirely. `capabilities.rb` now uses `send_notification` (single-session) only.
 8. ~~Batch JSON-RPC support contradicts single-message requirement.~~ **FIXED** -- Array POST bodies now rejected with 400. `handle_batch_request`, `process_batch_item`, and `batch_invalid_item_error` removed.
+9. ~~Event IDs lack stream origin for proper replay scoping.~~ **FIXED** -- Added `stream_id` to `Event` struct and `EventStore`. Events are stored with stream-scoped IDs. Replay filters by `session_id` only (not `stream_id`) to preserve resumability across reconnections.
+10. ~~No POST/GET stream distinction for response restrictions.~~ **FIXED** -- Added `origin` and `stream_id` fields to `StreamingConnection`. `send_message_to_session` blocks JSON-RPC responses on GET streams per spec.
 
 The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, outgoing response detection, protocol version header validation, notification responses, SSE priming, and SSE retry guidance.
 
@@ -82,8 +84,8 @@ Key requirements include:
 | 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | **FIXED** |
 | 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | **FIXED** |
 | 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | Open |
-| 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | Open |
-| 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST | Open |
+| 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | **FIXED** |
+| 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST | **FIXED** |
 | 10 | Protocol version stuck at `2024-11-05` | Potential | MEDIUM | -- | **FIXED** |
 | 11 | Non-standard SSE events and JSON-RPC methods | Potential | LOW | -- | Partial |
 | 12 | POST SSE is single-event, no interim messages | Potential | LOW | MAY | Open |
@@ -364,7 +366,7 @@ end
 
 ### 8. Event IDs Lack Stream Origin Information
 
-**Severity:** MEDIUM | **Spec Level:** SHOULD + MUST
+**Severity:** MEDIUM | **Spec Level:** SHOULD + MUST | **Status: FIXED**
 
 #### Spec Requirement
 
@@ -372,54 +374,27 @@ end
 
 > The server **MUST NOT** replay messages that would have been delivered on a different stream.
 
-#### Current Behavior
+#### Resolution
 
-Event IDs are generated at `lib/vector_mcp/transport/http_stream/event_store.rb:150-153`:
+**Fixed on 2026-04-09.** Implementation:
 
-```ruby
-def generate_event_id
-  sequence = @current_sequence.increment
-  "#{Time.now.to_i}-#{sequence}-#{SecureRandom.hex(4)}"
-end
-```
+- Added `stream_id` field to `Event` struct in `EventStore`
+- `store_event` accepts optional `stream_id:` keyword, passed through from `StreamHandler`
+- `get_events_after` accepts optional `stream_id:` for filtering
+- Each `StreamingConnection` generates a unique `stream_id` (`{session_id}-{origin}-{random}`)
+- Events are stored with their originating `stream_id` for traceability
+- **Critical design choice:** `replay_events` filters by `session_id` only (not `stream_id`) because resumability must work across reconnections where the `stream_id` changes. The `stream_id` is stored for auditing and future multi-stream support.
 
-The format `{timestamp}-{sequence}-{random}` contains **no stream identifier**. Events are stored with `session_id` but no `stream_id`. Replay filtering (`get_events_after` at `event_store.rb:78-93`) filters by session only.
+#### Files Changed
 
-#### Impact
-
-If a session has had multiple streams (POST SSE + GET SSE), resuming a GET stream via `Last-Event-ID` could replay events that were originally sent on a POST SSE stream. The spec explicitly prohibits replaying events from different streams.
-
-#### Suggested Fix
-
-```ruby
-# Add stream_id to Event struct
-Event = Struct.new(:id, :data, :type, :timestamp, :session_id, :stream_id)
-
-# Include stream ID in event ID for correlation
-def generate_event_id(stream_id)
-  sequence = @current_sequence.increment
-  "#{stream_id}-#{sequence}-#{SecureRandom.hex(4)}"
-end
-
-# Filter by stream_id during replay
-def get_events_after(last_event_id, session_id: nil, stream_id: nil)
-  # ... existing logic ...
-  events = events.select { |e| e.stream_id == stream_id } if stream_id
-  events
-end
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream/event_store.rb` — Add stream tracking
-- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Pass stream IDs when storing events
-- `lib/vector_mcp/transport/http_stream.rb` — Pass stream IDs when storing POST SSE events
+- `lib/vector_mcp/transport/http_stream/event_store.rb` — Added `stream_id` to Event struct, `store_event`, and `get_events_after`
+- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Pass `stream_id` when storing events and heartbeats
 
 ---
 
 ### 9. No Distinction Between POST SSE and GET SSE Streams
 
-**Severity:** MEDIUM | **Spec Level:** MUST
+**Severity:** MEDIUM | **Spec Level:** MUST | **Status: FIXED**
 
 #### Spec Requirement
 
@@ -428,49 +403,19 @@ On GET streams:
 
 POST SSE streams may include the response plus interim requests and notifications.
 
-#### Current Behavior
+#### Resolution
 
-The implementation does not track whether a stream originated from POST or GET. `StreamingConnection` (`lib/vector_mcp/transport/http_stream/stream_handler.rb:21-30`) has no `origin` field:
+**Fixed on 2026-04-09.** Implementation:
 
-```ruby
-StreamingConnection = Struct.new(:session, :yielder, :thread, :closed)
-```
+- Added `origin` (`:get` or `:post`) and `stream_id` fields to `StreamingConnection` struct
+- Added `from_get?` convenience method to `StreamingConnection`
+- `send_message_to_session` checks `connection.from_get?` and `json_rpc_response?(message)` — blocks responses (both `result` and `error` keyed, string or symbol) on GET streams
+- Added `json_rpc_response?` private helper that detects responses by presence of `result`/`error` keys without `method` key (handles both string and symbol keys)
+- Notifications and server-initiated requests are still allowed on GET streams
 
-`send_message_to_session` (`stream_handler.rb:62-87`) sends any message type to any streaming connection without checking stream origin.
+#### Files Changed
 
-#### Impact
-
-JSON-RPC responses could be sent on GET SSE streams, violating a MUST requirement.
-
-#### Suggested Fix
-
-```ruby
-StreamingConnection = Struct.new(:session, :yielder, :thread, :closed, :origin) do
-  # ...existing methods...
-  def from_get?
-    origin == :get
-  end
-end
-
-def send_message_to_session(session, message)
-  return false unless session.streaming?
-
-  connection = @active_connections[session.id]
-  return false unless connection && !connection.closed?
-
-  # Enforce GET stream restrictions
-  if connection.from_get? && json_rpc_response?(message) && !resuming?
-    logger.warn("Cannot send JSON-RPC response on GET stream for session #{session.id}")
-    return false
-  end
-
-  # ...rest of method...
-end
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Add origin tracking to `StreamingConnection`, enforce in `send_message_to_session`
+- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Added `origin`, `stream_id`, `from_get?` to struct; added `json_rpc_response?` helper; gated `send_message_to_session`
 
 ---
 
@@ -606,8 +551,8 @@ The following areas correctly implement the specification:
 
 | # | Fix | Effort | Status |
 |---|-----|--------|--------|
-| 9 | Track stream origin (POST vs GET) in `StreamingConnection` | Medium | Open |
-| 8 | Add stream ID to events and filter replay by stream | Medium | Open |
+| 9 | Track stream origin (POST vs GET) in `StreamingConnection` | Medium | **DONE** |
+| 8 | Add stream ID to events and filter replay by stream | Medium | **DONE** |
 | 3 | Add SSE priming event with empty data field | Small | **DONE** |
 | 4 | Add SSE `retry` field support | Small | **DONE** |
 | 7 | Tighten POST Accept validation | Small | Open |
