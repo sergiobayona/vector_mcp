@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# prove_it: fast tests—runs every time Claude finishes a response
+# Replace the test command below, or change the 'fast-tests' command
+# in .claude/prove_it/config.json to point at your existing test runner.
+set -e
+trap 'rc=$?; command -v prove_it >/dev/null 2>&1 && prove_it record --name fast-tests --result $rc' EXIT
+bundle exec rspec --format progress --tag fast

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# prove_it: full test suite—runs before every git commit
+# Replace the test command below, or change the 'full-tests' command
+# in .claude/prove_it/config.json to point at your existing test runner.
+set -e
+trap 'rc=$?; command -v prove_it >/dev/null 2>&1 && prove_it record --name full-tests --result $rc' EXIT
+bundle exec rspec --format progress
