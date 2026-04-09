@@ -12,7 +12,7 @@ VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-sid
 
 - **🛡️ Security-First**: Built-in input validation and schema checking prevent injection attacks
 - **⚡ Production-Ready**: Robust error handling, comprehensive test suite, and proven reliability  
-- **🔌 Multiple Transports**: stdio for CLI tools, SSE for web applications
+- **🔌 Streamable HTTP Transport**: MCP-compliant HTTP transport with session management and resumability
 - **📦 Zero Configuration**: Works out of the box with sensible defaults
 - **🔄 Fully Compatible**: Implements the complete MCP specification
 
@@ -40,30 +40,19 @@ server.register_tool(
 ) { |args| "Hello, #{args['name']}!" }
 
 # Start the server
-server.run  # Uses stdio transport by default
+server.run  # Uses HTTP stream transport by default
 ```
 
 **That's it!** Your MCP server is ready to connect with Claude Desktop, custom clients, or any MCP-compatible application.
 
-## Transport Options
+## Transport
 
-### Command Line Tools (stdio)
-
-Perfect for desktop applications and process-based integrations:
+VectorMCP uses the MCP-compliant streamable HTTP transport with session management and resumability:
 
 ```ruby
-server.run  # Default: stdio transport
+server.run  # Default: http_stream transport
+server.run(transport: :http_stream, port: 8080)
 ```
-
-### Web Applications (HTTP + SSE)
-
-Ideal for web apps and browser-based clients:
-
-```ruby
-server.run(transport: :sse, port: 8080)
-```
-
-Connect via Server-Sent Events at `http://localhost:8080/sse`
 
 ## Core Features
 
@@ -206,10 +195,9 @@ end
 
 ### Transport Security
 
-Security works seamlessly across all transport layers:
+Security works seamlessly with the HTTP stream transport:
 
-- **Stdio**: Header simulation for desktop applications
-- **SSE**: Full HTTP header and query parameter support
+- **HTTP Stream**: Full HTTP header support with session management
 - **Request Pipeline**: Automatic authentication and authorization checking
 
 **👉 [Complete Security Guide →](./security/README.md)**
@@ -388,23 +376,16 @@ Add to your Claude Desktop configuration:
 ### Web Applications
 
 ```javascript
-// Connect to SSE endpoint
-const eventSource = new EventSource('http://localhost:8080/sse');
-
-eventSource.addEventListener('endpoint', (event) => {
-  const { uri } = JSON.parse(event.data);
-  
-  // Send MCP requests
-  fetch(uri, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/call',
-      params: { name: 'greet', arguments: { name: 'World' } }
-    })
-  });
+// Send MCP requests via HTTP stream
+fetch('http://localhost:8080/mcp', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'greet', arguments: { name: 'World' } }
+  })
 });
 ```
 

@@ -57,7 +57,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
           server,
           transport,
           id: "minimal-session",
-          request_context: VectorMCP::RequestContext.minimal("stdio")
+          request_context: VectorMCP::RequestContext.minimal("test")
         )
 
         result = described_class.send(:extract_request_from_session, minimal_session)
@@ -185,56 +185,55 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
     end
 
-    context "with SSE transport session" do
-      let(:sse_session) do
+    context "with HTTP transport session" do
+      let(:http_session) do
         VectorMCP::Session.new(
           server,
           transport,
-          id: "sse-session",
+          id: "http-session",
           request_context: VectorMCP::RequestContext.from_rack_env({
                                                                      "REQUEST_METHOD" => "GET",
-                                                                     "PATH_INFO" => "/sse",
-                                                                     "QUERY_STRING" => "session_id=sse-123&auth_token=sse-token",
+                                                                     "PATH_INFO" => "/mcp",
+                                                                     "QUERY_STRING" => "session_id=http-123&auth_token=http-token",
                                                                      "HTTP_ACCEPT" => "text/event-stream",
-                                                                     "HTTP_X_SSE_AUTH" => "sse-secret",
+                                                                     "HTTP_X_CUSTOM_AUTH" => "custom-secret",
                                                                      "REMOTE_ADDR" => "192.168.1.100"
-                                                                   }, "sse")
+                                                                   }, "http_stream")
         )
       end
 
-      it "extracts context suitable for SSE-specific authentication" do
-        result = described_class.send(:extract_request_from_session, sse_session)
+      it "extracts context suitable for HTTP-specific authentication" do
+        result = described_class.send(:extract_request_from_session, http_session)
 
         expect(result[:headers]["Accept"]).to eq("text/event-stream")
-        expect(result[:headers]["X-Sse-Auth"]).to eq("sse-secret")
-        expect(result[:params]["session_id"]).to eq("sse-123")
-        expect(result[:params]["auth_token"]).to eq("sse-token")
-        expect(result[:session_id]).to eq("sse-session")
+        expect(result[:headers]["X-Custom-Auth"]).to eq("custom-secret")
+        expect(result[:params]["session_id"]).to eq("http-123")
+        expect(result[:params]["auth_token"]).to eq("http-token")
+        expect(result[:session_id]).to eq("http-session")
       end
     end
 
-    context "with stdio transport session" do
-      let(:stdio_session) do
+    context "with minimal transport session" do
+      let(:minimal_transport_session) do
         VectorMCP::Session.new(
           server,
           transport,
-          id: "stdio-session",
-          request_context: VectorMCP::RequestContext.minimal("stdio")
+          id: "minimal-transport-session",
+          request_context: VectorMCP::RequestContext.minimal("test")
         )
       end
 
-      it "extracts minimal context for stdio transport" do
-        result = described_class.send(:extract_request_from_session, stdio_session)
+      it "extracts minimal context for non-HTTP transport" do
+        result = described_class.send(:extract_request_from_session, minimal_transport_session)
 
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("stdio-session")
+        expect(result[:session_id]).to eq("minimal-transport-session")
       end
 
       it "works with authentication disabled scenarios" do
-        result = described_class.send(:extract_request_from_session, stdio_session)
+        result = described_class.send(:extract_request_from_session, minimal_transport_session)
 
-        # Should not have authentication headers (typical for stdio)
         expect(result[:headers]["Authorization"]).to be_nil
         expect(result[:headers]["X-API-Key"]).to be_nil
         expect(result[:params]["api_key"]).to be_nil

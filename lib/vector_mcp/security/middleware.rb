@@ -120,11 +120,11 @@ module VectorMCP
       # @param transport_request [Object] the transport request
       # @return [Hash] extracted request data
       def extract_request_data(transport_request)
-        # Handle Rack environment (for SSE transport)
+        # Handle Rack environment (for HTTP transports)
         if transport_request.respond_to?(:[]) && transport_request["REQUEST_METHOD"]
           extract_from_rack_env(transport_request)
         else
-          # Default fallback
+          # Default fallback for non-HTTP request formats
           { headers: {}, params: {} }
         end
       end

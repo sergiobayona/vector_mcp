@@ -21,9 +21,7 @@ RSpec.describe "Transport Security Integration" do
     end
   end
 
-  describe "SSE Transport Security" do
-    let(:transport) { VectorMCP::Transport::Sse.new(server) }
-
+  describe "HTTP Transport Security" do
     before do
       server.enable_authentication!(strategy: :api_key, keys: %w[valid-api-key admin-key])
       server.enable_authorization! do
@@ -201,118 +199,6 @@ RSpec.describe "Transport Security Integration" do
     end
   end
 
-  describe "Stdio Transport Security" do
-    let(:transport) { VectorMCP::Transport::Stdio.new(server) }
-    let(:session) { VectorMCP::Session.new(server) }
-
-    before do
-      server.enable_authentication!(strategy: :custom) do |request|
-        # Custom authentication based on session metadata or request context
-        session_id = request[:session_id] || "unknown"
-        case session_id
-        when "authenticated-session"
-          { user_id: "stdio-user", role: "user" }
-        when "admin-session"
-          { user_id: "stdio-admin", role: "admin" }
-        else
-          false
-        end
-      end
-
-      server.enable_authorization! do
-        authorize_tools do |user, _action, tool|
-          case tool.name
-          when "secure_tool"
-            user && %w[user admin].include?(user[:role])
-          else
-            true
-          end
-        end
-      end
-    end
-
-    describe "session-based authentication" do
-      context "with authenticated session" do
-        let(:request_context) { { session_id: "authenticated-session" } }
-
-        it "successfully authenticates stdio requests" do
-          result = server.security_middleware.process_request(request_context)
-
-          expect(result[:success]).to be true
-          expect(result[:session_context].authenticated?).to be true
-          expect(result[:session_context].user[:user_id]).to eq("stdio-user")
-          expect(result[:session_context].user[:role]).to eq("user")
-        end
-      end
-
-      context "with admin session" do
-        let(:request_context) { { session_id: "admin-session" } }
-
-        it "authenticates with admin privileges" do
-          result = server.security_middleware.process_request(request_context)
-
-          expect(result[:success]).to be true
-          expect(result[:session_context].user[:role]).to eq("admin")
-        end
-      end
-
-      context "with unauthenticated session" do
-        let(:request_context) { { session_id: "unknown-session" } }
-
-        it "rejects authentication" do
-          result = server.security_middleware.process_request(request_context)
-
-          expect(result[:success]).to be false
-          expect(result[:error]).to eq("Authentication required")
-        end
-      end
-    end
-
-    describe "tool access authorization" do
-      let(:tool) { server.tools["secure_tool"] }
-
-      context "with authenticated user" do
-        let(:request_context) { { session_id: "authenticated-session" } }
-
-        it "allows access to secure tools" do
-          security_result = server.security_middleware.process_request(request_context)
-          session_context = security_result[:session_context]
-
-          authorization_result = server.security_middleware.authorize_action(
-            session_context, :call, tool
-          )
-
-          expect(authorization_result).to be true
-        end
-      end
-
-      context "with admin user" do
-        let(:request_context) { { session_id: "admin-session" } }
-
-        it "allows access to secure tools" do
-          security_result = server.security_middleware.process_request(request_context)
-          session_context = security_result[:session_context]
-
-          authorization_result = server.security_middleware.authorize_action(
-            session_context, :call, tool
-          )
-
-          expect(authorization_result).to be true
-        end
-      end
-
-      context "with unauthenticated session" do
-        let(:request_context) { { session_id: "unknown-session" } }
-
-        it "denies access to secure tools" do
-          security_result = server.security_middleware.process_request(request_context)
-
-          expect(security_result[:success]).to be false
-        end
-      end
-    end
-  end
-
   describe "Cross-Transport Security Consistency" do
     let(:api_key) { "cross-transport-key" }
 
@@ -326,7 +212,7 @@ RSpec.describe "Transport Security Integration" do
     end
 
     describe "consistent authentication across transports" do
-      let(:sse_request) do
+      let(:rack_request) do
         {
           "REQUEST_METHOD" => "POST",
           "HTTP_X_API_KEY" => api_key,
@@ -334,44 +220,44 @@ RSpec.describe "Transport Security Integration" do
         }
       end
 
-      let(:stdio_request) do
+      let(:normalized_request) do
         { headers: { "X-API-Key" => api_key }, params: {} }
       end
 
-      it "authenticates consistently across SSE and Stdio" do
-        sse_result = server.security_middleware.process_request(sse_request)
-        stdio_result = server.security_middleware.process_request(stdio_request)
+      it "authenticates consistently across Rack and normalized request formats" do
+        rack_result = server.security_middleware.process_request(rack_request)
+        normalized_result = server.security_middleware.process_request(normalized_request)
 
-        expect(sse_result[:success]).to be true
-        expect(stdio_result[:success]).to be true
+        expect(rack_result[:success]).to be true
+        expect(normalized_result[:success]).to be true
 
-        expect(sse_result[:session_context].user[:api_key]).to eq(api_key)
-        expect(stdio_result[:session_context].user[:api_key]).to eq(api_key)
+        expect(rack_result[:session_context].user[:api_key]).to eq(api_key)
+        expect(normalized_result[:session_context].user[:api_key]).to eq(api_key)
       end
     end
 
     describe "consistent authorization across transports" do
       let(:tool) { server.tools["secure_tool"] }
 
-      it "applies same authorization rules across transports" do
-        sse_request = {
+      it "applies same authorization rules across request formats" do
+        rack_request = {
           "REQUEST_METHOD" => "POST",
           "HTTP_X_API_KEY" => api_key
         }
-        stdio_request = { headers: { "X-API-Key" => api_key } }
+        normalized_request = { headers: { "X-API-Key" => api_key } }
 
-        sse_security = server.security_middleware.process_request(sse_request)
-        stdio_security = server.security_middleware.process_request(stdio_request)
+        rack_security = server.security_middleware.process_request(rack_request)
+        normalized_security = server.security_middleware.process_request(normalized_request)
 
-        sse_auth = server.security_middleware.authorize_action(
-          sse_security[:session_context], :call, tool
+        rack_auth = server.security_middleware.authorize_action(
+          rack_security[:session_context], :call, tool
         )
-        stdio_auth = server.security_middleware.authorize_action(
-          stdio_security[:session_context], :call, tool
+        normalized_auth = server.security_middleware.authorize_action(
+          normalized_security[:session_context], :call, tool
         )
 
-        expect(sse_auth).to eq(stdio_auth)
-        expect(sse_auth).to be true
+        expect(rack_auth).to eq(normalized_auth)
+        expect(rack_auth).to be true
       end
     end
   end

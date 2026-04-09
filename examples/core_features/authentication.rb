@@ -103,4 +103,4 @@ puts "  Admin tool (admin only): Add header 'X-API-Key: admin-secret-key'"
 puts "\nPress Ctrl+C to stop"
 
 # Run the server
-server.run(transport: :stdio)
+server.run(transport: :http_stream)

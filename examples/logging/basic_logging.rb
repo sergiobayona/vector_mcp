@@ -15,10 +15,10 @@ puts
 # Test 2: Component-specific loggers
 puts "2. Testing component-specific loggers:"
 server_logger = VectorMCP.logger_for("server")
-transport_logger = VectorMCP.logger_for("transport.stdio")
+transport_logger = VectorMCP.logger_for("transport.http_stream")
 security_logger = VectorMCP.logger_for("security.auth")
 
-server_logger.info("Server initialized", port: 8080, transport: "stdio")
+server_logger.info("Server initialized", port: 8080, transport: "http_stream")
 transport_logger.debug("Processing request", request_id: "req_123", method: "tools/call")
 security_logger.security("Authentication successful", user_id: "user_456", strategy: "api_key")
 puts

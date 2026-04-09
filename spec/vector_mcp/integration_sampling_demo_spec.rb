@@ -2,12 +2,11 @@
 
 require "spec_helper"
 require "vector_mcp"
-require "stringio"
 
 RSpec.describe "Sampling Integration Demo", type: :integration do
-  describe "Real Stdio Transport Sampling" do
+  describe "Sampling Request-Response Cycle" do
     let(:server) { VectorMCP::Server.new(name: "SamplingDemo", version: "1.0.0") }
-    let(:transport) { VectorMCP::Transport::Stdio.new(server) }
+    let(:transport) { double("transport", send_request: nil) }
     let(:session) { VectorMCP::Session.new(server, transport) }
 
     before do

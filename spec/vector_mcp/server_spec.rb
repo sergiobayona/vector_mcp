@@ -790,30 +790,11 @@ RSpec.describe VectorMCP::Server do
       end
     end
 
-    context "with :sse transport" do
-      it "raises NotImplementedError when SSE dependencies are missing" do
-        # Mock the require to simulate missing dependencies
-        expect(server).to receive(:require_relative).with("transport/sse").and_raise(LoadError, "no such file")
-        expect(server.logger).to receive(:fatal).with(/SSE transport requires additional dependencies/)
-
+    context "with unsupported :sse transport" do
+      it "raises ArgumentError for removed SSE transport" do
         expect do
-          server.run(transport: :sse, options: { host: "localhost" })
-        end.to raise_error(NotImplementedError, /SSE transport dependencies not available/)
-      end
-
-      it "can instantiate SSE transport without hanging (fast test)" do
-        # This test verifies that SSE transport can be created without actually running it
-        # We use a timeout to ensure the test doesn't hang
-        require "timeout"
-        require_relative "../../lib/vector_mcp/transport/sse"
-
-        # Test that we can create the transport without it hanging
-        expect do
-          Timeout.timeout(1) do
-            # Just create the transport, don't run it
-            VectorMCP::Transport::SSE.new(server, host: "localhost", port: 0)
-          end
-        end.not_to raise_error
+          server.run(transport: :sse)
+        end.to raise_error(ArgumentError, /Unsupported transport/)
       end
     end
   end
@@ -873,15 +854,15 @@ RSpec.describe VectorMCP::Server do
   end
 
   describe "dynamic prompt list change notifications" do
-    let(:stdio_transport) { instance_double(VectorMCP::Transport::Stdio, send_notification: nil) }
+    let(:mock_transport) { double("transport", send_notification: nil) }
 
     before do
-      server.transport = stdio_transport
+      server.transport = mock_transport
     end
 
-    it "sends notifications/prompts/list_changed via stdio transport" do
+    it "sends notifications/prompts/list_changed via transport" do
       server.register_prompt(name: "notify_prompt", description: "d", arguments: []) { "resp" }
-      expect(stdio_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
+      expect(mock_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
     end
   end
 

@@ -125,14 +125,14 @@ server.register_root_from_path("./docs", name: "Documentation")
 
 ```bash
 # Connect to HTTP server
-ruby examples/core_features/cli_client.rb http://localhost:8080/sse
+ruby examples/core_features/cli_client.rb http://localhost:8080/mcp
 
 # Connect with custom session
-ruby examples/core_features/cli_client.rb http://localhost:8080/sse my-session-id
+ruby examples/core_features/cli_client.rb http://localhost:8080/mcp my-session-id
 ```
 
 **What it demonstrates:**
-- **Server connection**: SSE transport client implementation
+- **Server connection**: HTTP stream transport client implementation
 - **Session management**: Handling connection state and errors
 - **Tool invocation**: Calling server tools with parameters
 - **Resource fetching**: Retrieving dynamic content
@@ -141,7 +141,7 @@ ruby examples/core_features/cli_client.rb http://localhost:8080/sse my-session-i
 **Client patterns:**
 ```ruby
 # Initialize client
-client = MCPClient.new("http://localhost:8080/sse")
+client = MCPClient.new("http://localhost:8080/mcp")
 
 # List available tools
 tools = client.list_tools

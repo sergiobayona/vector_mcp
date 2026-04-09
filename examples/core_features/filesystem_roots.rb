@@ -126,4 +126,4 @@ puts "  - tools/call with list_root_contents"
 puts "  - resources/read with uri 'roots://summary'"
 
 # Start the server
-server.run # By default uses stdio transport
+server.run # Uses http_stream transport by default

@@ -8,7 +8,7 @@ require "json"
 # Configure logging using the new structured logging system
 
 # Create a client instance and connect to the server
-client = VectorMCP.new_client(endpoint: ARGV[0] || "http://localhost:7465/sse")
+client = VectorMCP.new_client(endpoint: ARGV[0] || "http://localhost:7465/mcp")
 
 # Start the conversation with the server
 session = client.start(
