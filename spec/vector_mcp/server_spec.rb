@@ -1049,6 +1049,56 @@ RSpec.describe VectorMCP::Server do
     end
   end
 
+  describe "#notify_prompts_list_changed" do
+    let(:mock_transport) { double("transport") }
+
+    before do
+      server.transport = mock_transport
+      server.register_prompt(name: "test_prompt", description: "A test prompt") { |_args, _ctx| "test" }
+    end
+
+    it "sends notification to one session when transport supports send_notification" do
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(true)
+
+      expect(mock_transport).to receive(:send_notification)
+        .with("notifications/prompts/list_changed")
+
+      server.notify_prompts_list_changed
+    end
+
+    it "does not use broadcast_notification (removed per MCP spec)" do
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(true)
+      allow(mock_transport).to receive(:send_notification)
+
+      expect(mock_transport).not_to receive(:broadcast_notification)
+
+      server.notify_prompts_list_changed
+    end
+
+    it "logs warning when transport doesn't support notifications" do
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(false)
+
+      expect(server.logger).to receive(:warn)
+        .with(%r{Transport does not support sending notifications/prompts/list_changed})
+
+      server.notify_prompts_list_changed
+    end
+
+    it "does nothing when no transport is set" do
+      server.transport = nil
+
+      expect { server.notify_prompts_list_changed }.not_to raise_error
+    end
+
+    it "does nothing when prompts_list_changed is false" do
+      server.instance_variable_set(:@prompts_list_changed, false)
+
+      expect(mock_transport).not_to receive(:send_notification)
+
+      server.notify_prompts_list_changed
+    end
+  end
+
   describe "#notify_roots_list_changed" do
     let(:test_dir) { Dir.mktmpdir }
     let(:mock_transport) { double("transport") }
@@ -1060,18 +1110,7 @@ RSpec.describe VectorMCP::Server do
       server.register_root(uri: "file://#{test_dir}", name: "Test")
     end
 
-    it "broadcasts notification when transport supports it" do
-      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(true)
-      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(false)
-
-      expect(mock_transport).to receive(:broadcast_notification)
-        .with("notifications/roots/list_changed")
-
-      server.notify_roots_list_changed
-    end
-
-    it "sends notification when transport supports it (fallback)" do
-      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(false)
+    it "sends notification to one session when transport supports send_notification" do
       allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(true)
 
       expect(mock_transport).to receive(:send_notification)
@@ -1080,8 +1119,16 @@ RSpec.describe VectorMCP::Server do
       server.notify_roots_list_changed
     end
 
+    it "does not use broadcast_notification (removed per MCP spec)" do
+      allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(true)
+      allow(mock_transport).to receive(:send_notification)
+
+      expect(mock_transport).not_to receive(:broadcast_notification)
+
+      server.notify_roots_list_changed
+    end
+
     it "logs warning when transport doesn't support notifications" do
-      allow(mock_transport).to receive(:respond_to?).with(:broadcast_notification).and_return(false)
       allow(mock_transport).to receive(:respond_to?).with(:send_notification).and_return(false)
 
       expect(server.logger).to receive(:warn)
@@ -1099,7 +1146,6 @@ RSpec.describe VectorMCP::Server do
     it "does nothing when roots_list_changed is false" do
       server.instance_variable_set(:@roots_list_changed, false)
 
-      expect(mock_transport).not_to receive(:broadcast_notification)
       expect(mock_transport).not_to receive(:send_notification)
 
       server.notify_roots_list_changed

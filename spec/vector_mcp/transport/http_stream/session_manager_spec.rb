@@ -286,46 +286,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
   end
 
   describe "#broadcast_message" do
-    let(:message) { { jsonrpc: "2.0", method: "notification", params: { data: "test" } } }
-    let(:stream_handler) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler) }
-
-    before do
-      allow(transport).to receive(:stream_handler).and_return(stream_handler)
-    end
-
-    it "returns 0 when no sessions exist" do
-      result = session_manager.broadcast_message(message)
-
-      expect(result).to eq(0)
-    end
-
-    it "sends message to all streaming sessions" do
-      session1 = session_manager.create_session("session-1")
-      session2 = session_manager.create_session("session-2")
-      session3 = session_manager.create_session("session-3")
-
-      # Mock streaming status
-      allow(session1).to receive(:streaming?).and_return(true)
-      allow(session2).to receive(:streaming?).and_return(false)
-      allow(session3).to receive(:streaming?).and_return(true)
-
-      expect(stream_handler).to receive(:send_message_to_session).with(session1, message).and_return(true)
-      expect(stream_handler).to receive(:send_message_to_session).with(session3, message).and_return(true)
-
-      result = session_manager.broadcast_message(message)
-
-      expect(result).to eq(2)
-    end
-
-    it "handles message sending failures gracefully" do
-      session1 = session_manager.create_session("session-1")
-      allow(session1).to receive(:streaming?).and_return(true)
-
-      expect(stream_handler).to receive(:send_message_to_session).with(session1, message).and_return(false)
-
-      result = session_manager.broadcast_message(message)
-
-      expect(result).to eq(0)
+    it "is not defined (MCP spec prohibits broadcasting same message to multiple streams)" do
+      expect(session_manager).not_to respond_to(:broadcast_message)
     end
   end
 

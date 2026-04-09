@@ -183,22 +183,6 @@ module VectorMCP
         end
       end
 
-      # Broadcasts a message to all sessions that support messaging.
-      #
-      # @param message [Hash] The message to broadcast
-      # @return [Integer] Number of sessions the message was sent to
-      def broadcast_message(message)
-        count = 0
-        @sessions.each_value do |session|
-          next unless can_send_message_to_session?(session)
-
-          count += 1 if message_sent_to_session?(session, message)
-        end
-
-        # Message broadcasted to recipients
-        count
-      end
-
       protected
 
       # Hook called when a session is created. Override in subclasses for transport-specific logic.

@@ -899,13 +899,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     end
 
     describe "#broadcast_notification" do
-      it "broadcasts notification to all sessions" do
-        expect(transport.session_manager).to receive(:broadcast_message).with(
-          hash_including(jsonrpc: "2.0", method: method_name, params: params)
-        ).and_return(2)
-
-        result = transport.broadcast_notification(method_name, params)
-        expect(result).to eq(2)
+      it "is not defined (MCP spec prohibits broadcasting same message to multiple streams)" do
+        expect(transport).not_to respond_to(:broadcast_notification)
       end
     end
   end

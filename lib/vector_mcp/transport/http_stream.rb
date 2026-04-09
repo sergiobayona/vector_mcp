@@ -144,16 +144,6 @@ module VectorMCP
         @stream_handler.send_message_to_session(session, message)
       end
 
-      # Broadcasts a notification to all active sessions.
-      #
-      # @param method [String] The notification method name
-      # @param params [Hash, Array, nil] The notification parameters
-      # @return [Integer] Number of sessions the notification was sent to
-      def broadcast_notification(method, params = nil)
-        message = build_notification(method, params)
-        @session_manager.broadcast_message(message)
-      end
-
       # Sends a server-initiated JSON-RPC request compatible with Session expectations.
       # This method will block until a response is received or the timeout is reached.
       # For HTTP transport, this requires finding an appropriate session with streaming connection.

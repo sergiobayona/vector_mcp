@@ -43,11 +43,8 @@ module VectorMCP
 
         notification_method = "notifications/prompts/list_changed"
         begin
-          if transport.respond_to?(:broadcast_notification)
-            logger.debug("Broadcasting prompts list changed notification.")
-            transport.broadcast_notification(notification_method)
-          elsif transport.respond_to?(:send_notification)
-            logger.debug("Sending prompts list changed notification (transport may broadcast or send to first client).")
+          if transport.respond_to?(:send_notification)
+            logger.debug("Sending prompts list changed notification.")
             transport.send_notification(notification_method)
           else
             logger.warn("Transport does not support sending notifications/prompts/list_changed.")
@@ -70,11 +67,8 @@ module VectorMCP
 
         notification_method = "notifications/roots/list_changed"
         begin
-          if transport.respond_to?(:broadcast_notification)
-            logger.debug("Broadcasting roots list changed notification.")
-            transport.broadcast_notification(notification_method)
-          elsif transport.respond_to?(:send_notification)
-            logger.debug("Sending roots list changed notification (transport may broadcast or send to first client).")
+          if transport.respond_to?(:send_notification)
+            logger.debug("Sending roots list changed notification.")
             transport.send_notification(notification_method)
           else
             logger.warn("Transport does not support sending notifications/roots/list_changed.")

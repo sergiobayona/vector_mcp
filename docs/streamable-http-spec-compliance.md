@@ -36,9 +36,8 @@
 
 This document audits VectorMCP's Streamable HTTP Transport implementation against the MCP specification version 2025-11-25. The audit identified **13 findings**: 4 missing implementations (now resolved), 5 incorrect interpretations, and 4 potential issues (1 now resolved).
 
-**2 remaining HIGH severity** (MUST-level spec violations):
+**1 remaining HIGH severity** (MUST-level spec violation):
 1. Batch JSON-RPC support contradicts the spec's single-message requirement.
-2. The `broadcast_message` API sends the same message to multiple streams.
 
 **Resolved since initial audit (2026-04-09):**
 1. ~~The `MCP-Protocol-Version` header is completely unimplemented.~~ **FIXED** -- Header validation added to POST, GET, and DELETE handlers. Unsupported versions return 400. Missing header assumes `2025-03-26` for backwards compatibility.
@@ -47,6 +46,7 @@ This document audits VectorMCP's Streamable HTTP Transport implementation agains
 4. ~~No SSE `retry` field support.~~ **FIXED** -- `format_sse_event` supports `retry_ms:` parameter. `keep_alive_loop` sends `retry: 5000` before intentional disconnections.
 5. ~~Protocol version hardcoded to `2024-11-05`.~~ **FIXED** -- Updated to `2025-03-26` with `SUPPORTED_PROTOCOL_VERSIONS` constant.
 6. ~~Non-standard `connection/established` SSE event.~~ **FIXED** -- Replaced with spec-compliant empty-data priming event.
+7. ~~`broadcast_message` sends same message to multiple streams.~~ **FIXED** -- Removed `broadcast_message` and `broadcast_notification` entirely. `capabilities.rb` now uses `send_notification` (single-session) only.
 
 The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, outgoing response detection, protocol version header validation, notification responses, SSE priming, and SSE retry guidance.
 
@@ -80,7 +80,7 @@ Key requirements include:
 | 3 | No SSE priming event with empty data | Missing | MEDIUM | SHOULD | **FIXED** |
 | 4 | No SSE `retry` field support | Missing | MEDIUM | SHOULD | **FIXED** |
 | 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | Open |
-| 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | Open |
+| 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | **FIXED** |
 | 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | Open |
 | 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | Open |
 | 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST | Open |
@@ -309,56 +309,27 @@ Or keep batch support as a documented non-standard extension with a configuratio
 
 ### 6. `broadcast_message` Violates No-Broadcast Rule
 
-**Severity:** HIGH | **Spec Level:** MUST
+**Severity:** HIGH | **Spec Level:** MUST | **Status: FIXED**
 
 #### Spec Requirement
 
 > The server **MUST** send each of its JSON-RPC messages on only one of the connected streams; that is, it **MUST NOT** broadcast the same message across multiple streams.
 
-#### Current Behavior
+#### Resolution
 
-`broadcast_message` (`lib/vector_mcp/transport/base_session_manager.rb:190-200`) sends the **same message object** to every session with a streaming connection:
+**Fixed on 2026-04-09.** Implementation:
 
-```ruby
-def broadcast_message(message)
-  count = 0
-  @sessions.each_value do |session|
-    next unless can_send_message_to_session?(session)
-    count += 1 if message_sent_to_session?(session, message)
-  end
-  count
-end
-```
+- Removed `broadcast_message` from `BaseSessionManager` entirely
+- Removed `broadcast_notification` from `HttpStream` entirely
+- Updated `Server::Capabilities` (`notify_prompts_list_changed` and `notify_roots_list_changed`) to use `send_notification` directly, which sends to a single session only
+- Callers who need multi-session notification can iterate sessions explicitly with `send_notification_to_session`, making the per-stream constraint visible at the call site
+- 3 tests updated in `server_spec.rb`, existing broadcast tests replaced with absence guards in `session_manager_spec.rb` and `http_stream_spec.rb`
 
-This is exposed via `broadcast_notification` (`lib/vector_mcp/transport/http_stream.rb:152-155`).
+#### Files Changed
 
-#### Impact
-
-Directly violates a MUST-level requirement. Broadcasting can cause clients to process duplicate messages, leading to incorrect state or side effects.
-
-#### Suggested Fix
-
-Option A: Remove `broadcast_message` and `broadcast_notification` entirely.
-
-Option B: Change `broadcast_notification` to target only one stream:
-
-```ruby
-def broadcast_notification(method, params = nil)
-  # Per MCP spec, send each message to only one stream
-  session = find_streaming_session
-  return 0 unless session
-
-  message = build_notification(method, params)
-  @stream_handler.send_message_to_session(session, message) ? 1 : 0
-end
-```
-
-Option C: If multi-session notification is needed, create unique messages per session (different message identity).
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/base_session_manager.rb` — Remove or modify `broadcast_message`
-- `lib/vector_mcp/transport/http_stream.rb` — Remove or modify `broadcast_notification`
+- `lib/vector_mcp/transport/base_session_manager.rb` — Removed `broadcast_message`
+- `lib/vector_mcp/transport/http_stream.rb` — Removed `broadcast_notification`
+- `lib/vector_mcp/server/capabilities.rb` — Removed `broadcast_notification` branch from both notification methods
 
 ---
 
@@ -647,7 +618,7 @@ The following areas correctly implement the specification:
 |---|-----|--------|--------|
 | 2 | Return 202 for notifications in `handle_single_request` | Small | **DONE** |
 | 1 | Add `MCP-Protocol-Version` header validation | Medium | **DONE** |
-| 6 | Remove or fix `broadcast_message` / `broadcast_notification` | Medium | Open |
+| 6 | Remove `broadcast_message` / `broadcast_notification` | Medium | **DONE** |
 | 5 | Reject or gate batch requests | Small | Open |
 
 ### Short-term (SHOULD violations and MUST-adjacent)
