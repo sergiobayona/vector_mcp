@@ -50,8 +50,8 @@ RSpec.describe VectorMCP do
       expect(VectorMCP::Handlers.const_defined?(:Core)).to be true
     end
 
-    it "has Stdio transport" do
-      expect(VectorMCP::Transport.const_defined?(:Stdio)).to be true
+    it "has HttpStream transport" do
+      expect(VectorMCP::Transport.const_defined?(:HttpStream)).to be true
     end
   end
 end

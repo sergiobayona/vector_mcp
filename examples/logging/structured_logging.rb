@@ -13,7 +13,7 @@ request_logger = VectorMCP.logger_for("request.handler")
 # Basic structured logging
 server_logger.info("Server starting",
                    version: "1.0.0",
-                   transport: "stdio",
+                   transport: "http_stream",
                    pid: Process.pid)
 
 # Request processing with context

@@ -243,11 +243,11 @@ module VectorMCP
       send_request_kwargs = {}
       send_request_kwargs[:timeout] = timeout if timeout
 
-      # For HTTP transport, we need to use send_request_to_session to target this specific session
+      # Prefer session-targeted request sending when available
       raw_result = if @transport.respond_to?(:send_request_to_session)
                      @transport.send_request_to_session(@id, *send_request_args, **send_request_kwargs)
                    else
-                     # Fallback to generic send_request for other transports
+                     # Fallback to generic send_request for transports without session targeting
                      @transport.send_request(*send_request_args, **send_request_kwargs)
                    end
 

@@ -157,13 +157,13 @@ RSpec.describe VectorMCP::RequestContext do
 
   describe ".minimal" do
     it "creates a minimal context for non-HTTP transports" do
-      context = described_class.minimal("stdio")
+      context = described_class.minimal("test")
 
       expect(context.headers).to eq({})
       expect(context.params).to eq({})
-      expect(context.method).to eq("STDIO")
+      expect(context.method).to eq("TEST")
       expect(context.path).to eq("/")
-      expect(context.metadata("transport_type")).to eq("stdio")
+      expect(context.metadata("transport_type")).to eq("test")
     end
   end
 

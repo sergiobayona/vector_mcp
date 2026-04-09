@@ -225,7 +225,7 @@ module VectorMCP
       end
 
       # Determines if this session manager should enable automatic cleanup.
-      # Override in subclasses that don't need automatic cleanup (e.g., stdio with single session).
+      # Override in subclasses that don't need automatic cleanup (e.g., transports with single persistent session).
       #
       # @return [Boolean] True if auto-cleanup should be enabled
       def auto_cleanup_enabled?

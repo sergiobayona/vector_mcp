@@ -12,7 +12,7 @@ VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-sid
 
 - **🛡️ Security-First**: Built-in input validation and schema checking prevent injection attacks
 - **⚡ Production-Ready**: Robust error handling, comprehensive test suite, and proven reliability  
-- **🔌 Multiple Transports**: stdio for CLI tools, SSE for web applications
+- **🔌 Multiple Transports**: Streamable HTTP (recommended) and SSE for web applications
 - **📦 Zero Configuration**: Works out of the box with sensible defaults
 - **🔄 Fully Compatible**: Implements the complete MCP specification
 
@@ -40,30 +40,29 @@ server.register_tool(
 ) { |args| "Hello, #{args['name']}!" }
 
 # Start the server
-server.run  # Uses stdio transport by default
+server.run  # Uses HTTP stream transport by default
 ```
 
 **That's it!** Your MCP server is ready to connect with Claude Desktop, custom clients, or any MCP-compatible application.
 
 ## Transport Options
 
-### Command Line Tools (stdio)
+### Streamable HTTP (Recommended)
 
-Perfect for desktop applications and process-based integrations:
+MCP-compliant streamable HTTP transport with session management and resumability:
 
 ```ruby
-server.run  # Default: stdio transport
+server.run  # Default: http_stream transport
+server.run(transport: :http_stream, port: 8080)
 ```
 
-### Web Applications (HTTP + SSE)
+### SSE (Deprecated)
 
-Ideal for web apps and browser-based clients:
+Legacy Server-Sent Events transport:
 
 ```ruby
 server.run(transport: :sse, port: 8080)
 ```
-
-Connect via Server-Sent Events at `http://localhost:8080/sse`
 
 ## Core Features
 
@@ -208,7 +207,7 @@ end
 
 Security works seamlessly across all transport layers:
 
-- **Stdio**: Header simulation for desktop applications
+- **HTTP Stream**: Full HTTP header support with session management
 - **SSE**: Full HTTP header and query parameter support
 - **Request Pipeline**: Automatic authentication and authorization checking
 

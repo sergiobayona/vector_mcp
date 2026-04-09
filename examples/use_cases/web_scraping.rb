@@ -33,11 +33,11 @@ class WebScrapingServer
     puts "🔍 Intelligent content extraction and processing"
     puts "⚡ Respectful scraping with rate limiting"
     puts
-    puts "🚀 Server starting on stdio transport..."
+    puts "🚀 Server starting on HTTP stream transport..."
     puts "💡 Try calling tools like 'extract_content', 'scrape_links', or 'extract_data_patterns'"
     puts
 
-    @server.run(transport: :stdio)
+    @server.run(transport: :http_stream)
   end
 
   private

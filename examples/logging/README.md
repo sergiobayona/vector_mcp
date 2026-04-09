@@ -185,8 +185,8 @@ analyzer.tool_usage
 VectorMCP Logger
 ├── server.*              # Core server operations
 ├── transport.*           # Communication layers
-│   ├── transport.stdio   # Stdio transport
-│   └── transport.sse     # SSE transport
+│   ├── transport.http_stream  # HTTP Stream transport (recommended)
+│   └── transport.sse          # SSE transport (deprecated)
 ├── security.*           # Security operations
 │   ├── security.auth    # Authentication
 │   └── security.authz   # Authorization

@@ -39,7 +39,6 @@ rake doc           # Alias for yard (outputs to doc/ directory)
 ```bash
 # Getting Started Examples
 ruby examples/getting_started/minimal_server.rb          # Simplest MCP server
-ruby examples/getting_started/basic_stdio_server.rb      # Command-line integration
 ruby examples/getting_started/basic_http_server.rb       # Web-based integration (deprecated SSE)
 ruby examples/getting_started/basic_http_stream_server.rb # MCP-compliant HTTP streaming
 
@@ -71,7 +70,7 @@ ruby examples/simple_middleware_demo.rb             # Basic middleware patterns
 # Environment-based logging configuration
 VECTORMCP_LOG_LEVEL=DEBUG ruby examples/logging_demo.rb
 VECTORMCP_LOG_FORMAT=json ruby examples/auth_server.rb
-VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby examples/stdio_server.rb
+VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby examples/getting_started/basic_http_stream_server.rb
 ```
 
 ## Architecture
@@ -83,7 +82,6 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
   - `Server::Capabilities` (`lib/vector_mcp/server/capabilities.rb`): Server info and capability management
   - `Server::MessageHandling` (`lib/vector_mcp/server/message_handling.rb`): Request/notification processing
 - **Transport Layer** (`lib/vector_mcp/transport/`): Communication protocols
-  - `Stdio` (`lib/vector_mcp/transport/stdio.rb`): Standard input/output (stable)
   - `HttpStream` (`lib/vector_mcp/transport/http_stream.rb`): **RECOMMENDED** - MCP-compliant streamable HTTP transport
     - `HttpStream::SessionManager`: Thread-safe session lifecycle management
     - `HttpStream::EventStore`: Event storage for resumable connections
@@ -114,15 +112,6 @@ VECTORMCP_LOG_OUTPUT=file VECTORMCP_LOG_FILE_PATH=/tmp/vectormcp.log ruby exampl
 - **Middleware**: Pluggable hooks for custom behavior around all MCP operations
 
 ### Request Flow
-
-**Stdio Transport:**
-1. Client connects via stdin/stdout
-2. Optional authentication via custom session-based strategies
-3. JSON-RPC messages processed line-by-line
-4. Security middleware processes authentication and authorization
-5. Structured logging captures all events with context
-6. Handlers dispatch to registered tools/resources/prompts with session context
-7. Responses sent back via stdout
 
 **SSE Transport (DEPRECATED):**
 ⚠️ **Note**: SSE Transport is deprecated as of MCP specification 2024-11-05. Use HTTP Stream Transport instead.
@@ -199,7 +188,7 @@ VectorMCP provides simple, environment-driven logging with support for structure
 **Component Loggers:**
 ```ruby
 server_logger = VectorMCP.logger_for("server")
-server_logger.info("Server started", port: 8080, transport: "stdio")
+server_logger.info("Server started", port: 8080, transport: "http_stream")
 ```
 
 **Performance Measurement:**
@@ -321,7 +310,7 @@ VectorMCP includes a comprehensive security framework implementing defense-in-de
 
 **✅ Security Middleware**
 - **Request Processing** - Automatic authentication and authorization checks
-- **Transport Integration** - Works across stdio and SSE transports
+- **Transport Integration** - Works across HTTP-based transports
 - **Error Handling** - Secure error responses without information leakage
 - **Session Isolation** - Per-request security context management
 
@@ -366,7 +355,7 @@ end
 
 **Comprehensive Test Coverage:**
 - 80+ authentication strategy tests covering all scenarios
-- Transport security integration tests for SSE and stdio
+- Transport security integration tests for SSE and HTTP stream
 - Authorization policy tests with edge cases
 - Error handling and attack scenario validation
 - Performance and concurrency security tests
@@ -576,7 +565,7 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 **Core Functionality:**
 - Protocol implementation and JSON-RPC handling
 - Tool/resource/prompt registration and execution
-- Transport layer functionality (stdio, SSE)
+- Transport layer functionality (SSE, HTTP stream)
 
 **Security:**
 - Authentication strategy testing
@@ -627,5 +616,5 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 3. **Quality**: Ensure `bundle exec rubocop` passes
 4. **Logging**: Use `VectorMCP.logger_for(component)` for component-specific logging
 5. **Security**: Test with `examples/core_features/authentication.rb` for security scenarios
-6. **Transport**: Note that SSE Transport is deprecated - migrate to HTTP Stream Transport per MCP spec 2024-11-05
+6. **Transport**: Use HTTP Stream Transport (recommended) per MCP spec 2024-11-05; SSE Transport is deprecated
 7. **Documentation**: Update YARD docs and run `rake yard`

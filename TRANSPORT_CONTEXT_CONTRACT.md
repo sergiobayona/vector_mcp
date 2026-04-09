@@ -84,20 +84,20 @@ end
 - Set path from `rack_env["PATH_INFO"]`
 - Include transport-specific metadata
 
-### Non-HTTP Transports (Stdio)
+### Non-HTTP Transports
 
 For non-HTTP transports, use the minimal context:
 
 ```ruby
 def create_session_with_context
-  context = VectorMCP::RequestContext.minimal("stdio")
+  context = VectorMCP::RequestContext.minimal("my_transport")
   VectorMCP::Session.new(@server, self, request_context: context)
 end
 ```
 
 **Required Implementation:**
 - Use empty headers and params
-- Set method to transport name (e.g., "STDIO")
+- Set method to transport name (e.g., "MY_TRANSPORT")
 - Set path to "/" or transport-appropriate default
 - Include transport type in metadata
 
@@ -175,17 +175,6 @@ class VectorMCP::Transport::SSE
       @session_manager.add_session(session)
     end
     # ... handle message
-  end
-end
-```
-
-### Stdio Transport
-```ruby
-class VectorMCP::Transport::Stdio
-  def run
-    context = VectorMCP::RequestContext.minimal("stdio")
-    session = VectorMCP::Session.new(@server, self, request_context: context)
-    # ... handle stdio communication
   end
 end
 ```

@@ -92,7 +92,7 @@ module VectorMCP
     end
 
     # Create a minimal request context for non-HTTP transports.
-    # This is useful for stdio and other command-line transports.
+    # This is useful for non-HTTP transports or testing contexts.
     #
     # @param transport_type [String] The transport type identifier
     # @return [RequestContext] A minimal request context

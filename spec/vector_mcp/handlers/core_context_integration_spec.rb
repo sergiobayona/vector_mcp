@@ -57,7 +57,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
           server,
           transport,
           id: "minimal-session",
-          request_context: VectorMCP::RequestContext.minimal("stdio")
+          request_context: VectorMCP::RequestContext.minimal("test")
         )
 
         result = described_class.send(:extract_request_from_session, minimal_session)
@@ -213,28 +213,27 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
     end
 
-    context "with stdio transport session" do
-      let(:stdio_session) do
+    context "with minimal transport session" do
+      let(:minimal_transport_session) do
         VectorMCP::Session.new(
           server,
           transport,
-          id: "stdio-session",
-          request_context: VectorMCP::RequestContext.minimal("stdio")
+          id: "minimal-transport-session",
+          request_context: VectorMCP::RequestContext.minimal("test")
         )
       end
 
-      it "extracts minimal context for stdio transport" do
-        result = described_class.send(:extract_request_from_session, stdio_session)
+      it "extracts minimal context for non-HTTP transport" do
+        result = described_class.send(:extract_request_from_session, minimal_transport_session)
 
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("stdio-session")
+        expect(result[:session_id]).to eq("minimal-transport-session")
       end
 
       it "works with authentication disabled scenarios" do
-        result = described_class.send(:extract_request_from_session, stdio_session)
+        result = described_class.send(:extract_request_from_session, minimal_transport_session)
 
-        # Should not have authentication headers (typical for stdio)
         expect(result[:headers]["Authorization"]).to be_nil
         expect(result[:headers]["X-API-Key"]).to be_nil
         expect(result[:params]["api_key"]).to be_nil

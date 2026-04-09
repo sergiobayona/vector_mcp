@@ -66,9 +66,3 @@ bundle exec rspec spec/integration/sse_basic_integration_spec.rb
 ```
 
 This test complements the unit tests and provides confidence that the SSE transport works correctly in realistic scenarios with actual HTTP connections and concurrent clients.
-
-## Stdio Transport Integration Test
-
-**File:** `server_stdio_spec.rb`
-
-Comprehensive integration test for the stdio transport, testing the complete MCP protocol flow including initialization, tool calls, resource access, and prompt handling.

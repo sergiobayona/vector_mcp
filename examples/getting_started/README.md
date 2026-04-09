@@ -6,7 +6,7 @@ Welcome to VectorMCP! This section contains simple, beginner-friendly examples t
 
 - **MCP Protocol Basics**: Understanding JSON-RPC communication
 - **Server Setup**: Creating and configuring MCP servers
-- **Transport Options**: Choosing between stdio and HTTP/SSE
+- **Transport Options**: Using HTTP Stream and HTTP/SSE transports
 - **Tool Registration**: Adding functions that LLMs can call
 - **Resource Serving**: Providing data to LLM clients
 
@@ -31,37 +31,7 @@ ruby examples/getting_started/minimal_server.rb
 
 ---
 
-### 2. [`basic_stdio_server.rb`](./basic_stdio_server.rb)
-**Command-line integration using stdin/stdout transport**
-
-```bash
-ruby examples/getting_started/basic_stdio_server.rb
-```
-
-**What it demonstrates:**
-- Stdio transport for process-based integration
-- Input validation with JSON schemas
-- Dynamic resource serving (current time)
-- Prompt templates for LLM interactions
-- Proper error handling and logging
-
-**Perfect for:** CLI tools, subprocess integration, desktop applications
-
-**Integration example:**
-```json
-{
-  "mcpServers": {
-    "my-server": {
-      "command": "ruby",
-      "args": ["examples/getting_started/basic_stdio_server.rb"]
-    }
-  }
-}
-```
-
----
-
-### 3. [`basic_http_server.rb`](./basic_http_server.rb)
+### 2. [`basic_http_server.rb`](./basic_http_server.rb)
 **Web-based integration using HTTP and Server-Sent Events**
 
 ```bash
@@ -88,27 +58,20 @@ const eventSource = new EventSource('http://localhost:8080/sse');
 
 ## 🛠️ Development Workflow
 
-### 1. Choose Your Transport
+### 1. Start Your Server
 
-**Stdio** - For command-line tools:
+**HTTP Stream** (recommended):
 ```bash
-ruby examples/getting_started/basic_stdio_server.rb
+ruby examples/getting_started/basic_http_stream_server.rb
 ```
 
-**HTTP/SSE** - For web applications:
+**HTTP/SSE** (deprecated):
 ```bash
 ruby examples/getting_started/basic_http_server.rb
 ```
 
 ### 2. Test Your Server
 
-**Stdio Testing:**
-```bash
-# Send JSON-RPC message to stdin
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ruby examples/getting_started/basic_stdio_server.rb
-```
-
-**HTTP Testing:**
 ```bash
 # In another terminal
 ruby examples/core_features/cli_client.rb http://localhost:8080/sse
@@ -182,7 +145,7 @@ Once you've mastered these basics:
 
 - **Start minimal**: Use `minimal_server.rb` to understand core concepts
 - **Add validation**: Always include input schemas for security
-- **Choose transport carefully**: Stdio for CLI, HTTP/SSE for web
+- **Use HTTP Stream transport**: The default and recommended transport for all use cases
 - **Test early**: Use the CLI client to verify your server works
 - **Read the logs**: Enable debug mode with `DEBUG=1` for troubleshooting
 
@@ -191,7 +154,7 @@ Once you've mastered these basics:
 ## 🤔 Common Questions
 
 **Q: Which transport should I use?**
-A: Stdio for command-line tools, HTTP/SSE for web applications and browser integration.
+A: HTTP Stream is the default and recommended transport for all use cases. HTTP/SSE is available but deprecated.
 
 **Q: How do I test my server?**
 A: Use the CLI client: `ruby examples/core_features/cli_client.rb http://localhost:8080/sse`

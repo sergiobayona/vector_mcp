@@ -63,7 +63,7 @@ server.register_tool(
   "Authenticated user accessed: #{args['message']}"
 end
 
-server.run(transport: :stdio)
+server.run(transport: :http_stream)
 ```
 
 **Client Usage:**
@@ -302,29 +302,6 @@ end
 ```
 
 ## Transport Integration
-
-### Stdio Transport
-
-Security works seamlessly with stdio transport through request headers simulation:
-
-```ruby
-server.enable_authentication!(strategy: :api_key, keys: ["key123"])
-server.run(transport: :stdio)
-```
-
-**Request Processing:**
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "my_tool",
-    "arguments": { "message": "hello" }
-  },
-  "headers": {
-    "X-API-Key": "key123"
-  }
-}
-```
 
 ### SSE Transport
 

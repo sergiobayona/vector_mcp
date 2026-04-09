@@ -11,7 +11,6 @@ require_relative "vector_mcp/util"
 require_relative "vector_mcp/log_filter"
 require_relative "vector_mcp/image_util"
 require_relative "vector_mcp/handlers/core"
-require_relative "vector_mcp/transport/stdio"
 # require_relative "vector_mcp/transport/sse" # Load on demand
 require_relative "vector_mcp/logger"
 require_relative "vector_mcp/middleware"
@@ -21,7 +20,7 @@ require_relative "vector_mcp/server"
 # of the **Model Context Protocol (MCP)**.  It gives developers everything needed
 # to spin up an MCP-compatible server—including:
 #
-# * **Transport adapters** (synchronous `stdio` or HTTP + SSE)
+# * **Transport adapters** (streamable HTTP and SSE)
 # * **High-level abstractions** for *tools*, *resources*, and *prompts*
 # * **JSON-RPC 2.0** message handling with sensible defaults and detailed
 #   error reporting helpers
@@ -40,7 +39,7 @@ require_relative "vector_mcp/server"
 #   input_schema: {type: "object", properties: {text: {type: "string"}}}
 # ) { |args| args["text"] }
 #
-# server.run # => starts the stdio transport and begins processing JSON-RPC messages
+# server.run # => starts the HTTP stream transport and begins processing JSON-RPC messages
 # ```
 #
 # For production you could instead pass an `SSE` transport instance to `run` in

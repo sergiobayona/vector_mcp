@@ -34,7 +34,6 @@ Practical implementations for common scenarios like file operations and data pro
 examples/
 ├── 🚀 getting_started/          # Start here for new users
 │   ├── minimal_server.rb        # Simplest possible MCP server
-│   ├── basic_stdio_server.rb    # Command-line integration
 │   └── basic_http_server.rb     # Web-based integration
 │
 ├── 🔧 core_features/            # VectorMCP capabilities
@@ -70,9 +69,6 @@ bundle install
 # Minimal example (5 lines of code)
 ruby examples/getting_started/minimal_server.rb
 
-# Or command-line integration
-ruby examples/getting_started/basic_stdio_server.rb
-
 # Or web-based integration  
 ruby examples/getting_started/basic_http_server.rb
 ```
@@ -89,8 +85,8 @@ ruby examples/core_features/cli_client.rb http://localhost:8080/sse
 
 | Transport | Best For | Example |
 |-----------|----------|---------|
-| **Stdio** | CLI tools, subprocess integration | `basic_stdio_server.rb` |
-| **HTTP/SSE** | Web apps, browsers, dashboards | `basic_http_server.rb` |
+| **HTTP Stream** | Web apps, browsers, dashboards, CLI tools | `basic_http_stream_server.rb` |
+| **HTTP/SSE** | Legacy web integrations (deprecated) | `basic_http_server.rb` |
 
 ---
 
@@ -110,7 +106,7 @@ All examples demonstrate VectorMCP's security-first approach:
 
 ### Beginner Journey
 1. **Start**: `getting_started/minimal_server.rb`
-2. **Expand**: `getting_started/basic_stdio_server.rb`
+2. **Expand**: `getting_started/basic_http_server.rb`
 3. **Secure**: `core_features/authentication.rb`
 4. **Validate**: `core_features/input_validation.rb`
 

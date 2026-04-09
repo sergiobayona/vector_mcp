@@ -33,11 +33,11 @@ class FileOperationsServer
       puts "  📂 #{root.name}: #{root.path}"
     end
     puts
-    puts "🚀 Server starting on stdio transport..."
+    puts "🚀 Server starting on HTTP stream transport..."
     puts "💡 Try calling tools like 'read_file', 'search_files', or 'analyze_content'"
     puts
 
-    @server.run(transport: :stdio)
+    @server.run(transport: :http_stream)
   end
 
   private

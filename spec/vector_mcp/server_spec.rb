@@ -873,15 +873,15 @@ RSpec.describe VectorMCP::Server do
   end
 
   describe "dynamic prompt list change notifications" do
-    let(:stdio_transport) { instance_double(VectorMCP::Transport::Stdio, send_notification: nil) }
+    let(:mock_transport) { double("transport", send_notification: nil) }
 
     before do
-      server.transport = stdio_transport
+      server.transport = mock_transport
     end
 
-    it "sends notifications/prompts/list_changed via stdio transport" do
+    it "sends notifications/prompts/list_changed via transport" do
       server.register_prompt(name: "notify_prompt", description: "d", arguments: []) { "resp" }
-      expect(stdio_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
+      expect(mock_transport).to have_received(:send_notification).with("notifications/prompts/list_changed")
     end
   end
 

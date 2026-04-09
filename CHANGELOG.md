@@ -1,3 +1,12 @@
+## [Unreleased]
+
+### Removed
+
+* **Stdio Transport**: Removed stdio transport support entirely. The `:http_stream` transport is now the default.
+  - Deleted `lib/vector_mcp/transport/stdio.rb` and `lib/vector_mcp/transport/stdio_session_manager.rb`
+  - `Server#run` now defaults to `transport: :http_stream` instead of `transport: :stdio`
+  - Use `:http_stream` for all server implementations (recommended per MCP spec 2024-11-05)
+
 ## [0.3.4] – 2026-03-17
 
 ### Added

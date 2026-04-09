@@ -124,7 +124,7 @@ module VectorMCP
         if transport_request.respond_to?(:[]) && transport_request["REQUEST_METHOD"]
           extract_from_rack_env(transport_request)
         else
-          # Default fallback
+          # Default fallback for non-HTTP request formats
           { headers: {}, params: {} }
         end
       end
