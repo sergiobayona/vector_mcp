@@ -36,8 +36,7 @@
 
 This document audits VectorMCP's Streamable HTTP Transport implementation against the MCP specification version 2025-11-25. The audit identified **13 findings**: 4 missing implementations (now resolved), 5 incorrect interpretations, and 4 potential issues (1 now resolved).
 
-**1 remaining HIGH severity** (MUST-level spec violation):
-1. Batch JSON-RPC support contradicts the spec's single-message requirement.
+**0 remaining HIGH severity** MUST-level spec violations.
 
 **Resolved since initial audit (2026-04-09):**
 1. ~~The `MCP-Protocol-Version` header is completely unimplemented.~~ **FIXED** -- Header validation added to POST, GET, and DELETE handlers. Unsupported versions return 400. Missing header assumes `2025-03-26` for backwards compatibility.
@@ -47,6 +46,7 @@ This document audits VectorMCP's Streamable HTTP Transport implementation agains
 5. ~~Protocol version hardcoded to `2024-11-05`.~~ **FIXED** -- Updated to `2025-03-26` with `SUPPORTED_PROTOCOL_VERSIONS` constant.
 6. ~~Non-standard `connection/established` SSE event.~~ **FIXED** -- Replaced with spec-compliant empty-data priming event.
 7. ~~`broadcast_message` sends same message to multiple streams.~~ **FIXED** -- Removed `broadcast_message` and `broadcast_notification` entirely. `capabilities.rb` now uses `send_notification` (single-session) only.
+8. ~~Batch JSON-RPC support contradicts single-message requirement.~~ **FIXED** -- Array POST bodies now rejected with 400. `handle_batch_request`, `process_batch_item`, and `batch_invalid_item_error` removed.
 
 The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, outgoing response detection, protocol version header validation, notification responses, SSE priming, and SSE retry guidance.
 
@@ -79,7 +79,7 @@ Key requirements include:
 | 2 | Notifications return 200 instead of 202 | Missing | **HIGH** | MUST | **FIXED** |
 | 3 | No SSE priming event with empty data | Missing | MEDIUM | SHOULD | **FIXED** |
 | 4 | No SSE `retry` field support | Missing | MEDIUM | SHOULD | **FIXED** |
-| 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | Open |
+| 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | **FIXED** |
 | 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | **FIXED** |
 | 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | Open |
 | 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | Open |
@@ -265,45 +265,26 @@ The `retry` field is a standard SSE mechanism defined in the [WHATWG HTML Living
 
 ### 5. Batch Request Support Violates Spec
 
-**Severity:** HIGH | **Spec Level:** MUST
+**Severity:** HIGH | **Spec Level:** MUST | **Status: FIXED**
 
 #### Spec Requirement
 
 > The body of the POST request **MUST** be a **single** JSON-RPC request, notification, or response.
 
-#### Current Behavior
+#### Resolution
 
-`handle_post_request` (`lib/vector_mcp/transport/http_stream.rb:356-359`) explicitly supports JSON arrays:
+**Fixed on 2026-04-09.** Implementation:
 
-```ruby
-if parsed.is_a?(Array)
-  handle_batch_request(parsed, session)
-else
-  handle_single_request(parsed, session, env)
-end
-```
+- Array POST bodies are now rejected early in `handle_post_request` with a 400 JSON-RPC error (code -32600, "Invalid Request") before session resolution
+- Removed dead code: `handle_batch_request`, `process_batch_item`, and `batch_invalid_item_error` methods
+- Cleaned up `resolve_session_for_post` to remove array handling logic
+- 2 tests: rejection of non-empty arrays and empty arrays, plus existing test confirming single objects still work
+- 6 old batch behavior tests replaced
 
-`handle_batch_request` (`http_stream.rb:388-401`) processes multiple messages in a single POST, returning a JSON array of responses.
+#### Files Changed
 
-#### Impact
-
-While JSON-RPC 2.0 supports batching, the MCP spec overrides this for the Streamable HTTP transport. The batch response format (JSON array) is not something compliant MCP clients expect.
-
-#### Suggested Fix
-
-Either reject array bodies:
-
-```ruby
-if parsed.is_a?(Array)
-  return bad_request_response("Batch requests are not supported. Send a single JSON-RPC message per POST.")
-end
-```
-
-Or keep batch support as a documented non-standard extension with a configuration flag.
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream.rb` — Modify `handle_post_request`
+- `lib/vector_mcp/transport/http_stream.rb` — Reject arrays in `handle_post_request`, remove batch methods, simplify `resolve_session_for_post`
+- `spec/vector_mcp/transport/http_stream_spec.rb` — Replace batch behavior tests with rejection tests
 
 ---
 
@@ -619,7 +600,7 @@ The following areas correctly implement the specification:
 | 2 | Return 202 for notifications in `handle_single_request` | Small | **DONE** |
 | 1 | Add `MCP-Protocol-Version` header validation | Medium | **DONE** |
 | 6 | Remove `broadcast_message` / `broadcast_notification` | Medium | **DONE** |
-| 5 | Reject or gate batch requests | Small | Open |
+| 5 | Reject batch requests | Small | **DONE** |
 
 ### Short-term (SHOULD violations and MUST-adjacent)
 

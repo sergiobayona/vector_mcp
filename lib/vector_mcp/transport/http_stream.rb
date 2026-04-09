@@ -356,22 +356,23 @@ module VectorMCP
         request_body = read_request_body(env)
         parsed = parse_json_message(request_body)
 
+        # MCP spec: POST body MUST be a single JSON-RPC message, not a batch array
+        if parsed.is_a?(Array)
+          return json_error_response(nil, -32_600, "Invalid Request",
+                                     { details: "Batch requests are not supported. Send a single JSON-RPC message per POST." })
+        end
+
         session = resolve_session_for_post(session_id, parsed, env)
         return session if session.is_a?(Array) # Rack error response
 
         # Validate MCP-Protocol-Version header (skip for initialize requests)
-        first_message = parsed.is_a?(Array) ? parsed.first : parsed
-        is_initialize = first_message.is_a?(Hash) && first_message["method"] == "initialize"
+        is_initialize = parsed.is_a?(Hash) && parsed["method"] == "initialize"
         unless is_initialize
           version_error = validate_protocol_version_header(env)
           return version_error if version_error
         end
 
-        if parsed.is_a?(Array)
-          handle_batch_request(parsed, session)
-        else
-          handle_single_request(parsed, session, env)
-        end
+        handle_single_request(parsed, session, env)
       rescue JSON::ParserError => e
         json_error_response(nil, -32_700, "Parse error", { details: e.message })
       end
@@ -400,55 +401,6 @@ module VectorMCP
         build_protocol_error_response(env, e, session_id: session.id)
       end
 
-      # Handles a batch of JSON-RPC messages per JSON-RPC 2.0 spec.
-      #
-      # @param messages [Array] Array of parsed JSON-RPC messages
-      # @param session [Session] The resolved session
-      # @return [Array] Rack response triplet
-      def handle_batch_request(messages, session)
-        return json_error_response(nil, -32_600, "Invalid Request", { details: "Empty batch" }) if messages.empty?
-
-        responses = messages.filter_map do |message|
-          next batch_invalid_item_error unless message.is_a?(Hash)
-
-          process_batch_item(message, session)
-        end
-
-        return [204, { "Mcp-Session-Id" => session.id }, []] if responses.empty?
-
-        headers = { "Content-Type" => "application/json", "Mcp-Session-Id" => session.id }
-        [200, headers, [responses.to_json]]
-      end
-
-      # Processes a single item within a batch request.
-      #
-      # @param message [Hash] A single JSON-RPC message
-      # @param session [Session] The resolved session
-      # @return [Hash, nil] Response hash or nil for notifications/outgoing responses
-      def process_batch_item(message, session)
-        if outgoing_response?(message)
-          handle_outgoing_response(message)
-          return nil
-        end
-
-        result = @server.handle_message(message, session.context, session.id)
-        return nil if result.nil? && message["id"].nil?
-
-        { jsonrpc: "2.0", id: message["id"], result: result }
-      rescue VectorMCP::ProtocolError => e
-        { jsonrpc: "2.0", id: e.request_id, error: { code: e.code, message: e.message, data: e.details } }
-      rescue StandardError => e
-        { jsonrpc: "2.0", id: message["id"],
-          error: { code: -32_603, message: "Internal error", data: { details: e.message } } }
-      end
-
-      # Returns an error object for non-Hash items in a batch.
-      #
-      # @return [Hash] JSON-RPC error object
-      def batch_invalid_item_error
-        { jsonrpc: "2.0", id: nil, error: { code: -32_600, message: "Invalid Request" } }
-      end
-
       # Resolves or creates the session for a POST request following MCP spec rules:
       # - session_id present and known  → return existing session (updating request context)
       # - session_id present but unknown/expired → 404 Not Found
@@ -456,12 +408,11 @@ module VectorMCP
       # - no session_id + other request → 400 Bad Request
       #
       # @param session_id [String, nil] Client-supplied Mcp-Session-Id header value
-      # @param message [Hash, Array] Parsed JSON-RPC message or batch array
+      # @param message [Hash] Parsed JSON-RPC message
       # @param env [Hash] Rack environment
       # @return [Session, Array] Session object or Rack error response triplet
       def resolve_session_for_post(session_id, message, env)
-        first_message = message.is_a?(Array) ? message.first : message
-        is_initialize = first_message.is_a?(Hash) && first_message["method"] == "initialize"
+        is_initialize = message.is_a?(Hash) && message["method"] == "initialize"
 
         if session_id
           session = @session_manager.get_session(session_id)
