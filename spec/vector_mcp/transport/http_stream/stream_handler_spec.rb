@@ -590,20 +590,24 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(stream_handler).to receive(:sleep) # Mock sleep to speed up tests
       end
 
-      it "sends periodic heartbeat events with stream_id" do
-        expect(mock_event_store).to receive(:store_event)
-          .with(anything, "heartbeat", hash_including(session_id: session_id, stream_id: test_stream_id))
-          .at_least(:once)
-
+      it "sends SSE comments for heartbeat (not JSON-RPC notifications)" do
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
+
+        expect(mock_yielder).to have_received(:<<).with(": heartbeat\n\n").at_least(:once)
+      end
+
+      it "does not store heartbeat events in event store" do
+        stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
+
+        expect(mock_event_store).not_to have_received(:store_event)
       end
 
       it "stops when connection is closed" do
         allow(mock_connection).to receive(:closed?).and_return(true)
 
-        expect(mock_event_store).not_to receive(:store_event).with(anything, "heartbeat", anything)
-
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
+
+        expect(mock_yielder).not_to have_received(:<<)
       end
 
       it "handles heartbeat send failures gracefully" do

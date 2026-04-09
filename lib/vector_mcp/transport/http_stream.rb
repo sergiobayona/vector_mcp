@@ -640,7 +640,8 @@ module VectorMCP
       end
 
       def forbidden_response(message = "Forbidden")
-        [403, { "Content-Type" => "text/plain" }, [message]]
+        error = { jsonrpc: "2.0", error: { code: -32_600, message: message } }
+        [403, { "Content-Type" => "application/json" }, [error.to_json]]
       end
 
       def method_not_allowed_response(allowed_methods)
@@ -668,8 +669,10 @@ module VectorMCP
       def valid_post_accept?(env)
         accept = env["HTTP_ACCEPT"]
         return true if accept.nil? || accept.strip.empty?
+        return true if accept.include?("*/*")
 
-        accept.include?("application/json") || accept.include?("*/*")
+        # MCP spec: client MUST include both application/json AND text/event-stream
+        accept.include?("application/json") && accept.include?("text/event-stream")
       end
 
       def valid_get_accept?(env)

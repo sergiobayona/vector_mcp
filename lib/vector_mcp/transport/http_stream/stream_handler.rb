@@ -218,7 +218,7 @@ module VectorMCP
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param stream_id [String] The stream ID for event storage
         # @return [void]
-        def keep_alive_loop(session, yielder, stream_id)
+        def keep_alive_loop(session, yielder, _stream_id)
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
 
@@ -236,19 +236,9 @@ module VectorMCP
               break
             end
 
-            # Send heartbeat
-            heartbeat_event = {
-              jsonrpc: "2.0",
-              method: "heartbeat",
-              params: { timestamp: Time.now.iso8601 }
-            }
-
+            # Send heartbeat as SSE comment (not a JSON-RPC notification)
             begin
-              event_id = @transport.event_store.store_event(
-                heartbeat_event.to_json, "heartbeat",
-                session_id: session.id, stream_id: stream_id
-              )
-              yielder << format_sse_event(heartbeat_event.to_json, "heartbeat", event_id)
+              yielder << ": heartbeat\n\n"
             rescue StandardError
               logger.debug("Heartbeat failed for #{session.id}, connection likely closed")
               break

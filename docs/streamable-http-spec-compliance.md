@@ -49,6 +49,9 @@ This document audits VectorMCP's Streamable HTTP Transport implementation agains
 8. ~~Batch JSON-RPC support contradicts single-message requirement.~~ **FIXED** -- Array POST bodies now rejected with 400. `handle_batch_request`, `process_batch_item`, and `batch_invalid_item_error` removed.
 9. ~~Event IDs lack stream origin for proper replay scoping.~~ **FIXED** -- Added `stream_id` to `Event` struct and `EventStore`. Events are stored with stream-scoped IDs. Replay filters by `session_id` only (not `stream_id`) to preserve resumability across reconnections.
 10. ~~No POST/GET stream distinction for response restrictions.~~ **FIXED** -- Added `origin` and `stream_id` fields to `StreamingConnection`. `send_message_to_session` blocks JSON-RPC responses on GET streams per spec.
+11. ~~POST Accept validation doesn't require `text/event-stream`.~~ **FIXED** -- `valid_post_accept?` now requires both `application/json` AND `text/event-stream` when Accept header is present. `*/*` and missing header still accepted for backwards compatibility.
+12. ~~Non-standard heartbeat SSE events.~~ **FIXED** -- Heartbeats now use SSE comments (`": heartbeat\n\n"`) instead of JSON-RPC notifications. No longer stored in event store.
+13. ~~Origin error uses plain text instead of JSON-RPC error.~~ **FIXED** -- `forbidden_response` now returns JSON-RPC error object with `application/json` content type.
 
 The implementation correctly handles session ID assignment, session lifecycle (creation, validation, termination), origin validation, DELETE requests, outgoing response detection, protocol version header validation, notification responses, SSE priming, and SSE retry guidance.
 
@@ -83,13 +86,13 @@ Key requirements include:
 | 4 | No SSE `retry` field support | Missing | MEDIUM | SHOULD | **FIXED** |
 | 5 | Batch support violates single-message requirement | Incorrect | **HIGH** | MUST | **FIXED** |
 | 6 | `broadcast_message` sends same message to multiple streams | Incorrect | **HIGH** | MUST | **FIXED** |
-| 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | Open |
+| 7 | POST Accept validation doesn't require `text/event-stream` | Incorrect | MEDIUM | MUST (client) | **FIXED** |
 | 8 | Event IDs lack stream origin for proper replay scoping | Incorrect | MEDIUM | SHOULD/MUST | **FIXED** |
 | 9 | No POST/GET stream distinction for response restrictions | Incorrect | MEDIUM | MUST | **FIXED** |
 | 10 | Protocol version stuck at `2024-11-05` | Potential | MEDIUM | -- | **FIXED** |
-| 11 | Non-standard SSE events and JSON-RPC methods | Potential | LOW | -- | Partial |
+| 11 | Non-standard SSE events and JSON-RPC methods | Potential | LOW | -- | **FIXED** |
 | 12 | POST SSE is single-event, no interim messages | Potential | LOW | MAY | Open |
-| 13 | Origin error uses plain text instead of JSON-RPC error | Potential | LOW | MAY | Open |
+| 13 | Origin error uses plain text instead of JSON-RPC error | Potential | LOW | MAY | **FIXED** |
 
 ---
 
@@ -318,49 +321,19 @@ The `retry` field is a standard SSE mechanism defined in the [WHATWG HTML Living
 
 ### 7. POST Accept Header Validation Too Lenient
 
-**Severity:** MEDIUM | **Spec Level:** MUST (client requirement)
+**Severity:** MEDIUM | **Spec Level:** MUST (client requirement) | **Status: FIXED**
 
 #### Spec Requirement
 
 > The client **MUST** include an `Accept` header, listing both `application/json` and `text/event-stream` as supported content types.
 
-#### Current Behavior
+#### Resolution
 
-`valid_post_accept?` (`lib/vector_mcp/transport/http_stream.rb:668-673`):
+**Fixed on 2026-04-09.** `valid_post_accept?` now requires both `application/json` AND `text/event-stream` when an Accept header is present. `*/*` and missing/empty Accept headers are still accepted for backwards compatibility with non-browser clients.
 
-```ruby
-def valid_post_accept?(env)
-  accept = env["HTTP_ACCEPT"]
-  return true if accept.nil? || accept.strip.empty?
-  accept.include?("application/json") || accept.include?("*/*")
-end
-```
+#### Files Changed
 
-This allows:
-1. Missing Accept header entirely
-2. Accept with only `application/json` (no `text/event-stream`)
-3. `*/*` alone (doesn't prove SSE understanding)
-
-#### Impact
-
-The server may return SSE to a client that doesn't support it. Clients not advertising `text/event-stream` support may receive SSE responses they can't parse.
-
-#### Suggested Fix
-
-```ruby
-def valid_post_accept?(env)
-  accept = env["HTTP_ACCEPT"]
-  return true if accept.nil? || accept.strip.empty? # lenient for non-browser clients
-  return true if accept.include?("*/*")
-
-  # Spec requires both application/json AND text/event-stream
-  accept.include?("application/json") && accept.include?("text/event-stream")
-end
-```
-
-#### Files to Change
-
-- `lib/vector_mcp/transport/http_stream.rb` — Modify `valid_post_accept?`
+- `lib/vector_mcp/transport/http_stream.rb` — Tightened `valid_post_accept?` from OR to AND
 
 ---
 
@@ -433,22 +406,19 @@ POST SSE streams may include the response plus interim requests and notification
 
 ### 11. Non-Standard SSE Events and JSON-RPC Methods
 
-**Severity:** LOW | **Status: Partially Fixed**
+**Severity:** LOW | **Status: FIXED**
 
-#### Current Behavior
+#### Resolution
 
-The `connection/established` event has been replaced with a spec-compliant priming event (Finding #3). The remaining non-standard event is:
+**Fixed on 2026-04-09.** The `connection/established` event was previously replaced with a spec-compliant priming event (Finding #3). The remaining non-standard heartbeat event has now been fixed:
 
-| Event | Location | Description |
-|-------|----------|-------------|
-| `heartbeat` | `stream_handler.rb:223-227` | Sent every 30 seconds |
+- Heartbeats now use SSE comments (`": heartbeat\n\n"`) instead of JSON-RPC notification objects
+- Heartbeat events are no longer stored in the event store (SSE comments are not replayable, which is correct — they are keep-alive signals only)
+- The `stream_id` parameter to `keep_alive_loop` is now unused (prefixed with `_`)
 
-Additionally, SSE events still use named `event:` types (`message`, `heartbeat`). Standard `EventSource.onmessage` only receives events **without** a named type or with `event: message`. Events with custom types like `event: heartbeat` require explicit `addEventListener("heartbeat", ...)`.
+#### Files Changed
 
-#### Remaining Work
-
-- Use SSE comments (`: heartbeat\n\n`) instead of JSON-RPC notifications for keep-alive.
-- Consider removing the `event:` field from data messages so they arrive on the default `onmessage` handler.
+- `lib/vector_mcp/transport/http_stream/stream_handler.rb` — Replaced JSON-RPC heartbeat with SSE comment
 
 ---
 
@@ -482,32 +452,19 @@ For long-running operations, create a long-lived SSE stream (similar to the GET 
 
 ### 13. Origin Validation Error Response Format
 
-**Severity:** LOW | **Spec Level:** MAY
+**Severity:** LOW | **Spec Level:** MAY | **Status: FIXED**
 
 #### Spec Requirement
 
 > The HTTP response body **MAY** comprise a JSON-RPC error response that has no `id`.
 
-#### Current Behavior
+#### Resolution
 
-`forbidden_response` (`lib/vector_mcp/transport/http_stream.rb:655-657`):
+**Fixed on 2026-04-09.** `forbidden_response` now returns a JSON-RPC error object with `application/json` content type and error code `-32600` instead of plain text.
 
-```ruby
-def forbidden_response(message = "Forbidden")
-  [403, { "Content-Type" => "text/plain" }, [message]]
-end
-```
+#### Files Changed
 
-Returns plain text instead of a JSON-RPC error object.
-
-#### Suggested Fix
-
-```ruby
-def forbidden_response(message = "Forbidden")
-  error = { jsonrpc: "2.0", error: { code: -32_600, message: message } }
-  [403, { "Content-Type" => "application/json" }, [error.to_json]]
-end
-```
+- `lib/vector_mcp/transport/http_stream.rb` — Updated `forbidden_response` to return JSON-RPC error
 
 ---
 
@@ -523,7 +480,7 @@ The following areas correctly implement the specification:
 | Session termination via DELETE | **Pass** | Returns 204 on success, 404 if not found |
 | Origin header validation | **Pass** | Validates against allowed list, returns 403 for invalid, permits absent Origin (non-browser) |
 | Default localhost binding | **Pass** | `DEFAULT_HOST = "localhost"` |
-| Event storage and replay | **Partial** | Events stored with unique IDs and replayed via `Last-Event-ID`; circular buffer with configurable retention. Missing: stream-scoped filtering. |
+| Event storage and replay | **Pass** | Events stored with unique IDs, stream_id, and replayed via `Last-Event-ID`; circular buffer with configurable retention. Session-scoped replay preserves resumability across reconnections. |
 | Outgoing response handling | **Pass** | Client responses to server-initiated requests correctly detected and return 202 |
 | GET Accept header validation | **Pass** | Requires `text/event-stream` or `*/*` |
 | GET returns SSE stream | **Pass** | Returns `text/event-stream` content type with streaming body |
@@ -555,13 +512,13 @@ The following areas correctly implement the specification:
 | 8 | Add stream ID to events and filter replay by stream | Medium | **DONE** |
 | 3 | Add SSE priming event with empty data field | Small | **DONE** |
 | 4 | Add SSE `retry` field support | Small | **DONE** |
-| 7 | Tighten POST Accept validation | Small | Open |
+| 7 | Tighten POST Accept validation | Small | **DONE** |
 
 ### Later (low severity, nice-to-have)
 
 | # | Fix | Effort | Status |
 |---|-----|--------|--------|
 | 10 | Update `PROTOCOL_VERSION` constant | Small | **DONE** |
-| 11 | Replace custom SSE events with spec-compliant patterns | Medium | Partial |
+| 11 | Replace custom SSE events with spec-compliant patterns | Medium | **DONE** |
 | 12 | Support long-lived POST SSE streams | Large | Open |
-| 13 | Return JSON-RPC error on 403 | Small | Open |
+| 13 | Return JSON-RPC error on 403 | Small | **DONE** |

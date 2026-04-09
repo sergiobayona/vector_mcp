@@ -247,11 +247,10 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(last_response.headers["Mcp-Session-Id"]).to eq(session_id)
           end
 
-          it "returns JSON when client only accepts application/json" do
+          it "rejects POST when client only accepts application/json (missing text/event-stream)" do
             post "/mcp", json_request.to_json, json_accept_headers
 
-            expect(last_response.status).to eq(200)
-            expect(last_response.content_type).to eq("application/json")
+            expect(last_response.status).to eq(406)
           end
 
           it "returns JSON when no Accept header is present" do
@@ -340,14 +339,13 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(error_event).to match(/data: .*error/)
           end
 
-          it "returns JSON-formatted errors when client does not accept SSE" do
+          it "rejects error requests when client does not accept SSE" do
             protocol_error = VectorMCP::MethodNotFoundError.new("unknown_method", request_id: 1)
             allow(mock_mcp_server).to receive(:handle_message).and_raise(protocol_error)
 
             post "/mcp", json_request.to_json, json_accept_headers
 
-            expect(last_response.status).to eq(400)
-            expect(last_response.content_type).to eq("application/json")
+            expect(last_response.status).to eq(406)
           end
         end
 
@@ -435,12 +433,20 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(last_response.status).to eq(200)
           end
 
-          it "accepts application/json alone" do
+          it "rejects application/json alone (spec requires both json and event-stream)" do
             post "/mcp", json_request.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json",
                                      "HTTP_ACCEPT" => "application/json")
 
-            expect(last_response.status).to eq(200)
+            expect(last_response.status).to eq(406)
+          end
+
+          it "rejects text/event-stream alone" do
+            post "/mcp", json_request.to_json,
+                 valid_headers.merge("CONTENT_TYPE" => "application/json",
+                                     "HTTP_ACCEPT" => "text/event-stream")
+
+            expect(last_response.status).to eq(406)
           end
 
           it "accepts */* wildcard" do
@@ -711,26 +717,31 @@ RSpec.describe VectorMCP::Transport::HttpStream do
             expect(last_response.status).to eq(200)
           end
 
-          it "rejects requests from disallowed origins" do
+          it "rejects requests from disallowed origins with JSON-RPC error" do
             post "/mcp", { "jsonrpc" => "2.0", "method" => "ping" }.to_json,
                  valid_headers.merge("CONTENT_TYPE" => "application/json", "HTTP_ORIGIN" => "https://malicious.com")
 
             expect(last_response.status).to eq(403)
-            expect(last_response.body).to eq("Origin not allowed")
+            expect(last_response.content_type).to eq("application/json")
+            response = JSON.parse(last_response.body)
+            expect(response["error"]["code"]).to eq(-32_600)
+            expect(response["error"]["message"]).to eq("Origin not allowed")
           end
 
-          it "rejects GET requests from disallowed origins" do
+          it "rejects GET requests from disallowed origins with JSON-RPC error" do
             get "/mcp", {}, valid_headers.merge("HTTP_ORIGIN" => "https://malicious.com")
 
             expect(last_response.status).to eq(403)
-            expect(last_response.body).to eq("Origin not allowed")
+            response = JSON.parse(last_response.body)
+            expect(response["error"]["code"]).to eq(-32_600)
           end
 
-          it "rejects DELETE requests from disallowed origins" do
+          it "rejects DELETE requests from disallowed origins with JSON-RPC error" do
             delete "/mcp", {}, valid_headers.merge("HTTP_ORIGIN" => "https://malicious.com")
 
             expect(last_response.status).to eq(403)
-            expect(last_response.body).to eq("Origin not allowed")
+            response = JSON.parse(last_response.body)
+            expect(response["error"]["code"]).to eq(-32_600)
           end
         end
       end
