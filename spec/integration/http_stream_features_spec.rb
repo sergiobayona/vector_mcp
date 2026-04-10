@@ -171,16 +171,9 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       it "receives Server-Sent Events in proper format" do
         mock_client.start_streaming
 
-        # Wait for connection event or initial messages
-        sleep(0.5)
-
-        # Events should be properly formatted
-        events = mock_client.events_received
-        if events.any?
-          event = events.first
-          expect(event).to have_key(:id)
-          expect(event).to have_key(:data)
-        end
+        event = mock_client.wait_for_events(1, timeout: 1).first
+        expect(event).to have_key(:id)
+        expect(event).to have_key(:data)
       end
 
       it "maintains connection state correctly" do
@@ -225,29 +218,16 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
       end
 
       it "validates JSON-RPC format for sampling requests" do
-        sampling_received = false
-
-        mock_client.on_method("sampling/createMessage") do |event|
-          sampling_received = true
-          message = event[:data]
-
-          # Should be proper JSON-RPC format
-          expect(message["jsonrpc"]).to eq("2.0")
-          expect(message["id"]).not_to be_nil
-          expect(message["method"]).to eq("sampling/createMessage")
-          expect(message["params"]).to be_a(Hash)
-        end
-
         # Trigger sampling
         call_tool(base_url, session_id, "interactive_tool", {
                     question: "What is the capital of France?"
                   })
 
-        # Give time for sampling to occur
-        sleep(1)
-
-        # If sampling was attempted, it should be properly formatted
-        # Note: May not receive sampling if no active streaming connection
+        message = mock_client.wait_for_method("sampling/createMessage", timeout: 2).first[:data]
+        expect(message["jsonrpc"]).to eq("2.0")
+        expect(message["id"]).not_to be_nil
+        expect(message["method"]).to eq("sampling/createMessage")
+        expect(message["params"]).to be_a(Hash)
       end
 
       it "handles sampling timeout scenarios" do
@@ -337,11 +317,10 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                     message: "Test isolation"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { session1_requests.positive? }
 
-        # Session 1 should receive sampling, session 2 should not
-        # Note: May not receive if no streaming connection is active
-        expect(session2_requests).to eq(0) if session1_requests > 0
+        expect(session1_requests).to eq(1)
+        expect(session2_requests).to eq(0)
       end
     end
 
@@ -421,8 +400,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                     })
         end
 
-        # Give time for sampling to start
-        sleep(0.5)
+        mock_client.wait_for_method("sampling/createMessage", timeout: 2)
 
         # Disconnect client
         mock_client.stop_streaming
@@ -697,7 +675,7 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
                                message: "Test multi-stream session routing"
                              })
 
-        sleep(1)
+        wait_until(timeout: 2) { (stream1_requests + stream2_requests) == 1 }
 
         expect(client1.connected?).to be true
         expect(client2.connected?).to be true

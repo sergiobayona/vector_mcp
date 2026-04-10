@@ -17,16 +17,25 @@ module HttpStreamIntegrationHelpers
 
   # Helper method to wait for server to start
   def wait_for_server_start(base_url, timeout: 10)
-    Timeout.timeout(timeout) do
-      loop do
-        Net::HTTP.get_response(URI("#{base_url}/"))
-        break
-      rescue Errno::ECONNREFUSED
-        sleep(0.1)
-      end
+    wait_until(timeout: timeout) do
+      Net::HTTP.get_response(URI("#{base_url}/"))
+      true
+    rescue Errno::ECONNREFUSED
+      false
     end
   rescue Timeout::Error
     raise "Server failed to start within #{timeout} seconds"
+  end
+
+  def wait_until(timeout: 2, interval: 0.01)
+    Timeout.timeout(timeout) do
+      loop do
+        result = yield
+        return result if result
+
+        sleep(interval)
+      end
+    end
   end
 
   # Helper method to make HTTP requests with session ID
@@ -300,7 +309,7 @@ module HttpStreamIntegrationHelpers
 
   def stop_test_server(transport, server_thread)
     transport.stop
-    server_thread&.join(2) # Wait up to 2 seconds for graceful shutdown
+    server_thread&.join(0.5)
     server_thread&.kill if server_thread&.alive? # Force kill if still alive
   end
 

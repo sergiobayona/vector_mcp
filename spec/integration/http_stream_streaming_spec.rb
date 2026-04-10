@@ -24,8 +24,11 @@ class MockStreamingClient
 
   def stop_streaming
     @running = false
-    @stream_thread&.join(1)
-    @stream_thread&.kill if @stream_thread&.alive?
+    @stream_thread&.join(0.05)
+    return unless @stream_thread&.alive?
+
+    @stream_thread.kill
+    @stream_thread.join(0.1)
   end
 
   def set_response_for_method(method, response)
@@ -40,6 +43,12 @@ class MockStreamingClient
 
     http.request(request) do |response|
       response.read_body { |chunk| process_stream_chunk(chunk) }
+    end
+  ensure
+    begin
+      http.finish if http&.started?
+    rescue StandardError
+      nil
     end
   end
 
@@ -425,9 +434,9 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
 
-      # Set very short timeout just to check if connection is accepted
-      http.read_timeout = 1
-      http.open_timeout = 1
+      # Set a small timeout just to check if connection is accepted
+      http.read_timeout = 0.1
+      http.open_timeout = 0.1
 
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id
@@ -448,9 +457,9 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
 
-      # Set very short timeout just to check if connection is accepted
-      http.read_timeout = 1
-      http.open_timeout = 1
+      # Set a small timeout just to check if connection is accepted
+      http.read_timeout = 0.1
+      http.open_timeout = 0.1
 
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id
@@ -497,8 +506,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # Establish streaming connection (expect timeout as SSE connections stay open)
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      http.read_timeout = 1
-      http.open_timeout = 1
+      http.read_timeout = 0.1
+      http.open_timeout = 0.1
 
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id
@@ -538,8 +547,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # Try to establish streaming connection without initializing session
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      http.read_timeout = 1
-      http.open_timeout = 1
+      http.read_timeout = 0.1
+      http.open_timeout = 0.1
 
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = "non-existent-session"
@@ -598,8 +607,8 @@ RSpec.describe "HTTP Stream Transport - Streaming Features" do
       # Try to make streaming request with invalid headers
       uri = URI("#{base_url}/mcp")
       http = Net::HTTP.new(uri.host, uri.port)
-      http.read_timeout = 2
-      http.open_timeout = 2
+      http.read_timeout = 0.2
+      http.open_timeout = 0.2
 
       request = Net::HTTP::Get.new(uri)
       request["Mcp-Session-Id"] = session_id

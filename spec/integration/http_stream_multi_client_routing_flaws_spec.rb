@@ -96,7 +96,6 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
         # Start streaming - ORDER MATTERS! First client will receive ALL sampling requests
         client_a.start_streaming  # This client connects FIRST
-        sleep(0.1)
         client_b.start_streaming  # This client connects SECOND
 
         # Capture which client receives the sampling request
@@ -118,7 +117,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                                          message: "Process my billing information"
                                        })
 
-        sleep(1) # Allow sampling to complete
+        wait_until(timeout: 2) { received_by_client_b.any? }
 
         puts "\nDEBUG INFO:"
         puts "  Tenant A received: #{received_by_client_a.length} messages"
@@ -165,7 +164,6 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
         # Connection order determines routing
         alice_client.start_streaming  # Alice connects FIRST
-        sleep(0.1)
         bob_client.start_streaming    # Bob connects SECOND
 
         alice_messages = []
@@ -186,7 +184,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                     message: "Show my account balance"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { bob_messages.any? }
 
         alice_client.stop_streaming
         bob_client.stop_streaming
@@ -219,7 +217,6 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
         # Dev client connects first (common during development)
         dev_client.start_streaming    # Dev connects FIRST
-        sleep(0.1)
         prod_client.start_streaming   # Prod connects SECOND
 
         dev_received = []
@@ -240,7 +237,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                     message: "URGENT: Production system requires immediate attention"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { prod_received.any? }
 
         dev_client.stop_streaming
         prod_client.stop_streaming
@@ -285,11 +282,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
         # Connect clients in random order
         clients.each do |client_info|
           client_info[:client].start_streaming
-          sleep(0.1) # Small delay between connections
         end
-
-        # Wait for all clients to be properly connected
-        sleep(0.3)
 
         # Track which client receives the message
         receiver_id = nil
@@ -304,7 +297,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                     message: "This should go to client 3"
                   })
 
-        sleep(1.5) # Wait for sampling to complete
+        wait_until(timeout: 2) { !receiver_id.nil? }
 
         puts "\n✅ ROUTING CONSISTENCY RESULTS:"
         puts "  Connection order: #{clients.map { |c| c[:id] }}"
@@ -342,9 +335,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
 
         # Start clients in specific order
         auth_client.start_streaming       # Connects FIRST - will receive ALL messages
-        sleep(0.1)
         billing_client.start_streaming    # Connects SECOND
-        sleep(0.1)
         notification_client.start_streaming # Connects THIRD
 
         # Track all received messages
@@ -383,10 +374,11 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                       sensitive_data: "Service-specific data for #{req[:service]}",
                       message: req[:message]
                     })
-          sleep(0.2) # Small delay between requests
         end
 
-        sleep(1.5) # Wait for all sampling to complete
+        wait_until(timeout: 2) do
+          message_recipients.values.all? { |messages| messages.length == 1 }
+        end
 
         auth_client.stop_streaming
         billing_client.stop_streaming
@@ -428,7 +420,6 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
       client2.set_sampling_response("sampling/createMessage", "EVIDENCE: Client 2 received message")
 
       client1.start_streaming  # First connection
-      sleep(0.1)
       client2.start_streaming  # Second connection
 
       evidence = { client1_received: [], client2_received: [] }
@@ -455,7 +446,7 @@ RSpec.describe "HttpStream Multi-Client Routing Flaws", type: :integration do
                   message: "Request from Client 2 - should go to Client 2"
                 })
 
-      sleep(1)
+      wait_until(timeout: 2) { evidence[:client2_received].any? }
 
       client1.stop_streaming
       client2.stop_streaming

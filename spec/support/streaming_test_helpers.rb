@@ -8,6 +8,7 @@ require "concurrent-ruby"
 
 module StreamingTestHelpers
   # Enhanced mock streaming client for testing HTTP streaming features
+  # rubocop:disable Metrics/ClassLength
   class MockStreamingClient
     attr_reader :session_id, :base_url, :events_received, :connection_state
 
@@ -15,6 +16,7 @@ module StreamingTestHelpers
       @session_id = session_id
       @base_url = base_url
       @events_received = Concurrent::Array.new
+      @method_events = Concurrent::Map.new
       @sampling_responses = Concurrent::Hash.new
       @connection_state = :disconnected
       @running = false
@@ -45,7 +47,7 @@ module StreamingTestHelpers
       end
 
       # Wait for connection to establish
-      wait_for_connection_state(:connected, timeout: 5)
+      wait_for_stream_start(timeout: 5)
     end
 
     # Stop streaming connection
@@ -54,8 +56,11 @@ module StreamingTestHelpers
         @running = false
       end
 
-      @stream_thread&.join(2)
-      @stream_thread&.kill if @stream_thread&.alive?
+      @stream_thread&.join(0.05)
+      if @stream_thread&.alive?
+        @stream_thread.kill
+        @stream_thread.join(0.1)
+      end
       @stream_thread = nil
       @connection_state = :disconnected
     end
@@ -82,17 +87,19 @@ module StreamingTestHelpers
 
     # Wait for specific number of events
     def wait_for_events(count, timeout: 10)
-      Timeout.timeout(timeout) do
-        sleep(0.1) until @events_received.size >= count
-      end
+      wait_until(timeout: timeout) { @events_received.size >= count }
       @events_received.first(count)
+    end
+
+    # Wait for specific number of method calls
+    def wait_for_method(method, count: 1, timeout: 10)
+      wait_until(timeout: timeout) { method_event_bucket(method).size >= count }
+      method_event_bucket(method).first(count)
     end
 
     # Wait for specific connection state
     def wait_for_connection_state(state, timeout: 10)
-      Timeout.timeout(timeout) do
-        sleep(0.1) until @connection_state == state
-      end
+      wait_until(timeout: timeout) { @connection_state == state }
       true
     rescue Timeout::Error
       false
@@ -111,6 +118,11 @@ module StreamingTestHelpers
     # Clear method handlers
     def clear_method_handlers
       @response_handlers.clear
+    end
+
+    # Get events received for a specific method
+    def events_for_method(method)
+      method_event_bucket(method).dup
     end
 
     # Get connection statistics
@@ -159,19 +171,27 @@ module StreamingTestHelpers
           handle_error(:http_error, "HTTP #{response.code}: #{response.message}")
         end
       end
+    ensure
+      begin
+        http.finish if http&.started?
+      rescue StandardError
+        nil
+      end
     end
 
     def process_sse_event(event_data)
       event = parse_sse_event(event_data)
       @events_received << event
 
-      # Handle server-initiated requests
-      handle_server_request(event[:data]) if event[:data].is_a?(Hash) && event[:data]["method"]
-
-      # Trigger method-specific handler
       return unless event[:data].is_a?(Hash) && event[:data]["method"]
 
       method = event[:data]["method"]
+      method_event_bucket(method) << event
+
+      # Handle server-initiated requests
+      handle_server_request(event[:data])
+
+      # Trigger method-specific handler
       handler = @response_handlers[method]
       handler&.call(event)
     end
@@ -301,7 +321,30 @@ module StreamingTestHelpers
       callback = @connection_callbacks[state]
       callback&.call
     end
+
+    def wait_for_stream_start(timeout:)
+      wait_until(timeout: timeout) { @connection_state == :connected || !@running }
+      @connection_state == :connected
+    rescue Timeout::Error
+      false
+    end
+
+    def wait_until(timeout:, interval: 0.01)
+      Timeout.timeout(timeout) do
+        loop do
+          result = yield
+          return result if result
+
+          sleep(interval)
+        end
+      end
+    end
+
+    def method_event_bucket(method)
+      @method_events.compute_if_absent(method) { Concurrent::Array.new }
+    end
   end
+  # rubocop:enable Metrics/ClassLength
 
   # Server-Sent Events parser utility
   class SSEParser
@@ -361,7 +404,7 @@ module StreamingTestHelpers
     # Wait for all clients to connect
     def wait_for_clients_connected(clients, timeout: 10)
       Timeout.timeout(timeout) do
-        sleep(0.1) until clients.all?(&:connected?)
+        sleep(0.01) until clients.all?(&:connected?)
       end
       true
     rescue Timeout::Error

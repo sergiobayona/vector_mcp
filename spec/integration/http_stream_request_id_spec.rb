@@ -102,11 +102,9 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           call_tool(base_url, session_id, "id_test_tool", {
                       message: "Test message #{i}"
                     })
-          sleep(0.1) # Small delay to ensure proper ordering
         end
 
-        # Wait for all sampling calls to be captured
-        sleep(1)
+        wait_until(timeout: 2) { request_ids.length == 3 }
 
         # Verify unique IDs generated
         expect(request_ids.length).to eq(3)
@@ -135,10 +133,9 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
           call_tool(base_url, session_id, "id_test_tool", {
                       message: "Base test #{i}"
                     })
-          sleep(0.05)
         end
 
-        sleep(1)
+        wait_until(timeout: 2) { request_ids.length == 5 }
 
         # Extract base pattern (everything except the counter)
         bases = request_ids.map { |id| id.gsub(/_\d+\z/, "") }
@@ -200,7 +197,6 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
             call_tool(base_url, session1_id, "id_test_tool", {
                         message: "Session 1 message #{i}"
                       })
-            sleep(0.02)
           end
         end
 
@@ -209,12 +205,11 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
             call_tool(base_url, session2_id, "id_test_tool", {
                         message: "Session 2 message #{i}"
                       })
-            sleep(0.02)
           end
         end
 
         threads.each(&:join)
-        sleep(1.5) # Wait for all sampling calls to complete
+        wait_until(timeout: 2) { all_request_ids.length == 6 }
 
         # All IDs should be unique across sessions
         expect(all_request_ids.length).to eq(6)
@@ -316,7 +311,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
                     })
         end
 
-        sleep(1)
+        wait_until(timeout: 2) { first_batch_ids.length == 3 }
 
         # Clear the handler and capture second batch
         mock_client.clear_method_handlers
@@ -330,7 +325,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
                     })
         end
 
-        sleep(1)
+        wait_until(timeout: 2) { second_batch_ids.length == 3 }
 
         # Verify counter continued incrementing
         all_ids = first_batch_ids + second_batch_ids

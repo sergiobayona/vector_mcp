@@ -128,7 +128,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Doctor connects first (typical in healthcare systems)
         doctor_client.start_streaming
-        sleep(0.1)
         patient_client.start_streaming
 
         doctor_received_data = []
@@ -158,7 +157,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "medical_records_blood_test_results"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { patient_received_data.any? }
 
         doctor_client.stop_streaming
         patient_client.stop_streaming
@@ -194,7 +193,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Customer A connects first (random timing in real world)
         customer_a_client.start_streaming
-        sleep(0.1)
         customer_b_client.start_streaming
 
         financial_data_exposures = []
@@ -233,7 +231,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     transaction_type: "wire_transfer_to_offshore_account"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { customer_b_received_own_data.any? }
 
         customer_a_client.stop_streaming
         customer_b_client.stop_streaming
@@ -270,7 +268,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Attorney Smith connects first
         attorney1_client.start_streaming
-        sleep(0.1)
         attorney2_client.start_streaming
 
         privileged_communications_leaked = []
@@ -308,7 +305,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "confidential_criminal_defense_strategy"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { attorney2_received_own_client_data.any? }
 
         attorney1_client.stop_streaming
         attorney2_client.stop_streaming
@@ -347,7 +344,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Secret clearance user connects first
         secret_client.start_streaming
-        sleep(0.1)
         top_secret_client.start_streaming
 
         classified_data_leaks = []
@@ -385,7 +381,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "TOP_SECRET_NUCLEAR_SUBMARINE_LOCATIONS"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { top_secret_received_own_data.any? }
 
         secret_client.stop_streaming
         top_secret_client.stop_streaming
@@ -427,9 +423,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
 
         # Dev team connects first (they often have long-running connections)
         dev_client.start_streaming
-        sleep(0.1)
         ops_client.start_streaming
-        sleep(0.1)
         monitoring_client.start_streaming
 
         alert_routing_failures = []
@@ -466,7 +460,7 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "CRITICAL_DATABASE_FAILURE_ALERT"
                   })
 
-        sleep(1)
+        wait_until(timeout: 2) { ops_team_received_alerts.any? }
 
         dev_client.stop_streaming
         ops_client.stop_streaming
@@ -521,7 +515,6 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
       # Start all clients
       clients_data.each do |client_data|
         client_data[:client].start_streaming
-        sleep(0.1) # Stagger connections slightly
 
         # Set up message tracking - verify each client receives their own messages
         client_data[:client].on_method("sampling/createMessage") do |event|
@@ -543,10 +536,8 @@ RSpec.describe "HttpStream Routing Security Implications", type: :integration do
                     data_type: "confidential_client_data"
                   })
         client_data[:messages_sent] += 1
-        sleep(0.2) # Allow time for processing
+        wait_until(timeout: 2) { client_data[:messages_received] == client_data[:messages_sent] }
       end
-
-      sleep(1.5) # Allow all sampling to complete
 
       # Stop all clients
       all_clients.each(&:stop_streaming)
