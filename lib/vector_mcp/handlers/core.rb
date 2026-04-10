@@ -52,18 +52,21 @@ module VectorMCP
       # @raise [VectorMCP::ForbiddenError] if authorization fails.
       def self.call_tool(params, session, server)
         tool_name = params["name"]
-        arguments = params["arguments"] || {}
-
         context = create_tool_context(tool_name, params, session, server)
-        context = server.middleware_manager.execute_hooks(:before_tool_call, context)
-        return handle_middleware_error(context) if context.error?
 
         begin
+          session_context = authenticate_session!(session, server, operation_type: :tool_call, operation_name: tool_name)
+
+          context = server.middleware_manager.execute_hooks(:before_tool_call, context)
+          return handle_middleware_error(context) if context.error?
+
+          tool_name = context.params["name"] || tool_name
+          arguments = context.params["arguments"] || {}
           tool = find_tool!(tool_name, server)
-          security_result = validate_tool_security!(session, tool, server)
+          authorize_action!(session_context, :call, tool, server)
           validate_input_arguments!(tool_name, tool, arguments)
 
-          result = execute_tool_handler(tool, arguments, security_result, session)
+          result = execute_tool_handler(tool, arguments, session)
           context.result = build_tool_result(result)
 
           context = server.middleware_manager.execute_hooks(:after_tool_call, context)
@@ -99,16 +102,19 @@ module VectorMCP
       # @raise [VectorMCP::ForbiddenError] if authorization fails.
       def self.read_resource(params, session, server)
         uri_s = params["uri"]
-
         context = create_resource_context(uri_s, params, session, server)
-        context = server.middleware_manager.execute_hooks(:before_resource_read, context)
-        return handle_middleware_error(context) if context.error?
 
         begin
-          resource = find_resource!(uri_s, server)
-          security_result = validate_resource_security!(session, resource, server)
+          session_context = authenticate_session!(session, server, operation_type: :resource_read, operation_name: uri_s)
 
-          content_raw = execute_resource_handler(resource, params, security_result)
+          context = server.middleware_manager.execute_hooks(:before_resource_read, context)
+          return handle_middleware_error(context) if context.error?
+
+          uri_s = context.params["uri"] || uri_s
+          resource = find_resource!(uri_s, server)
+          authorize_action!(session_context, :read, resource, server)
+
+          content_raw = execute_resource_handler(resource, context.params, session_context)
           contents = process_resource_content(content_raw, resource, uri_s)
 
           context.result = { contents: contents }
@@ -195,9 +201,11 @@ module VectorMCP
         return handle_middleware_error(context) if context.error?
 
         begin
+          context_params = context.params
+          prompt_name = context_params["name"] || prompt_name
           prompt = fetch_prompt(prompt_name, server)
 
-          arguments = params["arguments"] || {}
+          arguments = context_params["arguments"] || {}
           validate_arguments!(prompt_name, prompt, arguments)
 
           # Call the registered handler after arguments were validated
@@ -491,15 +499,34 @@ module VectorMCP
         tool
       end
 
-      # Validate tool security
-      def self.validate_tool_security!(session, tool, server)
-        security_result = check_tool_security(session, tool, server)
-        handle_security_failure(security_result) unless security_result[:success]
-        security_result
+      # Resolve the session authentication state before operation middleware runs.
+      def self.authenticate_session!(session, server, operation_type:, operation_name:)
+        request = extract_request_from_session(session)
+        context = create_auth_context(operation_type, operation_name, request, session, server)
+        context = server.middleware_manager.execute_hooks(:before_auth, context)
+        raise context.error if context.error?
+
+        request = context.params
+        session_context = if server.security_middleware.respond_to?(:authenticate_request)
+                            server.security_middleware.authenticate_request(request)
+                          else
+                            legacy_result = server.security_middleware.process_request(request)
+                            legacy_result[:session_context]
+                          end
+        session.security_context = session_context if session.respond_to?(:security_context=)
+
+        auth_required = server.respond_to?(:auth_manager) ? server.auth_manager.required? : false
+        raise VectorMCP::UnauthorizedError, "Authentication required" if auth_required && !session_context.authenticated?
+
+        context.result = session_context
+        server.middleware_manager.execute_hooks(:after_auth, context)
+        session_context
+      rescue StandardError => e
+        handle_auth_error(e, context, server)
       end
 
       # Execute tool handler with proper arity handling
-      def self.execute_tool_handler(tool, arguments, _security_result, session)
+      def self.execute_tool_handler(tool, arguments, session)
         if [1, -1].include?(tool.handler.arity)
           tool.handler.call(arguments)
         else
@@ -546,18 +573,24 @@ module VectorMCP
       end
 
       # Validate resource security
-      def self.validate_resource_security!(session, resource, server)
-        security_result = check_resource_security(session, resource, server)
-        handle_security_failure(security_result) unless security_result[:success]
-        security_result
+      def self.authorize_action!(session_context, action, resource, server)
+        authorized = if server.security_middleware.respond_to?(:authorize_action)
+                       server.security_middleware.authorize_action(session_context, action, resource)
+                     else
+                       legacy_result = server.security_middleware.process_request({}, action: action, resource: resource)
+                       legacy_result[:success]
+                     end
+        return if authorized
+
+        raise VectorMCP::ForbiddenError, "Access denied"
       end
 
       # Execute resource handler with proper arity handling
-      def self.execute_resource_handler(resource, params, security_result)
+      def self.execute_resource_handler(resource, params, session_context)
         if [1, -1].include?(resource.handler.arity)
           resource.handler.call(params)
         else
-          resource.handler.call(params, security_result[:session_context])
+          resource.handler.call(params, session_context)
         end
       end
 
@@ -579,10 +612,32 @@ module VectorMCP
         context.result
       end
 
-      private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :validate_tool_security!,
+      # Create middleware context for authentication hooks.
+      def self.create_auth_context(operation_type, operation_name, request, session, server)
+        VectorMCP::Middleware::Context.new(
+          operation_type: operation_type,
+          operation_name: operation_name,
+          params: request,
+          session: session,
+          server: server,
+          metadata: { start_time: Time.now }
+        )
+      end
+
+      # Run auth error hooks and re-raise the original error.
+      def self.handle_auth_error(error, context, server)
+        return raise error unless context
+
+        context.error = error
+        server.middleware_manager.execute_hooks(:on_auth_error, context)
+        raise error
+      end
+
+      private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :authenticate_session!,
                            :execute_tool_handler, :build_tool_result, :handle_tool_error, :create_resource_context,
-                           :find_resource!, :validate_resource_security!, :execute_resource_handler,
-                           :process_resource_content, :handle_resource_error
+                           :find_resource!, :authorize_action!, :execute_resource_handler,
+                           :process_resource_content, :handle_resource_error, :create_auth_context,
+                           :handle_auth_error
     end
   end
 end

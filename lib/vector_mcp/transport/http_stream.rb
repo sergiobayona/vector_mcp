@@ -106,13 +106,29 @@ module VectorMCP
         start_time = Time.now
         path = env["PATH_INFO"]
         method = env["REQUEST_METHOD"]
+        transport_context = build_transport_context(env, method, path, start_time)
 
-        # Processing HTTP request
+        logger.debug { "Processing HTTP request #{method} #{path}" }
+
+        transport_context = execute_transport_hooks(:before_request, transport_context)
+        raise transport_context.error if transport_context.error?
+        return transport_context.result if transport_context.result
 
         response = route_request(path, method, env)
+        transport_context.result = response
+        transport_context = execute_transport_hooks(:after_response, transport_context)
+        raise transport_context.error if transport_context.error?
+
+        response = transport_context.result || response
         log_request_completion(method, path, start_time, response[0])
         response
       rescue StandardError => e
+        if transport_context
+          transport_context.error = e
+          transport_context = execute_transport_hooks(:on_transport_error, transport_context)
+          return transport_context.result if transport_context.result
+        end
+
         handle_request_error(method, path, e)
       end
 
@@ -712,6 +728,29 @@ module VectorMCP
       def handle_request_error(method, path, error)
         logger.error { "Request processing error for #{method} #{path}: #{error.message}" }
         [500, { "Content-Type" => "text/plain" }, ["Internal Server Error"]]
+      end
+
+      def build_transport_context(env, method, path, start_time)
+        request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+
+        VectorMCP::Middleware::Context.new(
+          operation_type: :transport,
+          operation_name: "#{method} #{path}",
+          params: request_context.to_h,
+          session: nil,
+          server: @server,
+          metadata: {
+            start_time: start_time,
+            path: path,
+            method: method
+          }
+        )
+      end
+
+      def execute_transport_hooks(hook_type, context)
+        return context unless @server.respond_to?(:middleware_manager) && @server.middleware_manager
+
+        @server.middleware_manager.execute_hooks(hook_type, context)
       end
 
       def handle_fatal_error(error)

@@ -147,11 +147,7 @@ module VectorMCP
       # @param context [VectorMCP::Middleware::Context] Execution context
       # @param new_params [Hash] New parameters to set
       def modify_params(context, new_params)
-        if context.respond_to?(:params=)
-          context.params = new_params
-        else
-          @logger.warn("Cannot modify immutable params in context")
-        end
+        context.params = new_params
       end
 
       # Helper method to modify response result

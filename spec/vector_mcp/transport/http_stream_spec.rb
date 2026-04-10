@@ -24,7 +24,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       server_capabilities: mock_server_capabilities,
       protocol_version: "2024-11-05",
       handle_message: "success",
-      security_middleware: nil
+      security_middleware: nil,
+      middleware_manager: nil
     )
   end
 
@@ -103,6 +104,34 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       get "/test"
       expect(last_response.status).to eq(500)
       expect(last_response.body).to eq("Internal Server Error")
+    end
+
+    it "executes transport middleware hooks when a manager is available" do
+      middleware_manager = instance_double(VectorMCP::Middleware::Manager)
+      allow(mock_mcp_server).to receive(:middleware_manager).and_return(middleware_manager)
+      allow(middleware_manager).to receive(:execute_hooks) do |_hook_type, context|
+        context
+      end
+
+      get "/"
+
+      expect(middleware_manager).to have_received(:execute_hooks).with(:before_request, kind_of(VectorMCP::Middleware::Context))
+      expect(middleware_manager).to have_received(:execute_hooks).with(:after_response, kind_of(VectorMCP::Middleware::Context))
+    end
+
+    it "lets transport error middleware replace the Rack response" do
+      middleware_manager = instance_double(VectorMCP::Middleware::Manager)
+      allow(mock_mcp_server).to receive(:middleware_manager).and_return(middleware_manager)
+      allow(transport).to receive(:route_request).and_raise(StandardError.new("Test error"))
+      allow(middleware_manager).to receive(:execute_hooks) do |hook_type, context|
+        context.result = [418, { "Content-Type" => "text/plain" }, ["Intercepted"]] if hook_type == :on_transport_error
+        context
+      end
+
+      get "/test"
+
+      expect(last_response.status).to eq(418)
+      expect(last_response.body).to eq("Intercepted")
     end
   end
 

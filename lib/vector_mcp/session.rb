@@ -4,6 +4,7 @@ require_relative "sampling/request"
 require_relative "sampling/result"
 require_relative "errors"
 require_relative "request_context"
+require_relative "security/session_context"
 
 module VectorMCP
   # Represents the state of a single client-server connection session in MCP.
@@ -17,7 +18,7 @@ module VectorMCP
   # @attr_reader request_context [RequestContext] The request context for this session.
   class Session
     attr_reader :server_info, :server_capabilities, :protocol_version, :client_info, :client_capabilities, :server, :transport, :id, :request_context
-    attr_accessor :data # For user-defined session-specific storage
+    attr_accessor :data, :security_context # For user-defined session-specific storage and resolved auth context
 
     # Initializes a new session.
     #
@@ -33,6 +34,7 @@ module VectorMCP
       @client_info = nil
       @client_capabilities = nil
       @data = {} # Initialize user data hash
+      @security_context = Security::SessionContext.anonymous
       @logger = server.logger
 
       # Initialize request context

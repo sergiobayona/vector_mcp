@@ -66,6 +66,40 @@ class SecondMiddleware < VectorMCP::Middleware::Base
   end
 end
 
+class ParamMutatingMiddleware < VectorMCP::Middleware::Base
+  def before_tool_call(context)
+    updated_params = context.params.dup
+    updated_arguments = (updated_params["arguments"] || {}).merge("message" => "mutated by middleware")
+    updated_params["arguments"] = updated_arguments
+    modify_params(context, updated_params)
+  end
+end
+
+class AuthTrackingMiddleware < VectorMCP::Middleware::Base
+  attr_reader :events
+
+  def initialize(config = {})
+    super
+    @events = []
+  end
+
+  def before_auth(context)
+    @events << { hook: :before_auth, operation: context.operation_name }
+  end
+
+  def after_auth(context)
+    @events << { hook: :after_auth, user: context.session&.security_context&.user }
+  end
+
+  def on_auth_error(context)
+    @events << { hook: :on_auth_error, error: context.error.class.name }
+  end
+
+  def before_tool_call(context)
+    @events << { hook: :before_tool_call, user: context.user }
+  end
+end
+
 RSpec.describe "Middleware Integration" do
   let(:server) { VectorMCP::Server.new(name: "MiddlewareTestServer", version: "1.0.0") }
   let(:session) { VectorMCP::Session.new(server) }
@@ -251,6 +285,76 @@ RSpec.describe "Middleware Integration" do
       # Check that middleware was only called for specific tool
       operations = middleware.hook_calls.map { |call| call[:operation] }.uniq
       expect(operations).to eq(["specific_tool"])
+    end
+  end
+
+  describe "Middleware-driven param mutation" do
+    it "allows before hooks to replace params used by the handler" do
+      server.clear_middleware!
+      server.use_middleware(ParamMutatingMiddleware, :before_tool_call)
+
+      server.register_tool(
+        name: "mutating_tool",
+        description: "Tool whose args are rewritten by middleware",
+        input_schema: {
+          type: "object",
+          properties: { message: { type: "string" } },
+          required: ["message"]
+        }
+      ) do |args|
+        "Echo: #{args["message"]}"
+      end
+
+      result = VectorMCP::Handlers::Core.call_tool(
+        { "name" => "mutating_tool", "arguments" => { "message" => "original" } },
+        session,
+        server
+      )
+
+      expect(result[:content].first[:text]).to include("mutated by middleware")
+    end
+  end
+
+  describe "Authentication hook integration" do
+    let(:auth_middleware) { AuthTrackingMiddleware.new }
+
+    before do
+      server.clear_middleware!
+      server.use_middleware(AuthTrackingMiddleware, %i[before_auth after_auth on_auth_error before_tool_call])
+      allow(AuthTrackingMiddleware).to receive(:new).and_return(auth_middleware)
+
+      server.enable_authentication!(strategy: :api_key, keys: ["valid-key"])
+      session.request_context = {
+        headers: { "X-API-Key" => "valid-key" },
+        params: {}
+      }
+
+      server.register_tool(
+        name: "secured_tool",
+        description: "Tool with auth-aware middleware",
+        input_schema: { type: "object", properties: {} }
+      ) { "secured" }
+    end
+
+    it "runs auth hooks before business-operation hooks and exposes the authenticated user" do
+      VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, session, server)
+
+      expect(auth_middleware.events.map { |event| event[:hook] }).to include(:before_auth, :after_auth, :before_tool_call)
+      before_tool_event = auth_middleware.events.find { |event| event[:hook] == :before_tool_call }
+      expect(before_tool_event[:user]).to include(api_key: "valid-key")
+    end
+
+    it "runs auth error hooks on authentication failure" do
+      session.request_context = {
+        headers: { "X-API-Key" => "invalid-key" },
+        params: {}
+      }
+
+      expect do
+        VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, session, server)
+      end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
+
+      expect(auth_middleware.events.map { |event| event[:hook] }).to include(:before_auth, :on_auth_error)
     end
   end
 

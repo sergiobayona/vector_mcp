@@ -18,13 +18,23 @@ module VectorMCP
       def initialize(options = {})
         @operation_type = options[:operation_type]
         @operation_name = options[:operation_name]
-        @params = (options[:params] || {}).dup.freeze # Immutable copy
+        self.params = options[:params]
         @session = options[:session]
         @server = options[:server]
         @metadata = (options[:metadata] || {}).dup
         @result = nil
         @error = nil
         @skip_remaining_hooks = false
+      end
+
+      # Replace request parameters for the current operation.
+      #
+      # @param value [Hash, nil] New request parameters.
+      # @return [Hash] The normalized parameter hash.
+      def params=(value)
+        raise ArgumentError, "params must be a Hash" unless value.nil? || value.is_a?(Hash)
+
+        @params = (value || {}).dup
       end
 
       # Check if operation completed successfully

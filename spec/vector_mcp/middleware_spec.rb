@@ -65,13 +65,15 @@ end
 
 RSpec.describe VectorMCP::Middleware do
   describe VectorMCP::Middleware::Context do
+    let(:server) { instance_double(VectorMCP::Server, logger: VectorMCP.logger_for("spec")) }
+    let(:session) { VectorMCP::Session.new(server, nil, id: "middleware-session") }
     let(:context) do
       VectorMCP::Middleware::Context.new(
         operation_type: :tool_call,
         operation_name: "test_tool",
         params: { message: "test" },
-        session: nil,
-        server: nil,
+        session: session,
+        server: server,
         metadata: { test: "data" }
       )
     end
@@ -97,6 +99,20 @@ RSpec.describe VectorMCP::Middleware do
       expect(context.metadata[:new_key]).to eq("new_value")
     end
 
+    it "allows replacing params" do
+      context.params = { message: "changed" }
+      expect(context.params).to eq({ message: "changed" })
+    end
+
+    it "exposes the authenticated user from the session security context" do
+      session.security_context = VectorMCP::Security::SessionContext.new(
+        user: { user_id: "user-123" },
+        authenticated: true
+      )
+
+      expect(context.user).to eq({ user_id: "user-123" })
+    end
+
     it "provides context summary" do
       summary = context.to_h
       expect(summary[:operation_type]).to eq(:tool_call)
@@ -106,6 +122,8 @@ RSpec.describe VectorMCP::Middleware do
   end
 
   describe VectorMCP::Middleware::Hook do
+    let(:server) { instance_double(VectorMCP::Server, logger: VectorMCP.logger_for("spec")) }
+    let(:session) { VectorMCP::Session.new(server, nil, id: "hook-session") }
     let(:hook) do
       VectorMCP::Middleware::Hook.new(
         TestMiddleware,
@@ -119,8 +137,8 @@ RSpec.describe VectorMCP::Middleware do
         operation_type: :tool_call,
         operation_name: "test_tool",
         params: {},
-        session: nil,
-        server: nil
+        session: session,
+        server: server
       )
     end
 
@@ -194,6 +212,27 @@ RSpec.describe VectorMCP::Middleware do
 
         # Should not execute for blocked operation
         context.instance_variable_set(:@operation_name, "blocked_tool")
+        expect(conditional_hook.should_execute?(context)).to be false
+      end
+
+      it "respects only_users condition" do
+        context.session.security_context = VectorMCP::Security::SessionContext.new(
+          user: { user_id: "user-123" },
+          authenticated: true
+        )
+
+        conditional_hook = VectorMCP::Middleware::Hook.new(
+          TestMiddleware,
+          :before_tool_call,
+          conditions: { only_users: ["user-123"] }
+        )
+
+        expect(conditional_hook.should_execute?(context)).to be true
+
+        context.session.security_context = VectorMCP::Security::SessionContext.new(
+          user: { user_id: "other-user" },
+          authenticated: true
+        )
         expect(conditional_hook.should_execute?(context)).to be false
       end
     end
@@ -302,7 +341,13 @@ RSpec.describe VectorMCP::Middleware do
     it "provides helper methods" do
       # Test helper methods exist (they are protected methods)
       expect(middleware.class.protected_instance_methods).to include(:modify_result)
+      expect(middleware.class.protected_instance_methods).to include(:modify_params)
       expect(middleware.class.protected_instance_methods).to include(:skip_remaining_hooks)
+    end
+
+    it "can modify params through the helper" do
+      middleware.send(:modify_params, context, { changed: true })
+      expect(context.params).to eq({ changed: true })
     end
   end
 end
