@@ -104,6 +104,23 @@ RSpec.describe VectorMCP::Middleware do
       expect(context.params).to eq({ message: "changed" })
     end
 
+    it "raises ArgumentError when params is set to a non-Hash" do
+      expect { context.params = "invalid" }.to raise_error(ArgumentError, /params must be a Hash/)
+      expect { context.params = 42 }.to raise_error(ArgumentError, /params must be a Hash/)
+    end
+
+    it "normalizes nil params to an empty hash" do
+      context.params = nil
+      expect(context.params).to eq({})
+    end
+
+    it "duplicates the hash so caller mutations do not leak" do
+      original = { "key" => "value" }
+      context.params = original
+      original["key"] = "mutated"
+      expect(context.params["key"]).to eq("value")
+    end
+
     it "exposes the authenticated user from the session security context" do
       session.security_context = VectorMCP::Security::SessionContext.new(
         user: { user_id: "user-123" },

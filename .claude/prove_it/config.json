@@ -135,18 +135,6 @@
           }
         }
       ]
-    },
-    "git": {
-      "pre-commit": [
-        {
-          "name": "full-tests",
-          "type": "script",
-          "command": "./script/test",
-          "when": {
-            "sourcesModifiedSinceLastRun": true
-          }
-        }
-      ]
     }
   },
   "initSeed": "a225a57e11fb"

@@ -27,6 +27,12 @@ RSpec.describe VectorMCP::Session do
     it "starts in uninitialized state" do
       expect(session.initialized?).to be false
     end
+
+    it "initializes security_context as anonymous" do
+      expect(session.security_context).to be_a(VectorMCP::Security::SessionContext)
+      expect(session.security_context.authenticated?).to be false
+      expect(session.security_context.user).to be_nil
+    end
   end
 
   describe "#initialize!" do

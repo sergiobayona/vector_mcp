@@ -373,6 +373,163 @@ RSpec.describe VectorMCP::Handlers::Core do
     end
   end
 
+  describe "authenticate_session! flow" do
+    let(:tool) { double("tool", handler: proc { |_args| "ok" }, input_schema: nil) }
+    let(:authenticated_context) do
+      VectorMCP::Security::SessionContext.new(user: { user_id: "user-1" }, authenticated: true)
+    end
+    let(:anonymous_context) { VectorMCP::Security::SessionContext.anonymous }
+
+    before do
+      server.tools["auth_tool"] = tool
+      allow(VectorMCP::Util).to receive(:convert_to_mcp_content).with("ok").and_return(["ok"])
+    end
+
+    context "when auth is not required" do
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: true,
+          session_context: anonymous_context
+        })
+        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(false)
+        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+      end
+
+      it "allows unauthenticated sessions through without error" do
+        params = { "name" => "auth_tool", "arguments" => {} }
+        result = described_class.call_tool(params, session, server)
+        expect(result[:isError]).to be(false)
+      end
+    end
+
+    context "when auth is required and session is authenticated" do
+      let(:auth_manager) { double("auth_manager", required?: true) }
+
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: true,
+          session_context: authenticated_context
+        })
+        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
+        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+        allow(server).to receive(:auth_manager).and_return(auth_manager)
+      end
+
+      it "allows the request and stores security context on session" do
+        params = { "name" => "auth_tool", "arguments" => {} }
+        result = described_class.call_tool(params, session, server)
+        expect(result[:isError]).to be(false)
+        expect(session.security_context).to eq(authenticated_context)
+      end
+    end
+
+    context "when auth is required and session is not authenticated" do
+      let(:auth_manager) { double("auth_manager", required?: true) }
+
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: false,
+          session_context: anonymous_context
+        })
+        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
+        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+        allow(server).to receive(:auth_manager).and_return(auth_manager)
+      end
+
+      it "raises UnauthorizedError" do
+        params = { "name" => "auth_tool", "arguments" => {} }
+        expect do
+          described_class.call_tool(params, session, server)
+        end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
+      end
+    end
+  end
+
+  describe "authorize_action! flow" do
+    let(:tool) { double("tool", handler: proc { |_args| "ok" }, input_schema: nil) }
+
+    before do
+      server.tools["authz_tool"] = tool
+      allow(VectorMCP::Util).to receive(:convert_to_mcp_content).with("ok").and_return(["ok"])
+      allow(server).to receive(:respond_to?).with(:auth_manager).and_return(false)
+      allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+    end
+
+    context "when authorization succeeds via legacy path" do
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: true,
+          session_context: VectorMCP::Security::SessionContext.anonymous
+        })
+      end
+
+      it "executes the tool handler" do
+        params = { "name" => "authz_tool", "arguments" => {} }
+        result = described_class.call_tool(params, session, server)
+        expect(result[:isError]).to be(false)
+      end
+    end
+
+    context "when authorization is denied via legacy path" do
+      before do
+        # Auth passes
+        allow(security_middleware).to receive(:process_request)
+          .with(anything)
+          .and_return({ success: true, session_context: VectorMCP::Security::SessionContext.anonymous })
+        # But authz fails
+        allow(security_middleware).to receive(:process_request)
+          .with({}, action: :call, resource: tool)
+          .and_return({ success: false })
+      end
+
+      it "raises ForbiddenError" do
+        params = { "name" => "authz_tool", "arguments" => {} }
+        expect do
+          described_class.call_tool(params, session, server)
+        end.to raise_error(VectorMCP::ForbiddenError, "Access denied")
+      end
+    end
+
+    context "when server supports authorize_action method" do
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: true,
+          session_context: VectorMCP::Security::SessionContext.anonymous
+        })
+        allow(security_middleware).to receive(:respond_to?) do |method_name|
+          %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
+        end
+        allow(security_middleware).to receive(:authorize_action).and_return(true)
+      end
+
+      it "uses the new authorize_action interface" do
+        params = { "name" => "authz_tool", "arguments" => {} }
+        described_class.call_tool(params, session, server)
+        expect(security_middleware).to have_received(:authorize_action)
+      end
+    end
+
+    context "when authorize_action denies access" do
+      before do
+        allow(security_middleware).to receive(:process_request).and_return({
+          success: true,
+          session_context: VectorMCP::Security::SessionContext.anonymous
+        })
+        allow(security_middleware).to receive(:respond_to?) do |method_name|
+          %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
+        end
+        allow(security_middleware).to receive(:authorize_action).and_return(false)
+      end
+
+      it "raises ForbiddenError" do
+        params = { "name" => "authz_tool", "arguments" => {} }
+        expect do
+          described_class.call_tool(params, session, server)
+        end.to raise_error(VectorMCP::ForbiddenError, "Access denied")
+      end
+    end
+  end
+
   describe "notification handlers" do
     describe ".initialized_notification" do
       it "logs session initialized" do
