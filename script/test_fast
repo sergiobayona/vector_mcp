@@ -4,4 +4,4 @@
 # in .claude/prove_it/config.json to point at your existing test runner.
 set -e
 trap 'rc=$?; command -v prove_it >/dev/null 2>&1 && prove_it record --name fast-tests --result $rc' EXIT
-bundle exec rspec --format progress --tag fast
+
