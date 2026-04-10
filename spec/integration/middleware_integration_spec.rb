@@ -3,111 +3,113 @@
 require "spec_helper"
 
 # Test middleware for integration testing
-class IntegrationTestMiddleware < VectorMCP::Middleware::Base
-  attr_reader :hook_calls
+module MiddlewareIntegrationSpecSupport
+  class IntegrationTestMiddleware < VectorMCP::Middleware::Base
+    attr_reader :hook_calls
 
-  def initialize(config = {})
-    super
-    @hook_calls = []
-  end
+    def initialize(config = {})
+      super
+      @hook_calls = []
+    end
 
-  def before_tool_call(context)
-    @hook_calls << { hook: :before_tool_call, operation: context.operation_name, time: Time.now }
-  end
+    def before_tool_call(context)
+      @hook_calls << { hook: :before_tool_call, operation: context.operation_name, time: Time.now }
+    end
 
-  def after_tool_call(context)
-    @hook_calls << { hook: :after_tool_call, operation: context.operation_name, time: Time.now }
+    def after_tool_call(context)
+      @hook_calls << { hook: :after_tool_call, operation: context.operation_name, time: Time.now }
 
-    # Modify the result to show middleware was executed
-    return unless context.result && context.result[:content]
+      # Modify the result to show middleware was executed
+      return unless context.result && context.result[:content]
 
-    context.result[:content] = context.result[:content].map do |item|
-      if item[:text]
-        item.merge(text: "#{item[:text]} [modified by middleware]")
-      else
-        item
+      context.result[:content] = context.result[:content].map do |item|
+        if item[:text]
+          item.merge(text: "#{item[:text]} [modified by middleware]")
+        else
+          item
+        end
       end
+    end
+
+    def on_tool_error(context)
+      @hook_calls << { hook: :on_tool_error, operation: context.operation_name, time: Time.now }
+    end
+
+    def before_resource_read(context)
+      @hook_calls << { hook: :before_resource_read, operation: context.operation_name, time: Time.now }
+    end
+
+    def after_resource_read(context)
+      @hook_calls << { hook: :after_resource_read, operation: context.operation_name, time: Time.now }
+    end
+
+    def before_prompt_get(context)
+      @hook_calls << { hook: :before_prompt_get, operation: context.operation_name, time: Time.now }
+    end
+
+    def after_prompt_get(context)
+      @hook_calls << { hook: :after_prompt_get, operation: context.operation_name, time: Time.now }
     end
   end
 
-  def on_tool_error(context)
-    @hook_calls << { hook: :on_tool_error, operation: context.operation_name, time: Time.now }
+  # Test middleware classes for priority testing
+  class FirstMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+      context.metadata[:execution_order] << :first
+    end
   end
 
-  def before_resource_read(context)
-    @hook_calls << { hook: :before_resource_read, operation: context.operation_name, time: Time.now }
+  class SecondMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+      context.metadata[:execution_order] << :second
+    end
   end
 
-  def after_resource_read(context)
-    @hook_calls << { hook: :after_resource_read, operation: context.operation_name, time: Time.now }
+  class ParamMutatingMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      updated_params = context.params.dup
+      updated_arguments = (updated_params["arguments"] || {}).merge("message" => "mutated by middleware")
+      updated_params["arguments"] = updated_arguments
+      modify_params(context, updated_params)
+    end
   end
 
-  def before_prompt_get(context)
-    @hook_calls << { hook: :before_prompt_get, operation: context.operation_name, time: Time.now }
-  end
+  class AuthTrackingMiddleware < VectorMCP::Middleware::Base
+    attr_reader :events
 
-  def after_prompt_get(context)
-    @hook_calls << { hook: :after_prompt_get, operation: context.operation_name, time: Time.now }
-  end
-end
+    def initialize(config = {})
+      super
+      @events = []
+    end
 
-# Test middleware classes for priority testing
-class FirstMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-    context.metadata[:execution_order] << :first
-  end
-end
+    def before_auth(context)
+      @events << { hook: :before_auth, operation: context.operation_name }
+    end
 
-class SecondMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-    context.metadata[:execution_order] << :second
-  end
-end
+    def after_auth(context)
+      @events << { hook: :after_auth, user: context.session&.security_context&.user }
+    end
 
-class ParamMutatingMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    updated_params = context.params.dup
-    updated_arguments = (updated_params["arguments"] || {}).merge("message" => "mutated by middleware")
-    updated_params["arguments"] = updated_arguments
-    modify_params(context, updated_params)
-  end
-end
+    def on_auth_error(context)
+      @events << { hook: :on_auth_error, error: context.error.class.name }
+    end
 
-class AuthTrackingMiddleware < VectorMCP::Middleware::Base
-  attr_reader :events
-
-  def initialize(config = {})
-    super
-    @events = []
-  end
-
-  def before_auth(context)
-    @events << { hook: :before_auth, operation: context.operation_name }
-  end
-
-  def after_auth(context)
-    @events << { hook: :after_auth, user: context.session&.security_context&.user }
-  end
-
-  def on_auth_error(context)
-    @events << { hook: :on_auth_error, error: context.error.class.name }
-  end
-
-  def before_tool_call(context)
-    @events << { hook: :before_tool_call, user: context.user }
+    def before_tool_call(context)
+      @events << { hook: :before_tool_call, user: context.user }
+    end
   end
 end
 
 RSpec.describe "Middleware Integration" do
   let(:server) { VectorMCP::Server.new(name: "MiddlewareTestServer", version: "1.0.0") }
   let(:session) { VectorMCP::Session.new(server) }
-  let(:middleware) { IntegrationTestMiddleware.new }
+  let(:middleware) { MiddlewareIntegrationSpecSupport::IntegrationTestMiddleware.new }
 
   before do
     # Register middleware
-    server.use_middleware(IntegrationTestMiddleware, %i[
+    server.use_middleware(MiddlewareIntegrationSpecSupport::IntegrationTestMiddleware, %i[
                             before_tool_call after_tool_call on_tool_error
                             before_resource_read after_resource_read
                             before_prompt_get after_prompt_get
@@ -115,7 +117,7 @@ RSpec.describe "Middleware Integration" do
 
     # Get reference to the middleware instance for testing
     # Note: In real usage, you wouldn't need to access the instance directly
-    allow(IntegrationTestMiddleware).to receive(:new).and_return(middleware)
+    allow(MiddlewareIntegrationSpecSupport::IntegrationTestMiddleware).to receive(:new).and_return(middleware)
   end
 
   describe "Tool call middleware integration" do
@@ -231,8 +233,8 @@ RSpec.describe "Middleware Integration" do
       # Clear existing middleware and register new ones with specific priorities
       server.clear_middleware!
 
-      server.use_middleware(SecondMiddleware, :before_tool_call, priority: 20)
-      server.use_middleware(FirstMiddleware, :before_tool_call, priority: 10)
+      server.use_middleware(MiddlewareIntegrationSpecSupport::SecondMiddleware, :before_tool_call, priority: 20)
+      server.use_middleware(MiddlewareIntegrationSpecSupport::FirstMiddleware, :before_tool_call, priority: 10)
 
       server.register_tool(
         name: "priority_test_tool",
@@ -258,7 +260,7 @@ RSpec.describe "Middleware Integration" do
       server.clear_middleware!
 
       # Register middleware only for specific tool
-      server.use_middleware(IntegrationTestMiddleware, :before_tool_call,
+      server.use_middleware(MiddlewareIntegrationSpecSupport::IntegrationTestMiddleware, :before_tool_call,
                             conditions: { only_operations: ["specific_tool"] })
 
       # Register two tools
@@ -291,7 +293,7 @@ RSpec.describe "Middleware Integration" do
   describe "Middleware-driven param mutation" do
     it "allows before hooks to replace params used by the handler" do
       server.clear_middleware!
-      server.use_middleware(ParamMutatingMiddleware, :before_tool_call)
+      server.use_middleware(MiddlewareIntegrationSpecSupport::ParamMutatingMiddleware, :before_tool_call)
 
       server.register_tool(
         name: "mutating_tool",
@@ -316,12 +318,12 @@ RSpec.describe "Middleware Integration" do
   end
 
   describe "Authentication hook integration" do
-    let(:auth_middleware) { AuthTrackingMiddleware.new }
+    let(:auth_middleware) { MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware.new }
 
     before do
       server.clear_middleware!
-      server.use_middleware(AuthTrackingMiddleware, %i[before_auth after_auth on_auth_error before_tool_call])
-      allow(AuthTrackingMiddleware).to receive(:new).and_return(auth_middleware)
+      server.use_middleware(MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware, %i[before_auth after_auth on_auth_error before_tool_call])
+      allow(MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware).to receive(:new).and_return(auth_middleware)
 
       server.enable_authentication!(strategy: :api_key, keys: ["valid-key"])
       session.request_context = {
@@ -371,7 +373,7 @@ RSpec.describe "Middleware Integration" do
     it "allows removing middleware" do
       server.middleware_stats[:total_hooks]
 
-      server.remove_middleware(IntegrationTestMiddleware)
+      server.remove_middleware(MiddlewareIntegrationSpecSupport::IntegrationTestMiddleware)
 
       expect(server.middleware_stats[:total_hooks]).to eq(0)
     end

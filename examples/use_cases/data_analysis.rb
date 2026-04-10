@@ -357,7 +357,7 @@ class DataAnalysisServer
 
     cols.each do |col|
       values = data.map { |row| row[col] }
-      frequency = values.each_with_object(Hash.new(0)) { |value, hash| hash[value] += 1 }
+      frequency = values.tally
 
       distributions[col] = {
         frequency: frequency.sort_by { |_k, v| -v }.first(10).to_h,

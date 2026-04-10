@@ -4,62 +4,64 @@ require "spec_helper"
 require "vector_mcp/middleware"
 
 # Test middleware class for specs
-class TestMiddleware < VectorMCP::Middleware::Base
-  attr_reader :called_hooks
+module MiddlewareSpecSupport
+  class TestMiddleware < VectorMCP::Middleware::Base
+    attr_reader :called_hooks
 
-  def initialize(config = {})
-    super
-    @called_hooks = []
+    def initialize(config = {})
+      super
+      @called_hooks = []
+    end
+
+    def before_tool_call(context)
+      @called_hooks << :before_tool_call
+      context.add_metadata(:test_middleware, "before_executed")
+    end
+
+    def after_tool_call(context)
+      @called_hooks << :after_tool_call
+      context.add_metadata(:test_middleware, "after_executed")
+    end
+
+    def on_tool_error(context)
+      @called_hooks << :on_tool_error
+      # Simulate error handling
+      context.result = {
+        isError: false,
+        content: [{ type: "text", text: "Error handled by middleware" }]
+      }
+    end
   end
 
-  def before_tool_call(context)
-    @called_hooks << :before_tool_call
-    context.add_metadata(:test_middleware, "before_executed")
+  # Failing middleware for error testing
+  class FailingMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(_context)
+      raise StandardError, "Middleware failed"
+    end
   end
 
-  def after_tool_call(context)
-    @called_hooks << :after_tool_call
-    context.add_metadata(:test_middleware, "after_executed")
+  # High priority middleware for priority testing
+  class HighPriorityMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+      context.metadata[:execution_order] << :high_priority
+    end
   end
 
-  def on_tool_error(context)
-    @called_hooks << :on_tool_error
-    # Simulate error handling
-    context.result = {
-      isError: false,
-      content: [{ type: "text", text: "Error handled by middleware" }]
-    }
+  # Low priority middleware for priority testing
+  class LowPriorityMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
+      context.metadata[:execution_order] << :low_priority
+    end
   end
-end
 
-# Failing middleware for error testing
-class FailingMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(_context)
-    raise StandardError, "Middleware failed"
-  end
-end
-
-# High priority middleware for priority testing
-class HighPriorityMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-    context.metadata[:execution_order] << :high_priority
-  end
-end
-
-# Low priority middleware for priority testing
-class LowPriorityMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    context.add_metadata(:execution_order, []) unless context.metadata[:execution_order]
-    context.metadata[:execution_order] << :low_priority
-  end
-end
-
-# Skipping middleware for flow control testing
-class SkippingMiddleware < VectorMCP::Middleware::Base
-  def before_tool_call(context)
-    context.add_metadata(:first_executed, true)
-    context.skip_remaining_hooks = true
+  # Skipping middleware for flow control testing
+  class SkippingMiddleware < VectorMCP::Middleware::Base
+    def before_tool_call(context)
+      context.add_metadata(:first_executed, true)
+      context.skip_remaining_hooks = true
+    end
   end
 end
 
@@ -143,7 +145,7 @@ RSpec.describe VectorMCP::Middleware do
     let(:session) { VectorMCP::Session.new(server, nil, id: "hook-session") }
     let(:hook) do
       VectorMCP::Middleware::Hook.new(
-        TestMiddleware,
+        MiddlewareSpecSupport::TestMiddleware,
         :before_tool_call,
         priority: 50
       )
@@ -160,14 +162,14 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "initializes with correct attributes" do
-      expect(hook.middleware_class).to eq(TestMiddleware)
+      expect(hook.middleware_class).to eq(MiddlewareSpecSupport::TestMiddleware)
       expect(hook.hook_type).to eq("before_tool_call")
       expect(hook.priority).to eq(50)
     end
 
     it "validates hook type" do
       expect do
-        VectorMCP::Middleware::Hook.new(TestMiddleware, :invalid_hook)
+        VectorMCP::Middleware::Hook.new(MiddlewareSpecSupport::TestMiddleware, :invalid_hook)
       end.to raise_error(VectorMCP::Middleware::InvalidHookTypeError)
     end
 
@@ -178,8 +180,8 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "executes hook method" do
-      middleware_instance = TestMiddleware.new
-      expect(TestMiddleware).to receive(:new).and_return(middleware_instance)
+      middleware_instance = MiddlewareSpecSupport::TestMiddleware.new
+      expect(MiddlewareSpecSupport::TestMiddleware).to receive(:new).and_return(middleware_instance)
 
       hook.execute(context)
 
@@ -188,15 +190,15 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "handles hook errors gracefully" do
-      failing_hook = VectorMCP::Middleware::Hook.new(FailingMiddleware, :before_tool_call)
+      failing_hook = VectorMCP::Middleware::Hook.new(MiddlewareSpecSupport::FailingMiddleware, :before_tool_call)
 
       # Should not raise error, but log it
       expect { failing_hook.execute(context) }.not_to raise_error
     end
 
     it "sorts by priority" do
-      high_priority_hook = VectorMCP::Middleware::Hook.new(TestMiddleware, :before_tool_call, priority: 10)
-      low_priority_hook = VectorMCP::Middleware::Hook.new(TestMiddleware, :before_tool_call, priority: 50)
+      high_priority_hook = VectorMCP::Middleware::Hook.new(MiddlewareSpecSupport::TestMiddleware, :before_tool_call, priority: 10)
+      low_priority_hook = VectorMCP::Middleware::Hook.new(MiddlewareSpecSupport::TestMiddleware, :before_tool_call, priority: 50)
 
       expect(high_priority_hook <=> low_priority_hook).to eq(-1)
     end
@@ -204,7 +206,7 @@ RSpec.describe VectorMCP::Middleware do
     context "with conditions" do
       it "respects only_operations condition" do
         conditional_hook = VectorMCP::Middleware::Hook.new(
-          TestMiddleware,
+          MiddlewareSpecSupport::TestMiddleware,
           :before_tool_call,
           conditions: { only_operations: ["allowed_tool"] }
         )
@@ -219,7 +221,7 @@ RSpec.describe VectorMCP::Middleware do
 
       it "respects except_operations condition" do
         conditional_hook = VectorMCP::Middleware::Hook.new(
-          TestMiddleware,
+          MiddlewareSpecSupport::TestMiddleware,
           :before_tool_call,
           conditions: { except_operations: ["blocked_tool"] }
         )
@@ -239,7 +241,7 @@ RSpec.describe VectorMCP::Middleware do
         )
 
         conditional_hook = VectorMCP::Middleware::Hook.new(
-          TestMiddleware,
+          MiddlewareSpecSupport::TestMiddleware,
           :before_tool_call,
           conditions: { only_users: ["user-123"] }
         )
@@ -268,7 +270,7 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "registers middleware for hooks" do
-      manager.register(TestMiddleware, %i[before_tool_call after_tool_call])
+      manager.register(MiddlewareSpecSupport::TestMiddleware, %i[before_tool_call after_tool_call])
 
       stats = manager.stats
       expect(stats[:total_hooks]).to eq(2)
@@ -277,8 +279,8 @@ RSpec.describe VectorMCP::Middleware do
 
     it "executes hooks in priority order" do
       # Register multiple middleware with different priorities
-      manager.register(LowPriorityMiddleware, :before_tool_call, priority: 50)
-      manager.register(HighPriorityMiddleware, :before_tool_call, priority: 10)
+      manager.register(MiddlewareSpecSupport::LowPriorityMiddleware, :before_tool_call, priority: 50)
+      manager.register(MiddlewareSpecSupport::HighPriorityMiddleware, :before_tool_call, priority: 10)
 
       result_context = manager.execute_hooks(:before_tool_call, context)
 
@@ -287,8 +289,8 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "stops execution when skip_remaining_hooks is set" do
-      manager.register(SkippingMiddleware, :before_tool_call, priority: 10)
-      manager.register(TestMiddleware, :before_tool_call, priority: 20)
+      manager.register(MiddlewareSpecSupport::SkippingMiddleware, :before_tool_call, priority: 10)
+      manager.register(MiddlewareSpecSupport::TestMiddleware, :before_tool_call, priority: 20)
 
       result_context = manager.execute_hooks(:before_tool_call, context)
 
@@ -297,15 +299,15 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "unregisters middleware" do
-      manager.register(TestMiddleware, :before_tool_call)
+      manager.register(MiddlewareSpecSupport::TestMiddleware, :before_tool_call)
       expect(manager.stats[:total_hooks]).to eq(1)
 
-      manager.unregister(TestMiddleware)
+      manager.unregister(MiddlewareSpecSupport::TestMiddleware)
       expect(manager.stats[:total_hooks]).to eq(0)
     end
 
     it "clears all hooks" do
-      manager.register(TestMiddleware, %i[before_tool_call after_tool_call])
+      manager.register(MiddlewareSpecSupport::TestMiddleware, %i[before_tool_call after_tool_call])
       expect(manager.stats[:total_hooks]).to eq(2)
 
       manager.clear!
@@ -313,7 +315,7 @@ RSpec.describe VectorMCP::Middleware do
     end
 
     it "provides execution timing metadata" do
-      manager.register(TestMiddleware, :before_tool_call)
+      manager.register(MiddlewareSpecSupport::TestMiddleware, :before_tool_call)
 
       result_context = manager.execute_hooks(:before_tool_call, context)
 
