@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+* **OAuth 2.1 Resource Server mode (HTTP Stream transport)**: `enable_authentication!` now accepts a `resource_metadata_url:` option. When set, unauthenticated requests to `/mcp` return HTTP `401` with a `WWW-Authenticate: Bearer realm="mcp", resource_metadata="<url>"` header (RFC 9728), enabling MCP clients such as Claude Desktop to discover the authorization server and initiate OAuth 2.1 + PKCE flows. Opt-in: when `resource_metadata_url` is not set, the existing JSON-RPC `-32401` behavior is unchanged. See [docs/oauth_resource_server.md](docs/oauth_resource_server.md) and [docs/rails_oauth_integration.md](docs/rails_oauth_integration.md) for end-to-end guidance.
+
 ## [0.4.0] – 2026-04-10
 
 ### Added

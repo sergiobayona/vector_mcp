@@ -345,6 +345,7 @@ module VectorMCP
       # Validates origin and dispatches to the appropriate handler by HTTP method.
       def validate_and_dispatch(method, env)
         return forbidden_response("Origin not allowed") unless valid_origin?(env)
+        return unauthorized_oauth_response(env) if oauth_gate_should_reject?(env)
 
         case method
         when "POST"
@@ -356,6 +357,73 @@ module VectorMCP
         else
           method_not_allowed_response(%w[POST GET DELETE])
         end
+      end
+
+      # True when OAuth 2.1 resource server mode is enabled and the incoming
+      # request has not successfully authenticated. Opt-in: only activates when the
+      # server was configured with a +resource_metadata_url+ via +enable_authentication!+.
+      #
+      # @param env [Hash] The Rack environment
+      # @return [Boolean]
+      def oauth_gate_should_reject?(env)
+        return false unless oauth_resource_server_enabled?
+
+        !authenticate_transport_request(env).authenticated?
+      end
+
+      # @return [Boolean] true when the server is configured to act as an OAuth 2.1 resource server.
+      def oauth_resource_server_enabled?
+        return false unless @server.respond_to?(:oauth_resource_metadata_url)
+        return false if @server.oauth_resource_metadata_url.nil?
+
+        @server.auth_manager.required?
+      end
+
+      # Runs the configured authentication strategy against the Rack env and returns
+      # the resulting SessionContext. The request is normalized into the
+      # +{ headers:, params:, method:, path:, rack_env: }+ hash shape that the rest
+      # of the codebase's authentication pipeline uses (see
+      # +VectorMCP::Handlers::Core.extract_request_from_session+), so +:custom+
+      # strategy handlers see the same contract here as they do on the in-handler
+      # auth path. Errors in the strategy are logged and treated as unauthenticated
+      # rather than propagated, so a malformed token can never crash the request
+      # pipeline.
+      #
+      # @param env [Hash] The Rack environment
+      # @return [VectorMCP::Security::SessionContext]
+      def authenticate_transport_request(env)
+        normalized_request = @server.security_middleware.normalize_request(env)
+        @server.security_middleware.authenticate_request(normalized_request)
+      rescue StandardError => e
+        VectorMCP.logger_for("security").warn do
+          "OAuth transport auth strategy raised #{e.class}: #{e.message}"
+        end
+        VectorMCP::Security::SessionContext.anonymous
+      end
+
+      # Returns a 401 Rack response carrying a WWW-Authenticate header that points
+      # Claude Desktop (and other RFC 9728 clients) at the configured OAuth 2.1
+      # protected resource metadata document. The JSON-RPC error envelope in the
+      # body is for clients that parse bodies regardless of status code; the header
+      # and status are the parts that drive the discovery flow.
+      #
+      # @param env [Hash] The Rack environment
+      # @return [Array] Rack response triplet
+      def unauthorized_oauth_response(env)
+        VectorMCP.logger_for("security").info do
+          "OAuth 401 challenge issued for #{env["REQUEST_METHOD"]} #{env["PATH_INFO"]}"
+        end
+
+        header_value = %(Bearer realm="mcp", resource_metadata="#{@server.oauth_resource_metadata_url}")
+        body = {
+          jsonrpc: "2.0",
+          id: nil,
+          error: { code: -32_401, message: "Authentication required" }
+        }.to_json
+
+        [401,
+         { "Content-Type" => "application/json", "WWW-Authenticate" => header_value },
+         [body]]
       end
 
       # Handles POST requests (client-to-server JSON-RPC)

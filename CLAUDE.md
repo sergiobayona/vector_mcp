@@ -331,6 +331,29 @@ server.enable_authorization! do
 end
 ```
 
+**Enable OAuth 2.1 Resource Server Mode (HTTP Stream transport):**
+When `resource_metadata_url:` is passed to `enable_authentication!`, unauthenticated
+requests to `/mcp` receive HTTP `401` with a `WWW-Authenticate: Bearer realm="mcp",
+resource_metadata="<url>"` header (RFC 9728). MCP clients such as Claude Desktop
+use this to discover the authorization server and initiate an OAuth 2.1 + PKCE flow.
+The `GET /` health check endpoint remains unauthenticated.
+
+```ruby
+server.enable_authentication!(
+  strategy: :custom,
+  resource_metadata_url: "https://app.example.com/.well-known/oauth-protected-resource"
+) do |request|
+  # Resolve the bearer token to a user (e.g. via Doorkeeper in a Rails app)
+  token = request[:headers]["Authorization"]&.sub(/\ABearer /, "")
+  Doorkeeper::AccessToken.by_token(token)&.then { |at| User.find(at.resource_owner_id) if at.acceptable?(nil) }
+end
+```
+
+Default behavior (no `resource_metadata_url`) is unchanged: auth failures continue
+to surface as JSON-RPC `-32401` errors. See `docs/oauth_resource_server.md` for the
+feature reference and `docs/rails_oauth_integration.md` for a full Rails + Doorkeeper
+recipe.
+
 ### Security Testing
 
 **Comprehensive Test Coverage:**

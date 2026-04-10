@@ -72,7 +72,7 @@ module VectorMCP
     SUPPORTED_PROTOCOL_VERSIONS = %w[2025-11-25 2025-03-26 2024-11-05].freeze
 
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests,
-                :auth_manager, :authorization, :security_middleware, :middleware_manager
+                :auth_manager, :authorization, :security_middleware, :middleware_manager, :oauth_resource_metadata_url
     attr_accessor :transport
 
     # Initializes a new VectorMCP server.
@@ -122,6 +122,7 @@ module VectorMCP
       @auth_manager = Security::AuthManager.new
       @authorization = Security::Authorization.new
       @security_middleware = Security::Middleware.new(@auth_manager, @authorization)
+      @oauth_resource_metadata_url = nil
 
       # Initialize middleware manager
       @middleware_manager = Middleware::Manager.new
@@ -188,10 +189,20 @@ module VectorMCP
     # Enable authentication with specified strategy and configuration
     # @param strategy [Symbol] the authentication strategy (:api_key, :jwt, :custom)
     # @param options [Hash] strategy-specific configuration options
+    # @option options [String] :resource_metadata_url OAuth 2.1 protected resource metadata URL
+    #   (RFC 9728). When provided, unauthenticated requests to the HTTP Stream transport's MCP
+    #   endpoint return HTTP 401 with a +WWW-Authenticate: Bearer+ header pointing at this URL,
+    #   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
+    #   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
+    #   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
     # @return [void]
     def enable_authentication!(strategy: :api_key, **options, &block)
       # Clear existing strategies when switching to a new configuration
       clear_auth_strategies unless @auth_manager.strategies.empty?
+
+      # Extract OAuth resource metadata URL before forwarding options to strategy constructors
+      @oauth_resource_metadata_url = options.delete(:resource_metadata_url)
+      warn_on_insecure_oauth_metadata_url(@oauth_resource_metadata_url)
 
       @auth_manager.enable!(default_strategy: strategy)
 
@@ -217,6 +228,7 @@ module VectorMCP
     # @return [void]
     def disable_authentication!
       @auth_manager.disable!
+      @oauth_resource_metadata_url = nil
       @logger.info("Authentication disabled")
     end
 
@@ -348,6 +360,20 @@ module VectorMCP
     def clear_auth_strategies
       @auth_manager.strategies.each_key do |strategy_name|
         @auth_manager.remove_strategy(strategy_name)
+      end
+    end
+
+    # Emit a warning when the OAuth resource metadata URL is not HTTPS.
+    # We don't raise because local development against http://localhost is a valid use case.
+    # @param url [String, nil] the configured metadata URL
+    # @return [void]
+    def warn_on_insecure_oauth_metadata_url(url)
+      return if url.nil?
+      return if url.start_with?("https://")
+
+      @logger.warn do
+        "[SECURITY] resource_metadata_url is not HTTPS (#{url}). " \
+          "Use HTTPS in production; plaintext is only acceptable for local development."
       end
     end
   end

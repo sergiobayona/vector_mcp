@@ -125,6 +125,96 @@ RSpec.describe VectorMCP::Server, "Security Features" do
       expect(server.auth_manager.default_strategy).to be_nil
       expect(logger_double).to have_received(:info).with("Authentication disabled")
     end
+
+    it "clears oauth_resource_metadata_url" do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["test-key"],
+        resource_metadata_url: "https://example.test/.well-known/oauth-protected-resource"
+      )
+      expect(server.oauth_resource_metadata_url).not_to be_nil
+
+      server.disable_authentication!
+
+      expect(server.oauth_resource_metadata_url).to be_nil
+    end
+  end
+
+  describe "OAuth 2.1 resource server configuration" do
+    it "defaults oauth_resource_metadata_url to nil" do
+      expect(server.oauth_resource_metadata_url).to be_nil
+    end
+
+    it "stores resource_metadata_url when passed to enable_authentication!" do
+      url = "https://example.test/.well-known/oauth-protected-resource"
+      server.enable_authentication!(strategy: :api_key, keys: ["k"], resource_metadata_url: url)
+
+      expect(server.oauth_resource_metadata_url).to eq(url)
+    end
+
+    it "leaves oauth_resource_metadata_url nil when not provided (legacy mode)" do
+      server.enable_authentication!(strategy: :api_key, keys: ["k"])
+
+      expect(server.oauth_resource_metadata_url).to be_nil
+    end
+
+    it "does not forward resource_metadata_url to the strategy constructor" do
+      # If the option leaked through to ApiKey.new, it would raise ArgumentError
+      # because ApiKey only accepts :keys and :allow_query_params.
+      expect do
+        server.enable_authentication!(
+          strategy: :api_key,
+          keys: ["k"],
+          resource_metadata_url: "https://example.test/meta"
+        )
+      end.not_to raise_error
+    end
+
+    it "warns when resource_metadata_url is not HTTPS" do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["k"],
+        resource_metadata_url: "http://localhost/meta"
+      )
+
+      expect(logger_double).to have_received(:warn)
+    end
+
+    it "does not warn when resource_metadata_url is HTTPS" do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["k"],
+        resource_metadata_url: "https://example.test/meta"
+      )
+
+      expect(logger_double).not_to have_received(:warn)
+    end
+
+    it "replaces an earlier resource_metadata_url when re-enabling auth" do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["k"],
+        resource_metadata_url: "https://first.example/meta"
+      )
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["k"],
+        resource_metadata_url: "https://second.example/meta"
+      )
+
+      expect(server.oauth_resource_metadata_url).to eq("https://second.example/meta")
+    end
+
+    it "clears a previously configured resource_metadata_url when re-enabling without it" do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["k"],
+        resource_metadata_url: "https://first.example/meta"
+      )
+      server.enable_authentication!(strategy: :api_key, keys: ["k"])
+
+      expect(server.oauth_resource_metadata_url).to be_nil
+    end
   end
 
   describe "#enable_authorization!" do

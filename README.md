@@ -188,6 +188,8 @@ server.enable_authentication!(strategy: :custom) do |request|
 end
 ```
 
+For MCP clients that speak OAuth 2.1 (e.g. Claude Desktop), pass a `resource_metadata_url:` to turn on RFC 9728 discovery. Unauthenticated requests to `/mcp` return `401` with a `WWW-Authenticate` header pointing at the configured metadata document, and the client drives the rest of the OAuth dance automatically. See [docs/oauth_resource_server.md](./docs/oauth_resource_server.md) for the feature reference and [docs/rails_oauth_integration.md](./docs/rails_oauth_integration.md) for a full Rails + Doorkeeper recipe.
+
 Middleware can hook into tool, resource, prompt, sampling, auth, and transport events, including `before_auth`, `after_auth`, `on_auth_error`, `before_request`, `after_response`, and `on_transport_error`.
 
 See [security/README.md](./security/README.md) for the full security guide.
@@ -223,6 +225,8 @@ curl -X POST http://localhost:8080/mcp \
 - [CHANGELOG.md](./CHANGELOG.md)
 - [examples/](./examples/)
 - [docs/rails-setup-guide.md](./docs/rails-setup-guide.md)
+- [docs/rails_oauth_integration.md](./docs/rails_oauth_integration.md)
+- [docs/oauth_resource_server.md](./docs/oauth_resource_server.md)
 - [docs/streamable-http-spec-compliance.md](./docs/streamable-http-spec-compliance.md)
 - [security/README.md](./security/README.md)
 - [MCP Specification](https://modelcontextprotocol.io/)
