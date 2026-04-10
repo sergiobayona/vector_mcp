@@ -59,6 +59,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       allow(mock_session).to receive(:streaming_connection=)
       allow(mock_session_manager).to receive(:set_streaming_connection)
       allow(mock_event_store).to receive(:store_event).and_return("event-456")
+      allow(mock_event_store).to receive(:get_event).and_return(nil)
     end
 
     it "extracts Last-Event-ID from headers" do
@@ -107,7 +108,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
   describe "#send_message_to_session" do
     let(:message) { { "jsonrpc" => "2.0", "method" => "test", "params" => { "data" => "test" } } }
-    let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection) }
+    let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "test-stream-id") }
     let(:mock_yielder) { instance_double(Enumerator::Yielder) }
 
     before do
@@ -163,7 +164,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       it "cleans up connection on error" do
         allow(mock_yielder).to receive(:<<).and_raise(StandardError.new("Connection closed"))
-        expect(mock_session_manager).to receive(:remove_streaming_connection).with(mock_session)
+        expect(mock_session_manager).to receive(:remove_streaming_connection).with(mock_session, mock_connection)
 
         stream_handler.send_message_to_session(mock_session, message)
       end
@@ -270,6 +271,76 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         result = stream_handler.send_message_to_session(mock_session, message)
 
         expect(result).to be false
+      end
+    end
+
+    context "when multiple streams are active for the same session" do
+      let(:mock_connection1) do
+        instance_double(
+          VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection,
+          stream_id: "stream-1",
+          closed?: false,
+          from_get?: false,
+          yielder: mock_yielder1,
+          close: nil
+        )
+      end
+      let(:mock_connection2) do
+        instance_double(
+          VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection,
+          stream_id: "stream-2",
+          closed?: false,
+          from_get?: false,
+          yielder: mock_yielder2,
+          close: nil
+        )
+      end
+      let(:mock_yielder1) do
+        instance_double(Enumerator::Yielder).tap do |yielder|
+          allow(yielder).to receive(:<<)
+        end
+      end
+      let(:mock_yielder2) do
+        instance_double(Enumerator::Yielder).tap do |yielder|
+          allow(yielder).to receive(:<<)
+        end
+      end
+
+      before do
+        allow(mock_session).to receive(:streaming?).and_return(true)
+        allow(mock_session_manager).to receive(:remove_streaming_connection)
+        allow(mock_event_store).to receive(:store_event).and_return("event-789")
+
+        mock_session.add_streaming_connection(mock_connection1)
+        mock_session.add_streaming_connection(mock_connection2)
+
+        active_connections = stream_handler.instance_variable_get(:@active_connections)
+        active_connections["stream-1"] = mock_connection1
+        active_connections["stream-2"] = mock_connection2
+      end
+
+      it "routes the message to the preferred connection only" do
+        result = stream_handler.send_message_to_session(mock_session, message)
+
+        expect(result).to be true
+        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message",
+                                                                     hash_including(session_id: session_id,
+                                                                                    stream_id: "stream-2"))
+        expect(mock_yielder1).not_to have_received(:<<)
+        expect(mock_yielder2).to have_received(:<<)
+      end
+
+      it "falls back to another active connection when the preferred connection is closed" do
+        allow(mock_connection2).to receive(:closed?).and_return(true)
+
+        result = stream_handler.send_message_to_session(mock_session, message)
+
+        expect(result).to be true
+        expect(mock_event_store).to have_received(:store_event).with(message.to_json, "message",
+                                                                     hash_including(session_id: session_id,
+                                                                                    stream_id: "stream-1"))
+        expect(mock_yielder1).to have_received(:<<)
+        expect(mock_yielder2).not_to have_received(:<<)
       end
     end
   end
@@ -431,7 +502,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     end
 
     describe "#cleanup_connection" do
-      let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection) }
+      let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "cleanup-stream-id") }
 
       before do
         allow(mock_connection).to receive(:close)
@@ -462,7 +533,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
         stream_handler.send(:cleanup_connection, mock_session)
 
-        expect(mock_session_manager).to have_received(:remove_streaming_connection).with(mock_session)
+        expect(mock_session_manager).to have_received(:remove_streaming_connection).with(mock_session, mock_connection)
       end
 
       it "logs cleanup activity" do
@@ -476,6 +547,38 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       it "handles missing connection gracefully" do
         expect { stream_handler.send(:cleanup_connection, mock_session) }.not_to raise_error
+      end
+    end
+
+    describe "#resolve_stream_id" do
+      it "reuses the originating stream ID when Last-Event-ID belongs to the session" do
+        stored_event = VectorMCP::Transport::HttpStream::EventStore::Event.new(
+          "event-123", "{}", "message", Time.now, session_id, "stream-original"
+        )
+        allow(mock_event_store).to receive(:get_event).with("event-123").and_return(stored_event)
+
+        result = stream_handler.send(:resolve_stream_id, mock_session, "event-123", :get)
+
+        expect(result).to eq("stream-original")
+      end
+
+      it "falls back to a new stream ID when Last-Event-ID is unknown" do
+        allow(mock_event_store).to receive(:get_event).with("missing-event").and_return(nil)
+
+        result = stream_handler.send(:resolve_stream_id, mock_session, "missing-event", :get)
+
+        expect(result).to start_with("#{session_id}-get-")
+      end
+
+      it "falls back to a new stream ID when Last-Event-ID belongs to another session" do
+        stored_event = VectorMCP::Transport::HttpStream::EventStore::Event.new(
+          "event-123", "{}", "message", Time.now, "other-session", "other-stream"
+        )
+        allow(mock_event_store).to receive(:get_event).with("event-123").and_return(stored_event)
+
+        result = stream_handler.send(:resolve_stream_id, mock_session, "event-123", :get)
+
+        expect(result).to start_with("#{session_id}-get-")
       end
     end
   end
@@ -544,11 +647,11 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(mock_event1).to receive(:to_sse_format).and_return("id: event-457\ndata: test1\n\n")
         allow(mock_event2).to receive(:to_sse_format).and_return("id: event-458\ndata: test2\n\n")
         allow(mock_event_store).to receive(:get_events_after)
-          .with(last_event_id, session_id: session_id)
+          .with(last_event_id, session_id: session_id, stream_id: test_stream_id)
           .and_return([mock_event1, mock_event2])
       end
 
-      it "replays missed events after Last-Event-ID scoped to session" do
+      it "replays missed events after Last-Event-ID scoped to the originating stream" do
         expect(mock_logger).to receive(:info).with(/Replaying 2 missed events from #{last_event_id}/)
 
         stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, test_stream_id)
@@ -559,7 +662,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       it "handles empty missed events" do
         allow(mock_event_store).to receive(:get_events_after)
-          .with(last_event_id, session_id: session_id)
+          .with(last_event_id, session_id: session_id, stream_id: test_stream_id)
           .and_return([])
 
         expect(mock_logger).to receive(:info).with(/Replaying 0 missed events/)
@@ -567,21 +670,19 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, test_stream_id)
       end
 
-      it "replays events by session_id only, not stream_id (reconnection scenario)" do
-        # When a client reconnects, the new stream has a different stream_id.
-        # replay_events must find events from the OLD stream by session_id only.
+      it "does not replay events from a different stream" do
         expect(mock_event_store).to receive(:get_events_after)
-          .with(last_event_id, session_id: session_id)
+          .with(last_event_id, session_id: session_id, stream_id: "original-stream")
           .and_return([mock_event1])
 
-        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, "completely-new-stream-id")
+        stream_handler.send(:replay_events, mock_yielder, last_event_id, mock_session, "original-stream")
 
         expect(mock_yielder).to have_received(:<<).with("id: event-457\ndata: test1\n\n")
       end
     end
 
     describe "heartbeat functionality" do
-      let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection) }
+      let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "heartbeat-stream-id") }
       let(:test_stream_id) { "test-heartbeat-stream" }
 
       before do
@@ -717,7 +818,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
   describe "error handling scenarios" do
     let(:mock_yielder) { instance_double(Enumerator::Yielder) }
-    let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection) }
+    let(:mock_connection) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "error-stream-id") }
 
     describe "streaming thread errors" do
       before do
@@ -747,7 +848,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       it "ensures connection cleanup on thread error" do
         # Test that cleanup_connection is called when an error occurs in the thread
         allow(stream_handler).to receive(:stream_to_client).and_raise(StandardError.new("Thread error"))
-        expect(stream_handler).to receive(:cleanup_connection).with(mock_session)
+        expect(stream_handler).to receive(:cleanup_connection).with(mock_session, anything)
 
         enumerator = stream_handler.send(:create_sse_stream, mock_session, nil)
         # The error is caught and cleanup happens inside the thread

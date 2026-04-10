@@ -20,7 +20,7 @@ RSpec.describe VectorMCP::Transport::HttpStream, "#send_request sampling support
 
     context "when streaming session exists" do
       let(:session) { session_manager.create_session }
-      let(:mock_connection) { double("StreamingConnection", close: nil) }
+      let(:mock_connection) { double("StreamingConnection", close: nil, stream_id: "stream-1") }
 
       before do
         session_manager.set_streaming_connection(session, mock_connection)
@@ -65,7 +65,7 @@ RSpec.describe VectorMCP::Transport::HttpStream, "#send_request sampling support
 
   describe "#send_request_to_session" do
     let(:session) { session_manager.create_session }
-    let(:mock_connection) { double("StreamingConnection", close: nil) }
+    let(:mock_connection) { double("StreamingConnection", close: nil, stream_id: "stream-1") }
 
     before do
       session_manager.set_streaming_connection(session, mock_connection)
@@ -104,7 +104,7 @@ RSpec.describe VectorMCP::Transport::HttpStream, "#send_request sampling support
 
   describe "response handling" do
     let(:session) { session_manager.create_session }
-    let(:mock_connection) { double("StreamingConnection", close: nil) }
+    let(:mock_connection) { double("StreamingConnection", close: nil, stream_id: "stream-1") }
 
     before do
       session_manager.set_streaming_connection(session, mock_connection)

@@ -607,13 +607,14 @@ module VectorMCP
       def sse_rpc_response(result, request_id, headers = {}, session_id: nil)
         response = { jsonrpc: "2.0", id: request_id, result: result }
         event_data = response.to_json
+        stream_id = generate_sse_stream_id(session_id, :post)
 
         # Priming event per MCP spec: event ID + empty data field
-        prime_event_id = @event_store.store_event("", nil, session_id: session_id)
+        prime_event_id = @event_store.store_event("", nil, session_id: session_id, stream_id: stream_id)
         prime_event = "id: #{prime_event_id}\ndata:\n\n"
 
         # Actual response event
-        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id, stream_id: stream_id)
         sse_event = format_sse_event(event_data, "message", event_id)
 
         response_headers = {
@@ -631,12 +632,13 @@ module VectorMCP
         error_obj[:data] = data if data
         response = { jsonrpc: "2.0", id: id, error: error_obj }
         event_data = response.to_json
+        stream_id = generate_sse_stream_id(session_id, :post)
 
         # Priming event per MCP spec
-        prime_event_id = @event_store.store_event("", nil, session_id: session_id)
+        prime_event_id = @event_store.store_event("", nil, session_id: session_id, stream_id: stream_id)
         prime_event = "id: #{prime_event_id}\ndata:\n\n"
 
-        event_id = @event_store.store_event(event_data, "message", session_id: session_id)
+        event_id = @event_store.store_event(event_data, "message", session_id: session_id, stream_id: stream_id)
         sse_event = format_sse_event(event_data, "message", event_id)
 
         response_headers = {
@@ -971,6 +973,11 @@ module VectorMCP
         # Thread-safe request ID generation - avoid Fiber/Enumerator which can't cross threads
         @request_id_base = "vecmcp_http_#{Process.pid}_#{SecureRandom.hex(4)}"
         @request_id_counter = Concurrent::AtomicFixnum.new(0)
+      end
+
+      def generate_sse_stream_id(session_id, origin)
+        session_label = session_id || "anonymous"
+        "#{session_label}-#{origin}-#{SecureRandom.hex(4)}"
       end
 
       # Generate a unique, thread-safe request ID for server-initiated requests

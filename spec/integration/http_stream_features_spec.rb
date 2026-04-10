@@ -676,6 +676,39 @@ RSpec.describe "HTTP Stream Transport - Streaming Features", type: :integration 
         client1.stop_streaming
         client2.stop_streaming
       end
+
+      it "supports multiple concurrent streams for the same session without duplicating delivery" do
+        session_id = initialize_mcp_session(base_url)
+        client1 = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
+        client2 = StreamingTestHelpers::MockStreamingClient.new(session_id, base_url)
+        stream1_requests = 0
+        stream2_requests = 0
+
+        client1.set_sampling_response("sampling/createMessage", "Response from stream 1")
+        client2.set_sampling_response("sampling/createMessage", "Response from stream 2")
+
+        client1.on_method("sampling/createMessage") { |_event| stream1_requests += 1 }
+        client2.on_method("sampling/createMessage") { |_event| stream2_requests += 1 }
+
+        client1.start_streaming
+        client2.start_streaming
+
+        response = call_tool(base_url, session_id, "session_specific_tool", {
+                               message: "Test multi-stream session routing"
+                             })
+
+        sleep(1)
+
+        expect(client1.connected?).to be true
+        expect(client2.connected?).to be true
+        expect(stream1_requests + stream2_requests).to eq(1)
+        expect(stream2_requests).to eq(1)
+        expect(stream1_requests).to eq(0)
+        expect(response["session_id"]).to eq(session_id) if response["session_id"]
+
+        client1.stop_streaming
+        client2.stop_streaming
+      end
     end
 
     describe "3.3 Connection Cleanup" do

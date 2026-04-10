@@ -34,7 +34,7 @@ module VectorMCP
           end
 
           def streaming?
-            metadata[:streaming_connection] && !metadata[:streaming_connection].nil?
+            !streaming_connection.nil? || !streaming_connections.empty?
           end
 
           def streaming_connection
@@ -43,6 +43,25 @@ module VectorMCP
 
           def streaming_connection=(connection)
             metadata[:streaming_connection] = connection
+          end
+
+          def streaming_connections
+            metadata[:streaming_connections] ||= Concurrent::Hash.new
+          end
+
+          def add_streaming_connection(connection)
+            streaming_connections[connection.stream_id] = connection
+            self.streaming_connection = connection
+          end
+
+          def remove_streaming_connection(connection = nil)
+            if connection
+              streaming_connections.delete(connection.stream_id)
+              self.streaming_connection = streaming_connections.values.first if streaming_connection == connection
+            else
+              streaming_connections.clear
+              self.streaming_connection = nil
+            end
           end
         end
 
@@ -64,7 +83,7 @@ module VectorMCP
                             end
 
           # Pre-allocate metadata hash for better performance
-          metadata = { streaming_connection: nil }
+          metadata = create_session_metadata
 
           # Create internal session record with streaming connection metadata
           session = Session.new(session_id, session_context, now, now, metadata)
@@ -131,17 +150,18 @@ module VectorMCP
         # @param connection [Object] The streaming connection object
         # @return [void]
         def set_streaming_connection(session, connection)
-          session.streaming_connection = connection
+          session.add_streaming_connection(connection)
           session.touch!
-          logger.debug { "Streaming connection associated: #{session.id}" }
+          logger.debug { "Streaming connection associated: #{session.id} (stream #{connection.stream_id})" }
         end
 
         # Removes streaming connection from a session.
         #
         # @param session [Session] The session to remove streaming from
+        # @param connection [Object, nil] The specific connection to remove, or nil to clear all
         # @return [void]
-        def remove_streaming_connection(session)
-          session.streaming_connection = nil
+        def remove_streaming_connection(session, connection = nil)
+          session.remove_streaming_connection(connection)
           session.touch!
           logger.debug { "Streaming connection removed: #{session.id}" }
         end
@@ -155,7 +175,7 @@ module VectorMCP
 
         # Override: Returns metadata for new HTTP stream sessions.
         def create_session_metadata
-          { streaming_connection: nil }
+          { streaming_connection: nil, streaming_connections: Concurrent::Hash.new }
         end
 
         # Override: Checks if a session can receive messages (has streaming connection).
@@ -175,15 +195,18 @@ module VectorMCP
         # @param session [Session] The session whose connection to close
         # @return [void]
         def close_streaming_connection(session)
-          return unless session&.streaming_connection
+          return unless session&.streaming?
 
-          begin
-            session.streaming_connection.close
+          connections = session.streaming_connections.values
+          connections = [session.streaming_connection] if connections.empty? && session.streaming_connection
+
+          connections.each do |connection|
+            connection.close
           rescue StandardError => e
             logger.warn { "Error closing streaming connection for #{session.id}: #{e.message}" }
           end
 
-          session.streaming_connection = nil
+          session.remove_streaming_connection
         end
       end
     end

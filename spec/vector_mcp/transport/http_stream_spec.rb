@@ -22,7 +22,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       logger: mock_logger,
       server_info: mock_server_info,
       server_capabilities: mock_server_capabilities,
-      protocol_version: "2024-11-05",
+      protocol_version: "2025-11-25",
       handle_message: "success",
       security_middleware: nil,
       middleware_manager: nil
@@ -314,6 +314,16 @@ RSpec.describe VectorMCP::Transport::HttpStream do
               .to change { transport.event_store.event_count }.by(2) # priming event + data event
           end
 
+          it "stores POST SSE events under a single stream ID" do
+            post "/mcp", json_request.to_json, sse_accept_headers
+
+            events = transport.event_store.get_events_after(nil)
+
+            expect(events.length).to eq(2)
+            expect(events.map(&:stream_id).uniq.length).to eq(1)
+            expect(events.first.stream_id).not_to be_nil
+          end
+
           it "sends a priming event before the data event" do
             post "/mcp", json_request.to_json, sse_accept_headers
 
@@ -596,7 +606,14 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           expect(last_response.status).to eq(200)
         end
 
-        it "allows POST requests with a supported protocol version" do
+        it "allows POST requests with the latest supported protocol version" do
+          post "/mcp", request_body.to_json,
+               post_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "2025-11-25")
+
+          expect(last_response.status).to eq(200)
+        end
+
+        it "allows POST requests with the backwards-compatible 2025-03-26 version" do
           post "/mcp", request_body.to_json,
                post_headers.merge("HTTP_MCP_PROTOCOL_VERSION" => "2025-03-26")
 

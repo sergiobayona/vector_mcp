@@ -226,16 +226,31 @@ RSpec.describe VectorMCP::Transport::HttpStream::EventStore do
     context "resumability across reconnections" do
       let(:store) { described_class.new(100) }
 
-      it "replays events by session_id regardless of stream_id (reconnection scenario)" do
-        # Original connection stores events with old stream_id
+      it "can resolve the original stream for a retained event ID" do
         old_ids = 3.times.map { |i| store.store_event("msg-#{i}", "message", session_id: "sess-1", stream_id: "old-stream") }
 
-        # Client reconnects — replay should find events by session only, not stream
-        events = store.get_events_after(nil, session_id: "sess-1")
+        event = store.get_event(old_ids.last)
 
-        expect(events.length).to eq(3)
-        expect(events.map(&:data)).to eq(%w[msg-0 msg-1 msg-2])
+        expect(event).not_to be_nil
+        expect(event.stream_id).to eq("old-stream")
+        expect(event.session_id).to eq("sess-1")
       end
+    end
+  end
+
+  describe "#get_event" do
+    it "returns the stored event for a known ID" do
+      event_id = event_store.store_event("payload", "message", session_id: "session-1", stream_id: "stream-1")
+
+      event = event_store.get_event(event_id)
+
+      expect(event.id).to eq(event_id)
+      expect(event.data).to eq("payload")
+      expect(event.stream_id).to eq("stream-1")
+    end
+
+    it "returns nil for an unknown event ID" do
+      expect(event_store.get_event("missing-event")).to be_nil
     end
   end
 

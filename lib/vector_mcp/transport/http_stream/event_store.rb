@@ -95,6 +95,17 @@ module VectorMCP
           events
         end
 
+        # Retrieves a specific event by ID.
+        #
+        # @param event_id [String] The event ID to look up
+        # @return [Event, nil] The stored event, or nil if it is no longer retained
+        def get_event(event_id)
+          index = @event_index[event_id]
+          return nil if index.nil?
+
+          @events[index]
+        end
+
         # Gets the total number of stored events.
         #
         # @return [Integer] Number of events currently stored

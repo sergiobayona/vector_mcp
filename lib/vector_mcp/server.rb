@@ -66,10 +66,10 @@ module VectorMCP
     include MessageHandling
 
     # The specific version of the Model Context Protocol this server implements.
-    PROTOCOL_VERSION = "2025-03-26"
+    PROTOCOL_VERSION = "2025-11-25"
 
     # All protocol versions this server accepts via the MCP-Protocol-Version header.
-    SUPPORTED_PROTOCOL_VERSIONS = %w[2025-03-26 2024-11-05].freeze
+    SUPPORTED_PROTOCOL_VERSIONS = %w[2025-11-25 2025-03-26 2024-11-05].freeze
 
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests,
                 :auth_manager, :authorization, :security_middleware, :middleware_manager

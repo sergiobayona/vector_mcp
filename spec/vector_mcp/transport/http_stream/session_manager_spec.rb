@@ -227,8 +227,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
       it "cleans up streaming connection if present" do
         # Set up a mock streaming connection
-        connection = instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection)
-        existing_session.streaming_connection = connection
+        connection = instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "stream-1")
+        session_manager.set_streaming_connection(existing_session, connection)
 
         expect(connection).to receive(:close)
 
@@ -248,6 +248,47 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
 
         expect(result).to be false
       end
+    end
+  end
+
+  describe "multi-stream session support" do
+    let(:session) { session_manager.create_session("multi-stream-session") }
+    let(:connection1) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "stream-1") }
+    let(:connection2) { instance_double(VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection, stream_id: "stream-2") }
+
+    before do
+      allow(connection1).to receive(:close)
+      allow(connection2).to receive(:close)
+    end
+
+    it "tracks multiple streaming connections for one session" do
+      session_manager.set_streaming_connection(session, connection1)
+      session_manager.set_streaming_connection(session, connection2)
+
+      expect(session.streaming_connections.keys).to contain_exactly("stream-1", "stream-2")
+      expect(session.streaming_connection).to eq(connection2)
+      expect(session).to be_streaming
+    end
+
+    it "removes only the specified streaming connection" do
+      session_manager.set_streaming_connection(session, connection1)
+      session_manager.set_streaming_connection(session, connection2)
+
+      session_manager.remove_streaming_connection(session, connection2)
+
+      expect(session.streaming_connections.keys).to contain_exactly("stream-1")
+      expect(session.streaming_connection).to eq(connection1)
+      expect(session).to be_streaming
+    end
+
+    it "closes all streaming connections when the session terminates" do
+      session_manager.set_streaming_connection(session, connection1)
+      session_manager.set_streaming_connection(session, connection2)
+
+      expect(connection1).to receive(:close)
+      expect(connection2).to receive(:close)
+
+      session_manager.terminate_session(session.id)
     end
   end
 

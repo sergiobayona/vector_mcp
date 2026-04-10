@@ -53,11 +53,12 @@ module VectorMCP
         # @return [Array] Rack response triplet for SSE
         def handle_streaming_request(env, session)
           last_event_id = extract_last_event_id(env)
+          stream_id = resolve_stream_id(session, last_event_id, :get)
 
           logger.info("Starting SSE stream for session #{session.id}")
 
           headers = build_sse_headers
-          body = create_sse_stream(session, last_event_id)
+          body = create_sse_stream(session, last_event_id, stream_id: stream_id)
 
           [200, headers, body]
         end
@@ -70,14 +71,8 @@ module VectorMCP
         def send_message_to_session(session, message)
           return false unless session.streaming?
 
-          connection = @active_connections[session.id]
-          return false unless connection && !connection.closed?
-
-          # MCP spec: GET streams MUST NOT receive JSON-RPC responses (only notifications and server requests)
-          if connection.from_get? && json_rpc_response?(message)
-            logger.debug("Blocked JSON-RPC response on GET stream for session #{session.id}")
-            return false
-          end
+          connection = select_connection_for_message(session, message)
+          return false unless connection
 
           begin
             # Store event for resumability
@@ -97,7 +92,7 @@ module VectorMCP
             logger.error("Error sending message to session #{session.id}: #{e.message}")
 
             # Mark connection as closed and clean up
-            cleanup_connection(session)
+            cleanup_connection(session, connection)
             false
           end
         end
@@ -150,14 +145,15 @@ module VectorMCP
         # @param last_event_id [String, nil] The last event ID for resumability
         # @param origin [Symbol] The stream origin (:get or :post)
         # @return [Enumerator] SSE stream enumerator
-        def create_sse_stream(session, last_event_id, origin: :get)
-          stream_id = "#{session.id}-#{origin}-#{SecureRandom.hex(4)}"
+        def create_sse_stream(session, last_event_id, origin: :get, stream_id: nil)
+          stream_id ||= generate_stream_id(session.id, origin)
 
           Enumerator.new do |yielder|
             connection = StreamingConnection.new(session, yielder, nil, false, origin, stream_id)
 
             # Register connection
-            @active_connections[session.id] = connection
+            replace_existing_connection(session, stream_id)
+            @active_connections[stream_id] = connection
             @transport.session_manager.set_streaming_connection(session, connection)
 
             # Start streaming thread
@@ -166,7 +162,7 @@ module VectorMCP
             rescue StandardError => e
               logger.error("Error in streaming thread for #{session.id}: #{e.message}")
             ensure
-              cleanup_connection(session)
+              cleanup_connection(session, connection)
             end
 
             # Keep connection alive until thread completes
@@ -186,24 +182,26 @@ module VectorMCP
           prime_event_id = @transport.event_store.store_event("", nil, session_id: session.id, stream_id: stream_id)
           yielder << "id: #{prime_event_id}\ndata:\n\n"
 
-          # Replay missed events if resuming — scoped to this stream only
+          # Replay missed events if resuming — scoped to the original stream only
           replay_events(yielder, last_event_id, session, stream_id) if last_event_id
 
           # Send periodic keep-alive events
           keep_alive_loop(session, yielder, stream_id)
         end
 
-        # Replays events after a specific event ID, scoped to the session.
-        # Note: replay filters by session_id only (not stream_id) because resumability
-        # must work across reconnections where the stream_id changes.
+        # Replays events after a specific event ID, scoped to the originating stream.
         #
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String] The last event ID received by client
         # @param session [SessionManager::Session] The session to filter events for
-        # @param _stream_id [String] Unused — kept for call-site consistency
+        # @param stream_id [String] The logical stream ID being resumed
         # @return [void]
-        def replay_events(yielder, last_event_id, session, _stream_id)
-          missed_events = @transport.event_store.get_events_after(last_event_id, session_id: session.id)
+        def replay_events(yielder, last_event_id, session, stream_id)
+          missed_events = @transport.event_store.get_events_after(
+            last_event_id,
+            session_id: session.id,
+            stream_id: stream_id
+          )
 
           logger.info("Replaying #{missed_events.length} missed events from #{last_event_id}")
 
@@ -218,14 +216,14 @@ module VectorMCP
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param stream_id [String] The stream ID for event storage
         # @return [void]
-        def keep_alive_loop(session, yielder, _stream_id)
+        def keep_alive_loop(session, yielder, stream_id)
           start_time = Time.now
           max_duration = 300 # 5 minutes maximum connection time
 
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
-            connection = @active_connections[session.id]
+            connection = @active_connections[stream_id] || @active_connections[session.id]
             break if connection.nil? || connection.closed?
 
             # Check if connection has been alive too long
@@ -278,14 +276,78 @@ module VectorMCP
         #
         # @param session [SessionManager::Session] The session to clean up
         # @return [void]
-        def cleanup_connection(session)
-          connection = @active_connections.delete(session.id)
+        def cleanup_connection(session, connection = nil)
+          connection ||= session.streaming_connection
+          connection ||= @active_connections[session.id]
           return unless connection
 
+          @active_connections.delete(connection.stream_id)
+          @active_connections.delete(session.id) if @active_connections[session.id] == connection
+
           connection.close
-          @transport.session_manager.remove_streaming_connection(session)
+          @transport.session_manager.remove_streaming_connection(session, connection)
 
           logger.debug("Streaming connection cleaned up for #{session.id}")
+        end
+
+        def resolve_stream_id(session, last_event_id, origin)
+          return generate_stream_id(session.id, origin) unless last_event_id
+
+          last_event = @transport.event_store.get_event(last_event_id)
+
+          if last_event && last_event.session_id == session.id && last_event.stream_id
+            last_event.stream_id
+          else
+            generate_stream_id(session.id, origin)
+          end
+        end
+
+        def generate_stream_id(session_id, origin)
+          "#{session_id}-#{origin}-#{SecureRandom.hex(4)}"
+        end
+
+        def select_connection_for_message(session, message)
+          connections = active_connections_for_session(session)
+          return nil if connections.empty?
+
+          if json_rpc_response?(message)
+            eligible_connections = connections.reject(&:from_get?)
+            if eligible_connections.empty?
+              logger.debug("Blocked JSON-RPC response on GET stream for session #{session.id}")
+              return nil
+            end
+
+            preferred_connection_for(session, eligible_connections)
+          else
+            preferred_connection_for(session, connections)
+          end
+        end
+
+        def active_connections_for_session(session)
+          connections = session.streaming_connections.values.select do |connection|
+            @active_connections[connection.stream_id] == connection && !connection.closed?
+          end
+
+          legacy_connection = @active_connections[session.id]
+          connections << legacy_connection if legacy_connection &&
+                                              !legacy_connection.closed? &&
+                                              !connections.include?(legacy_connection)
+
+          connections
+        end
+
+        def preferred_connection_for(session, connections)
+          preferred = session.streaming_connection
+          return connections.find { |connection| connection == preferred } if preferred && connections.include?(preferred)
+
+          connections.first
+        end
+
+        def replace_existing_connection(session, stream_id)
+          existing_connection = @active_connections[stream_id]
+          return unless existing_connection
+
+          cleanup_connection(session, existing_connection)
         end
       end
     end
