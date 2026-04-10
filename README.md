@@ -6,421 +6,230 @@
 [![Maintainability](https://qlty.sh/badges/fdb143b3-148a-4a86-8e3b-4ccebe993528/maintainability.svg)](https://qlty.sh/gh/sergiobayona/projects/vector_mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-VectorMCP is a Ruby gem implementing the Model Context Protocol (MCP) server-side specification. It provides a framework for creating MCP servers that expose tools, resources, prompts, and roots to LLM clients.
+VectorMCP is a Ruby implementation of the Model Context Protocol (MCP) server-side specification. It gives you a framework for exposing tools, resources, prompts, roots, sampling, middleware, and security over the MCP streamable HTTP transport.
 
-## Why VectorMCP?
+## Highlights
 
-- **🛡️ Security-First**: Built-in input validation and schema checking prevent injection attacks
-- **⚡ Production-Ready**: Robust error handling, comprehensive test suite, and proven reliability  
-- **🔌 Streamable HTTP Transport**: MCP-compliant HTTP transport with session management and resumability
-- **📦 Zero Configuration**: Works out of the box with sensible defaults
-- **🔄 Fully Compatible**: Implements the complete MCP specification
+- Streamable HTTP is the built-in transport, with session management, resumability, and MCP 2025-11-25 compliance
+- Class-based tools via `VectorMCP::Tool`, plus the original block-based `register_tool` API
+- Rack and Rails mounting through `server.rack_app`
+- Opt-in authentication and authorization, structured logging, and middleware hooks
+- Image-aware tools/resources/prompts, roots, and server-initiated sampling
 
-## Quick Start
+## Requirements
+
+- Ruby 3.2+
+
+## Installation
 
 ```bash
 gem install vector_mcp
 ```
 
 ```ruby
-require 'vector_mcp'
-
-# Create a server
-server = VectorMCP.new(name: 'MyApp', version: '1.0.0')
-
-# Add a tool
-server.register_tool(
-  name: 'greet',
-  description: 'Says hello to someone',
-  input_schema: {
-    type: 'object',
-    properties: { name: { type: 'string' } },
-    required: ['name']
-  }
-) { |args| "Hello, #{args['name']}!" }
-
-# Start the server
-server.run  # Uses HTTP stream transport by default
+gem "vector_mcp"
 ```
 
-**That's it!** Your MCP server is ready to connect with Claude Desktop, custom clients, or any MCP-compatible application.
-
-## Transport
-
-VectorMCP uses the MCP-compliant streamable HTTP transport with session management and resumability:
+## Quick Start
 
 ```ruby
-server.run  # Default: http_stream transport
-server.run(transport: :http_stream, port: 8080)
+require "vector_mcp"
+
+class Greet < VectorMCP::Tool
+  description "Say hello to someone"
+  param :name, type: :string, desc: "Name to greet", required: true
+
+  def call(args, _session)
+    "Hello, #{args["name"]}!"
+  end
+end
+
+server = VectorMCP::Server.new(name: "MyApp", version: "1.0.0")
+server.register(Greet)
+server.run(port: 8080)
 ```
 
-## Core Features
-
-### Tools (Functions)
-
-Expose functions that LLMs can call:
+The class-based DSL is optional. The existing block-based API still works:
 
 ```ruby
 server.register_tool(
-  name: 'calculate',
-  description: 'Performs basic math',
+  name: "echo",
+  description: "Echo back the supplied text",
   input_schema: {
-    type: 'object',
-    properties: {
-      operation: { type: 'string', enum: ['add', 'subtract', 'multiply'] },
-      a: { type: 'number' },
-      b: { type: 'number' }
-    },
-    required: ['operation', 'a', 'b']
+    type: "object",
+    properties: { text: { type: "string" } },
+    required: ["text"]
   }
-) do |args|
-  case args['operation']
-  when 'add' then args['a'] + args['b']
-  when 'subtract' then args['a'] - args['b']
-  when 'multiply' then args['a'] * args['b']
+) { |args| args["text"] }
+```
+
+## Rack and Rails
+
+VectorMCP can run as a standalone HTTP server or be mounted inside an existing Rack app:
+
+```ruby
+require "vector_mcp"
+
+server = VectorMCP::Server.new(name: "MyApp", version: "1.0.0")
+server.register(Greet)
+
+MCP_APP = server.rack_app
+```
+
+In Rails, mount it in `config/routes.rb`:
+
+```ruby
+mount MCP_APP => "/mcp"
+```
+
+For ActiveRecord-backed tools, opt into `VectorMCP::Rails::Tool`:
+
+```ruby
+require "vector_mcp/rails/tool"
+
+class FindUser < VectorMCP::Rails::Tool
+  description "Find a user by id"
+  param :id, type: :integer, required: true
+
+  def call(args, _session)
+    user = find!(User, args[:id])
+    { id: user.id, email: user.email }
   end
 end
 ```
 
-### Resources (Data Sources)
+See [docs/rails-setup-guide.md](./docs/rails-setup-guide.md) for a full setup guide.
 
-Provide data that LLMs can read:
+## Tools, Resources, and Prompts
+
+Expose callable tools:
+
+```ruby
+server.register_tool(
+  name: "calculate",
+  description: "Performs basic math",
+  input_schema: {
+    type: "object",
+    properties: {
+      operation: { type: "string", enum: ["add", "subtract", "multiply"] },
+      a: { type: "number" },
+      b: { type: "number" }
+    },
+    required: ["operation", "a", "b"]
+  }
+) do |args|
+  case args["operation"]
+  when "add" then args["a"] + args["b"]
+  when "subtract" then args["a"] - args["b"]
+  when "multiply" then args["a"] * args["b"]
+  end
+end
+```
+
+Expose readable resources:
 
 ```ruby
 server.register_resource(
-  uri: 'file://config.json',
-  name: 'App Configuration',
-  description: 'Current application settings'
-) { File.read('config.json') }
+  uri: "file://config.json",
+  name: "App Configuration",
+  description: "Current application settings"
+) { File.read("config.json") }
 ```
 
-### Prompts (Templates)
-
-Create reusable prompt templates:
+Define prompt templates:
 
 ```ruby
 server.register_prompt(
-  name: 'code_review',
-  description: 'Reviews code for best practices',
+  name: "code_review",
+  description: "Reviews code for best practices",
   arguments: [
-    { name: 'language', description: 'Programming language', required: true },
-    { name: 'code', description: 'Code to review', required: true }
+    { name: "language", description: "Programming language", required: true },
+    { name: "code", description: "Code to review", required: true }
   ]
 ) do |args|
   {
     messages: [{
-      role: 'user',
+      role: "user",
       content: {
-        type: 'text',
-        text: "Review this #{args['language']} code:\n\n#{args['code']}"
+        type: "text",
+        text: "Review this #{args["language"]} code:\n\n#{args["code"]}"
       }
     }]
   }
 end
 ```
 
-## Security Features
+`VectorMCP::Tool` also supports `type: :date` and `type: :datetime`, which are validated as strings in JSON Schema and coerced to `Date` and `Time` before `#call` runs.
 
-VectorMCP provides comprehensive, **opt-in security** for production applications:
+## Security and Middleware
 
-### Built-in Input Validation
-
-All inputs are automatically validated against your schemas:
+VectorMCP keeps security opt-in, but the primitives are built in:
 
 ```ruby
-# This tool is protected against invalid inputs
-server.register_tool(
-  name: 'process_user',
-  input_schema: {
-    type: 'object',
-    properties: {
-      email: { type: 'string', format: 'email' },
-      age: { type: 'integer', minimum: 0, maximum: 150 }
-    },
-    required: ['email']
-  }
-) { |args| "Processing #{args['email']}" }
-
-# Invalid inputs are automatically rejected:
-# ❌ { email: "not-an-email" }     -> Validation error
-# ❌ { age: -5 }                   -> Missing required field
-# ✅ { email: "user@example.com" } -> Passes validation
-```
-
-### Authentication & Authorization
-
-Secure your MCP server with flexible authentication strategies:
-
-```ruby
-# API Key Authentication
 server.enable_authentication!(
   strategy: :api_key,
-  keys: ["your-secret-key", "another-key"]
+  keys: ["your-secret-key"]
 )
 
-# JWT Token Authentication  
-server.enable_authentication!(
-  strategy: :jwt,
-  secret: ENV["JWT_SECRET"]
-)
+server.enable_authorization! do
+  authorize_tools do |user, _action, tool|
+    user[:role] == "admin" || !tool.name.start_with?("admin_")
+  end
+end
+```
 
-# Custom Authentication Logic
+Custom authentication works too:
+
+```ruby
 server.enable_authentication!(strategy: :custom) do |request|
   api_key = request[:headers]["X-API-Key"]
-  User.find_by(api_key: api_key) ? { user_id: user.id } : false
+  user = User.find_by(api_key: api_key)
+  user ? { user_id: user.id, role: user.role } : false
 end
 ```
 
-### Fine-Grained Authorization
+Middleware can hook into tool, resource, prompt, sampling, auth, and transport events, including `before_auth`, `after_auth`, `on_auth_error`, `before_request`, `after_response`, and `on_transport_error`.
 
-Control access to tools, resources, and prompts:
+See [security/README.md](./security/README.md) for the full security guide.
 
-```ruby
-server.enable_authorization! do
-  # Tool-level access control
-  authorize_tools do |user, action, tool|
-    case user[:role]
-    when "admin" then true
-    when "user" then !tool.name.start_with?("admin_")
-    else false
-    end
-  end
-  
-  # Resource-level permissions
-  authorize_resources do |user, action, resource|
-    user[:tenant_id] == resource.tenant_id
-  end
-end
-```
+## Transport Notes
 
-### Transport Security
+- VectorMCP ships with streamable HTTP as its built-in transport
+- `POST /mcp` accepts a single JSON-RPC request, notification, or response; batch arrays are rejected
+- `GET /mcp` opens an SSE stream for server-initiated messages
+- `DELETE /mcp` terminates the session
+- The server advertises MCP protocol `2025-11-25` and accepts `2025-03-26` and `2024-11-05` headers for compatibility
+- Default allowed origins are restricted to localhost and loopback addresses
 
-Security works seamlessly with the HTTP stream transport:
-
-- **HTTP Stream**: Full HTTP header support with session management
-- **Request Pipeline**: Automatic authentication and authorization checking
-
-**👉 [Complete Security Guide →](./security/README.md)**
-
-Our comprehensive security documentation covers authentication strategies, authorization policies, session management, and real-world examples.
-
-## Real-World Examples
-
-### File System Server
-
-```ruby
-server.register_tool(
-  name: 'read_file',
-  description: 'Reads a text file',
-  input_schema: {
-    type: 'object',
-    properties: { path: { type: 'string' } },
-    required: ['path']
-  }
-) { |args| File.read(args['path']) }
-```
-
-### Database Query Tool
-
-```ruby
-server.register_tool(
-  name: 'search_users',
-  description: 'Searches users by name',
-  input_schema: {
-    type: 'object',
-    properties: { 
-      query: { type: 'string', minLength: 1 },
-      limit: { type: 'integer', minimum: 1, maximum: 100 }
-    },
-    required: ['query']
-  }
-) do |args|
-  User.where('name ILIKE ?', "%#{args['query']}%")
-      .limit(args['limit'] || 10)
-      .to_json
-end
-```
-
-### API Integration
-
-```ruby
-server.register_tool(
-  name: 'get_weather',
-  description: 'Gets current weather for a city',
-  input_schema: {
-    type: 'object',
-    properties: { city: { type: 'string' } },
-    required: ['city']
-  }
-) do |args|
-  response = HTTP.get("https://api.weather.com/current", params: { city: args['city'] })
-  response.parse
-end
-```
-
----
-
-## Advanced Usage
-
-<details>
-<summary><strong>Filesystem Roots & Security</strong></summary>
-
-Define secure filesystem boundaries:
-
-```ruby
-# Register allowed directories
-server.register_root_from_path('./src', name: 'Source Code')
-server.register_root_from_path('./docs', name: 'Documentation')
-
-# Tools can safely operate within these bounds
-server.register_tool(
-  name: 'list_files',
-  input_schema: {
-    type: 'object', 
-    properties: { root_uri: { type: 'string' } },
-    required: ['root_uri']
-  }
-) do |args|
-  root = server.roots[args['root_uri']]
-  raise 'Invalid root' unless root
-  Dir.entries(root.path).reject { |f| f.start_with?('.') }
-end
-```
-
-</details>
-
-<details>
-<summary><strong>LLM Sampling (Server → Client)</strong></summary>
-
-Make requests to the connected LLM:
-
-```ruby
-server.register_tool(
-  name: 'generate_summary',
-  input_schema: {
-    type: 'object',
-    properties: { text: { type: 'string' } },
-    required: ['text']
-  }
-) do |args, session|
-  result = session.sample(
-    messages: [{ 
-      role: 'user', 
-      content: { type: 'text', text: "Summarize: #{args['text']}" }
-    }],
-    max_tokens: 100
-  )
-  result.text_content
-end
-```
-
-</details>
-
-<details>
-<summary><strong>Custom Error Handling</strong></summary>
-
-Use proper MCP error types:
-
-```ruby
-server.register_tool(name: 'risky_operation') do |args|
-  if args['dangerous']
-    raise VectorMCP::InvalidParamsError.new('Dangerous operation not allowed')
-  end
-  
-  begin
-    perform_operation(args)
-  rescue SomeError => e
-    raise VectorMCP::InternalError.new('Operation failed')
-  end
-end
-```
-
-</details>
-
-<details>
-<summary><strong>Session Information</strong></summary>
-
-Access client context:
-
-```ruby
-server.register_tool(name: 'client_info') do |args, session|
-  {
-    client: session.client_info&.dig('name'),
-    capabilities: session.client_capabilities,
-    initialized: session.initialized?
-  }
-end
-```
-
-</details>
-
----
-
-## Integration Examples
-
-### Claude Desktop
-
-Add to your Claude Desktop configuration:
-
-```json
-{
-  "mcpServers": {
-    "my-ruby-server": {
-      "command": "ruby",
-      "args": ["path/to/my_server.rb"]
-    }
-  }
-}
-```
-
-### Web Applications
-
-```javascript
-// Send MCP requests via HTTP stream
-fetch('http://localhost:8080/mcp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'tools/call',
-    params: { name: 'greet', arguments: { name: 'World' } }
-  })
-});
-```
-
-## Why Choose VectorMCP?
-
-**🏆 Battle-Tested**: Used in production applications serving thousands of requests
-
-**⚡ Performance**: Optimized for low latency and high throughput
-
-**🛡️ Secure by Default**: Comprehensive input validation prevents common attacks  
-
-**📖 Well-Documented**: Extensive examples and clear API documentation
-
-**🔧 Extensible**: Easy to customize and extend for your specific needs
-
-**🤝 Community**: Active development and responsive maintainer
-
-## Examples & Resources
-
-- **[Examples Directory](./examples/)** - Complete working examples
-- **[File System MCP](https://github.com/sergiobayona/file_system_mcp)** - Real-world implementation
-- **[MCP Specification](https://modelcontext.dev/)** - Official protocol documentation
-
-## Installation & Setup
+Initialize a session with curl:
 
 ```bash
-gem install vector_mcp
-
-# Or in your Gemfile
-gem 'vector_mcp'
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
 ```
+
+## More Features
+
+- Roots via `register_root` and `register_root_from_path`
+- Image resources and image-aware tools/prompts
+- Structured logging with component loggers
+- Server-initiated sampling with streaming/tool-call support
+- Middleware-driven request shaping and observability
+
+## Documentation
+
+- [CHANGELOG.md](./CHANGELOG.md)
+- [examples/](./examples/)
+- [docs/rails-setup-guide.md](./docs/rails-setup-guide.md)
+- [docs/streamable-http-spec-compliance.md](./docs/streamable-http-spec-compliance.md)
+- [security/README.md](./security/README.md)
+- [MCP Specification](https://modelcontextprotocol.io/)
 
 ## Contributing
 
-Bug reports and pull requests welcome on [GitHub](https://github.com/sergiobayona/vector_mcp).
+Bug reports and pull requests are welcome on [GitHub](https://github.com/sergiobayona/vector_mcp).
 
 ## License
 

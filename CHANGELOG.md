@@ -1,15 +1,61 @@
 ## [Unreleased]
 
+## [0.4.0] – 2026-04-10
+
+### Added
+
+* **Declarative Tool DSL**: Added `VectorMCP::Tool` for class-based tool definitions.
+  - Define tools with `tool_name`, `description`, and `param`
+  - Register one or more tool classes with `server.register(MyTool, OtherTool)`
+  - Added `:date` and `:datetime` param types with automatic coercion to `Date` and `Time`
+
+* **Rack and Rails Integration**: Added first-class mounting support for Rack-based applications.
+  - `Server#rack_app` returns a Rack-compatible MCP endpoint without starting Puma
+  - Added `VectorMCP::Rails::Tool` for ActiveRecord-backed tools
+  - Added `docs/rails-setup-guide.md` with a full Rails integration guide
+
+* **Expanded Middleware Lifecycle Hooks**: Middleware can now observe and shape more of the request lifecycle.
+  - Added `before_auth`, `after_auth`, and `on_auth_error` hooks
+  - Added transport-level `before_request`, `after_response`, and `on_transport_error` hooks
+  - Middleware can now mutate params before handlers execute
+
+### Changed
+
+* **MCP Protocol Version**: VectorMCP now advertises MCP protocol `2025-11-25` by default.
+  - `MCP-Protocol-Version` headers for `2025-11-25`, `2025-03-26`, and `2024-11-05` are accepted for compatibility
+
+* **Streamable HTTP Compliance**: HttpStream was updated to align with the MCP 2025-11-25 transport requirements.
+  - POST bodies must contain a single JSON-RPC request, notification, or response
+  - POST `Accept` validation now enforces `application/json` plus `text/event-stream` when the header is present
+  - Notifications now return `202 Accepted`
+  - SSE streams now send priming events, retry hints, and comment-based heartbeats
+  - Event replay and outbound routing are now scoped to the originating stream
+
+* **Ruby Requirement**: Minimum supported Ruby version is now `3.2`.
+
 ### Removed
 
 * **Stdio Transport**: Removed stdio transport support entirely.
   - Deleted `lib/vector_mcp/transport/stdio.rb` and `lib/vector_mcp/transport/stdio_session_manager.rb`
-  - `Server#run` now defaults to `transport: :http_stream` instead of `transport: :stdio`
+  - `Server#run` now defaults to `transport: :http_stream`
 
-* **SSE Transport**: Removed SSE transport support entirely. HttpStream is now the sole transport.
-  - Deleted `lib/vector_mcp/transport/sse.rb`, `lib/vector_mcp/transport/sse_session_manager.rb`, and `lib/vector_mcp/transport/sse/` directory
-  - Removed `:sse` option from `Server#run`; passing `transport: :sse` now raises `ArgumentError`
-  - Use `:http_stream` for all server implementations (recommended per MCP spec 2024-11-05)
+* **Standalone SSE Transport**: Removed the legacy SSE transport implementation.
+  - Deleted `lib/vector_mcp/transport/sse.rb`, `lib/vector_mcp/transport/sse_session_manager.rb`, and `lib/vector_mcp/transport/sse/`
+  - HttpStream is now the only built-in transport
+
+* **Broadcast APIs**: Removed `broadcast_message` and `broadcast_notification` to comply with the no-broadcast delivery rules in the MCP streamable HTTP specification.
+
+### Security
+
+* **Safer Origin Defaults**: Default allowed origins are now restricted to localhost and loopback addresses.
+  - Explicit wildcard origin configuration still works, but now emits a security warning
+
+* **Stronger Path Validation**: `ImageUtil` now canonicalizes file paths and blocks traversal attempts even when no `base_directory` is provided.
+
+### Fixed
+
+* **Stream Routing and Replay**: Multiple active SSE streams in the same session now replay and deliver messages to the correct logical stream.
+* **Authorization Context Propagation**: Resolved security context is now stored on the session so middleware and handlers can inspect authenticated state consistently.
 
 ## [0.3.4] – 2026-03-17
 

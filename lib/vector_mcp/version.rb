@@ -2,5 +2,5 @@
 
 module VectorMCP
   # The current version of the VectorMCP gem.
-  VERSION = "0.3.4"
+  VERSION = "0.4.0"
 end
