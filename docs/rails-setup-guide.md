@@ -13,7 +13,7 @@ This guide walks through mounting a VectorMCP server as a Rack endpoint inside a
 Add VectorMCP to your Gemfile:
 
 ```ruby
-gem "vector_mcp", "~> 0.3"
+gem "vector_mcp", "~> 0.4"
 ```
 
 Run:
@@ -92,7 +92,7 @@ Initialize an MCP session:
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
 ```
 
 You should receive a JSON response with `serverInfo`, `protocolVersion`, and an `Mcp-Session-Id` header.
