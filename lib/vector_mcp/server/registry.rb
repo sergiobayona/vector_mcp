@@ -29,6 +29,38 @@ module VectorMCP
         self
       end
 
+      # Registers one or more class-based tool definitions with the server.
+      #
+      # Each argument must be a subclass of +VectorMCP::Tool+ that declares
+      # its metadata via the class-level DSL (+tool_name+, +description+,
+      # +param+) and implements +#call+.
+      #
+      # @param tool_classes [Array<Class>] One or more +VectorMCP::Tool+ subclasses.
+      # @return [self] The server instance, for chaining.
+      # @raise [ArgumentError] If any argument is not a +VectorMCP::Tool+ subclass.
+      #
+      # @example Register a single tool
+      #   server.register(ListProviders)
+      #
+      # @example Register multiple tools
+      #   server.register(ListProviders, CreateProvider, UpdateProvider)
+      def register(*tool_classes)
+        tool_classes.each do |tool_class|
+          unless tool_class.is_a?(Class) && tool_class < VectorMCP::Tool
+            raise ArgumentError, "#{tool_class.inspect} is not a VectorMCP::Tool subclass"
+          end
+
+          definition = tool_class.to_definition
+          register_tool(
+            name: definition.name,
+            description: definition.description,
+            input_schema: definition.input_schema,
+            &definition.handler
+          )
+        end
+        self
+      end
+
       # Registers a new resource with the server.
       #
       # @param uri [String, URI] The unique URI for the resource.

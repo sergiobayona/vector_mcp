@@ -14,6 +14,7 @@ require_relative "vector_mcp/handlers/core"
 require_relative "vector_mcp/logger"
 require_relative "vector_mcp/middleware"
 require_relative "vector_mcp/server"
+require_relative "vector_mcp/tool"
 
 # The VectorMCP module provides a full-featured, opinionated Ruby implementation
 # of the **Model Context Protocol (MCP)**.  It gives developers everything needed
