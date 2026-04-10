@@ -171,11 +171,152 @@ RSpec.describe VectorMCP::Tool do
         klass = Class.new(described_class) do
           tool_name "bad_type"
           description "Bad type tool"
-          param :x, type: :datetime
+          param :x, type: :bogus_type
           def call(_args, _session); end
         end
 
-        expect { klass.to_definition }.to raise_error(ArgumentError, /Unknown param type :datetime/)
+        expect { klass.to_definition }.to raise_error(ArgumentError, /Unknown param type :bogus_type/)
+      end
+    end
+
+    describe "date and datetime param types" do
+      it "produces a string/date schema for :date params" do
+        klass = Class.new(described_class) do
+          tool_name "date_param"
+          description "Has a date"
+          param :when, type: :date, desc: "Target date"
+          def call(_args, _session); end
+        end
+
+        prop = klass.to_definition.input_schema["properties"]["when"]
+        expect(prop["type"]).to eq("string")
+        expect(prop["format"]).to eq("date")
+        expect(prop["description"]).to eq("Target date")
+      end
+
+      it "produces a string/date-time schema for :datetime params" do
+        klass = Class.new(described_class) do
+          tool_name "datetime_param"
+          description "Has a datetime"
+          param :at, type: :datetime
+          def call(_args, _session); end
+        end
+
+        prop = klass.to_definition.input_schema["properties"]["at"]
+        expect(prop["type"]).to eq("string")
+        expect(prop["format"]).to eq("date-time")
+      end
+
+      it "coerces :date string arguments to Date before #call runs" do
+        received = nil
+        klass = Class.new(described_class) do
+          tool_name "date_coerce"
+          description "Coerce date"
+          param :when, type: :date
+          define_method(:call) do |args, _session|
+            received = args["when"]
+          end
+        end
+
+        klass.to_definition.handler.call({ "when" => "2026-12-31" }, nil)
+        expect(received).to be_a(Date)
+        expect(received).to eq(Date.new(2026, 12, 31))
+      end
+
+      it "coerces :datetime string arguments to Time before #call runs" do
+        received = nil
+        klass = Class.new(described_class) do
+          tool_name "dt_coerce"
+          description "Coerce datetime"
+          param :at, type: :datetime
+          define_method(:call) do |args, _session|
+            received = args["at"]
+          end
+        end
+
+        klass.to_definition.handler.call({ "at" => "2026-12-31T10:00:00Z" }, nil)
+        expect(received).to be_a(Time)
+        expect(received.year).to eq(2026)
+      end
+
+      it "passes nil through uncoerced for optional :date params" do
+        received = :untouched
+        klass = Class.new(described_class) do
+          tool_name "date_nil"
+          description "Nil date"
+          param :when, type: :date
+          define_method(:call) do |args, _session|
+            received = args.fetch("when", :missing)
+          end
+        end
+
+        klass.to_definition.handler.call({}, nil)
+        expect(received).to eq(:missing)
+      end
+
+      it "leaves already-parsed Date values alone" do
+        received = nil
+        klass = Class.new(described_class) do
+          tool_name "date_passthrough"
+          description "Date passthrough"
+          param :when, type: :date
+          define_method(:call) do |args, _session|
+            received = args["when"]
+          end
+        end
+
+        already = Date.new(2026, 1, 1)
+        klass.to_definition.handler.call({ "when" => already }, nil)
+        expect(received).to equal(already)
+      end
+
+      it "raises InvalidParamsError when a :date string is unparseable" do
+        klass = Class.new(described_class) do
+          tool_name "date_bad"
+          description "Bad date"
+          param :when, type: :date
+          def call(_args, _session); end
+        end
+
+        expect do
+          klass.to_definition.handler.call({ "when" => "garbage" }, nil)
+        end.to raise_error(VectorMCP::InvalidParamsError) do |error|
+          expect(error.code).to eq(-32_602)
+          expect(error.message).to match(/when/)
+        end
+      end
+
+      it "raises InvalidParamsError when a :datetime string is unparseable" do
+        klass = Class.new(described_class) do
+          tool_name "dt_bad"
+          description "Bad datetime"
+          param :at, type: :datetime
+          def call(_args, _session); end
+        end
+
+        expect do
+          klass.to_definition.handler.call({ "at" => "garbage" }, nil)
+        end.to raise_error(VectorMCP::InvalidParamsError) do |error|
+          expect(error.code).to eq(-32_602)
+          expect(error.message).to match(/at/)
+        end
+      end
+
+      it "does not touch other param values during coercion" do
+        received = nil
+        klass = Class.new(described_class) do
+          tool_name "mixed"
+          description "Mixed params"
+          param :when, type: :date
+          param :count, type: :integer
+          define_method(:call) do |args, _session|
+            received = args
+          end
+        end
+
+        klass.to_definition.handler.call({ "when" => "2026-06-01", "count" => 7 }, nil)
+        expect(received["when"]).to eq(Date.new(2026, 6, 1))
+        expect(received["count"]).to eq(7)
       end
     end
   end

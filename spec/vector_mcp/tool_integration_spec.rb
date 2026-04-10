@@ -211,6 +211,116 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
     end
   end
 
+  describe "date-aware param types" do
+    it "coerces :date param strings to Date objects before handler runs" do
+      received = {}
+      tool_class = Class.new(VectorMCP::Tool) do
+        tool_name "date_coercer"
+        description "Receives a date"
+        param :when, type: :date, desc: "The date", required: true
+
+        define_method(:call) do |args, _session|
+          received[:value] = args["when"]
+          received[:class] = args["when"].class
+          "ok"
+        end
+      end
+
+      server.register(tool_class)
+
+      result = server.handle_message({
+                                       "jsonrpc" => "2.0",
+                                       "id" => 1,
+                                       "method" => "tools/call",
+                                       "params" => {
+                                         "name" => "date_coercer",
+                                         "arguments" => { "when" => "2026-12-31" }
+                                       }
+                                     }, session, "test-session")
+
+      expect(result[:isError]).to be(false)
+      expect(received[:class]).to eq(Date)
+      expect(received[:value]).to eq(Date.new(2026, 12, 31))
+    end
+
+    it "returns an InvalidParamsError (-32602) when a :date arg is unparseable" do
+      tool_class = Class.new(VectorMCP::Tool) do
+        tool_name "date_bad_e2e"
+        description "Takes a date"
+        param :when, type: :date, required: true
+        def call(_args, _session)
+          "ok"
+        end
+      end
+
+      server.register(tool_class)
+
+      expect do
+        server.handle_message({
+                                "jsonrpc" => "2.0",
+                                "id" => 1,
+                                "method" => "tools/call",
+                                "params" => {
+                                  "name" => "date_bad_e2e",
+                                  "arguments" => { "when" => "garbage" }
+                                }
+                              }, session, "test-session")
+      end.to raise_error(VectorMCP::InvalidParamsError) do |error|
+        expect(error.code).to eq(-32_602)
+      end
+    end
+
+    it "returns an InvalidParamsError (-32602) when a :datetime arg is unparseable" do
+      tool_class = Class.new(VectorMCP::Tool) do
+        tool_name "datetime_bad_e2e"
+        description "Takes a datetime"
+        param :at, type: :datetime, required: true
+        def call(_args, _session)
+          "ok"
+        end
+      end
+
+      server.register(tool_class)
+
+      expect do
+        server.handle_message({
+                                "jsonrpc" => "2.0",
+                                "id" => 1,
+                                "method" => "tools/call",
+                                "params" => {
+                                  "name" => "datetime_bad_e2e",
+                                  "arguments" => { "at" => "garbage" }
+                                }
+                              }, session, "test-session")
+      end.to raise_error(VectorMCP::InvalidParamsError) do |error|
+        expect(error.code).to eq(-32_602)
+      end
+    end
+
+    it "advertises :date params with format: date in the JSON Schema" do
+      tool_class = Class.new(VectorMCP::Tool) do
+        tool_name "date_schema"
+        description "Date schema tool"
+        param :valid_until, type: :date, desc: "Expiration"
+        def call(_args, _session); end
+      end
+
+      server.register(tool_class)
+
+      result = server.handle_message({
+                                       "jsonrpc" => "2.0",
+                                       "id" => 1,
+                                       "method" => "tools/list",
+                                       "params" => {}
+                                     }, session, "test-session")
+
+      tool_def = result[:tools].find { |t| t[:name] == "date_schema" }
+      prop = tool_def[:inputSchema]["properties"]["valid_until"]
+      expect(prop["type"]).to eq("string")
+      expect(prop["format"]).to eq("date")
+    end
+  end
+
   describe "tools/list includes class-based tools" do
     it "lists class-based tools in the tool definitions" do
       tool_class = Class.new(VectorMCP::Tool) do

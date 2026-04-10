@@ -4,7 +4,7 @@ This guide walks through mounting a VectorMCP server as a Rack endpoint inside a
 
 ## Prerequisites
 
-- Ruby 3.0.6+
+- Ruby 3.2+
 - Rails 7.0+ (Rails 7.1+ recommended for native Rack mounting improvements)
 - Bundler
 
@@ -24,38 +24,48 @@ bundle install
 
 ## Quick Start
 
-### 1. Create an MCP Server Initializer
+### 1. Define a Tool as a Class
+
+Create `app/mcp/tools/hello.rb`:
+
+```ruby
+# app/mcp/tools/hello.rb
+class Hello < VectorMCP::Tool
+  tool_name   "hello"
+  description "Returns a greeting"
+
+  param :name, type: :string, desc: "Name to greet", required: true
+
+  def call(args, _session)
+    "Hello, #{args['name']}!"
+  end
+end
+```
+
+VectorMCP ships a class-based DSL (`tool_name`, `description`, `param`) that
+generates the JSON Schema for you. The older block-based `register_tool` API
+still works and the two styles can coexist.
+
+### 2. Create an MCP Server Initializer
 
 Create `config/initializers/mcp_server.rb`:
 
 ```ruby
 # config/initializers/mcp_server.rb
+require_relative "../../app/mcp/tools/hello"
 
 MCP_SERVER = VectorMCP::Server.new(
   name: "MyRailsApp",
   version: "1.0.0"
 )
 
-# Register a simple tool
-MCP_SERVER.register_tool(
-  name: "hello",
-  description: "Returns a greeting",
-  input_schema: {
-    type: "object",
-    properties: {
-      name: { type: "string", description: "Name to greet" }
-    },
-    required: ["name"]
-  }
-) do |args, _session|
-  "Hello, #{args['name']}!"
-end
+MCP_SERVER.register(Hello)
 
 # Build the Rack app (does NOT start a server — Rails handles HTTP)
 MCP_APP = MCP_SERVER.rack_app
 ```
 
-### 2. Mount in Routes
+### 3. Mount in Routes
 
 Add to `config/routes.rb`:
 
@@ -68,7 +78,7 @@ Rails.application.routes.draw do
 end
 ```
 
-### 3. Verify It Works
+### 4. Verify It Works
 
 Start your Rails server:
 
@@ -108,49 +118,185 @@ MCP_APP = MCP_SERVER.rack_app(
 
 ### Registering Tools That Access Rails Models
 
-Tools run inside your Rails process, so they have full access to Active Record, services, and anything else in your application:
+Tools run inside your Rails process, so they have full access to Active
+Record, services, and anything else in your application.
+
+For ActiveRecord-backed tools, inherit from `VectorMCP::Rails::Tool`
+instead of `VectorMCP::Tool`. It adds ergonomic helpers for the patterns
+that show up in nearly every CRUD tool:
+
+- `find!(Model, id)` — fetch a record or raise `VectorMCP::NotFoundError`
+- `respond_with(record, **extras)` — standard success/error payload shape
+- `with_transaction { ... }` — wraps the block in an AR transaction
+- Auto-rescue of `ActiveRecord::RecordNotFound` → `NotFoundError` and
+  `ActiveRecord::RecordInvalid` → error payload
+- Arguments are delivered as a `HashWithIndifferentAccess`, so
+  `args[:email]` and `args["email"]` both work
+
+`VectorMCP::Rails::Tool` is opt-in — `require "vector_mcp/rails/tool"` to
+load it. The core gem has no ActiveRecord dependency.
+
+```ruby
+# app/mcp/tools/find_user.rb
+require "vector_mcp/rails/tool"
+
+class FindUser < VectorMCP::Rails::Tool
+  tool_name   "find_user"
+  description "Look up a user by email address"
+
+  param :email, type: :string, desc: "User's email", required: true, format: "email"
+
+  def call(args, _session)
+    user = User.find_by(email: args[:email])
+    raise VectorMCP::NotFoundError, "User #{args[:email]} not found" unless user
+
+    { id: user.id, name: user.name, email: user.email, created_at: user.created_at }
+  end
+end
+```
+
+```ruby
+# app/mcp/tools/search_products.rb
+class SearchProducts < VectorMCP::Rails::Tool
+  tool_name   "search_products"
+  description "Search products by name or category"
+
+  param :query,    type: :string,  desc: "Search term", required: true
+  param :category, type: :string,  desc: "Filter by category"
+  param :limit,    type: :integer, desc: "Max results", default: 10
+
+  def call(args, _session)
+    products = Product.search(args[:query])
+    products = products.where(category: args[:category]) if args[:category]
+    products.limit(args[:limit] || 10).map do |p|
+      { id: p.id, name: p.name, price: p.price.to_f, category: p.category }
+    end
+  end
+end
+```
+
+Register them on the server:
 
 ```ruby
 # config/initializers/mcp_server.rb
+require_relative "../../app/mcp/tools/find_user"
+require_relative "../../app/mcp/tools/search_products"
 
-MCP_SERVER.register_tool(
-  name: "find_user",
-  description: "Look up a user by email address",
-  input_schema: {
-    type: "object",
-    properties: {
-      email: { type: "string", format: "email" }
-    },
-    required: ["email"]
-  }
-) do |args, _session|
-  user = User.find_by(email: args["email"])
-  if user
-    { id: user.id, name: user.name, email: user.email, created_at: user.created_at }
-  else
-    { error: "User not found" }
+MCP_SERVER.register(FindUser, SearchProducts)
+```
+
+#### Using `find!` and `respond_with`
+
+The helpers shine most in mutation tools where the "find-or-raise" and
+"save-or-errors" patterns repeat. Compare:
+
+```ruby
+# Without helpers
+class UpdateUser < VectorMCP::Rails::Tool
+  tool_name   "update_user"
+  description "Update a user's profile"
+
+  param :id,   type: :integer, required: true
+  param :name, type: :string
+
+  def call(args, _session)
+    user = User.find_by(id: args[:id])
+    raise VectorMCP::NotFoundError, "User #{args[:id]} not found" unless user
+
+    if user.update(name: args[:name])
+      { success: true, id: user.id, name: user.name }
+    else
+      { success: false, errors: user.errors.full_messages }
+    end
   end
 end
+```
 
-MCP_SERVER.register_tool(
-  name: "search_products",
-  description: "Search products by name or category",
-  input_schema: {
-    type: "object",
-    properties: {
-      query: { type: "string" },
-      category: { type: "string" },
-      limit: { type: "integer", default: 10 }
-    },
-    required: ["query"]
-  }
-) do |args, _session|
-  products = Product.search(args["query"])
-  products = products.where(category: args["category"]) if args["category"]
-  products.limit(args["limit"] || 10).map do |p|
-    { id: p.id, name: p.name, price: p.price.to_f, category: p.category }
+```ruby
+# With helpers
+class UpdateUser < VectorMCP::Rails::Tool
+  tool_name   "update_user"
+  description "Update a user's profile"
+
+  param :id,   type: :integer, required: true
+  param :name, type: :string
+
+  def call(args, _session)
+    user = find!(User, args[:id])
+    user.update(name: args[:name])
+    respond_with(user, name: user.name)
   end
 end
+```
+
+You can also rely on automatic rescue of `ActiveRecord::RecordNotFound`
+and `ActiveRecord::RecordInvalid`. This is handy when you want
+`User.find(id)` or `User.create!(attrs)` to "just work":
+
+```ruby
+class DestroyUser < VectorMCP::Rails::Tool
+  tool_name   "destroy_user"
+  description "Delete a user"
+
+  param :id, type: :integer, required: true
+
+  def call(args, _session)
+    with_transaction do
+      user = User.find(args[:id])           # AR::RecordNotFound → NotFoundError
+      user.destroy!                         # AR::RecordInvalid  → error payload
+      { success: true, id: user.id }
+    end
+  end
+end
+```
+
+### Param Types and Coercion
+
+`param :foo, type: :xxx` accepts the usual JSON Schema types plus two
+Ruby-native conveniences that auto-coerce client-supplied strings before
+your `#call` runs:
+
+| Type        | JSON Schema                             | Handler receives      |
+|-------------|-----------------------------------------|-----------------------|
+| `:string`   | `{ "type": "string" }`                  | `String`              |
+| `:integer`  | `{ "type": "integer" }`                 | `Integer`             |
+| `:number`   | `{ "type": "number" }`                  | `Numeric`             |
+| `:boolean`  | `{ "type": "boolean" }`                 | `true` / `false`      |
+| `:array`    | `{ "type": "array" }`                   | `Array`               |
+| `:object`   | `{ "type": "object" }`                  | `Hash`                |
+| `:date`     | `{ "type": "string", "format": "date" }`      | `Date`          |
+| `:datetime` | `{ "type": "string", "format": "date-time" }` | `Time`          |
+
+`:date` and `:datetime` parse the incoming string via `Date.parse` /
+`Time.parse` before the handler sees it. Unparseable input is rejected
+with a JSON-RPC `InvalidParamsError` (code `-32602`) — the client sees a
+clean "bad request" response instead of a generic internal error.
+
+```ruby
+class ExpireSubscription < VectorMCP::Rails::Tool
+  tool_name   "expire_subscription"
+  description "Mark a subscription as expired on the given date"
+
+  param :id,         type: :integer, required: true
+  param :expires_on, type: :date,    required: true
+
+  def call(args, _session)
+    subscription = find!(Subscription, args[:id])
+    subscription.update(expires_on: args[:expires_on])  # already a Date
+    respond_with(subscription)
+  end
+end
+```
+
+Any additional JSON Schema keywords (`enum`, `minimum`, `maximum`,
+`pattern`, `format`, `items`, `default`) pass through as keyword
+arguments on `param`:
+
+```ruby
+param :priority, type: :string, enum: %w[low normal high], default: "normal"
+param :score,    type: :number, minimum: 0, maximum: 100
+param :email,    type: :string, format: "email"
+param :tags,     type: :array,  items: { "type" => "string" }
 ```
 
 ### Registering Resources
@@ -384,14 +530,16 @@ VectorMCP uses `concurrent-ruby` for thread-safe session management and event st
 
 ### Extracting MCP Setup to a Dedicated File
 
-For larger applications, move tool registrations out of the initializer:
+For larger applications, give each tool its own class file and collect
+the registrations in a single setup module:
 
 ```
 app/
   mcp/
     tools/
-      user_tools.rb
-      product_tools.rb
+      find_user.rb
+      search_users.rb
+      update_user.rb
     resources/
       schema_resources.rb
     prompts/
@@ -400,38 +548,49 @@ app/
 ```
 
 ```ruby
-# app/mcp/setup.rb
+# app/mcp/tools/find_user.rb
+require "vector_mcp/rails/tool"
+
 module Mcp
-  module Setup
-    def self.configure(server)
-      Tools::UserTools.register(server)
-      Tools::ProductTools.register(server)
-      Resources::SchemaResources.register(server)
-      Prompts::OrderPrompts.register(server)
+  module Tools
+    class FindUser < VectorMCP::Rails::Tool
+      tool_name   "find_user"
+      description "Look up a user by email address"
+
+      param :email, type: :string, required: true, format: "email"
+
+      def call(args, _session)
+        user = User.find_by(email: args[:email])
+        raise VectorMCP::NotFoundError, "User #{args[:email]} not found" unless user
+
+        { id: user.id, name: user.name, email: user.email }
+      end
     end
   end
 end
 ```
 
 ```ruby
-# app/mcp/tools/user_tools.rb
+# app/mcp/setup.rb
+require_relative "tools/find_user"
+require_relative "tools/search_users"
+require_relative "tools/update_user"
+require_relative "resources/schema_resources"
+require_relative "prompts/order_prompts"
+
 module Mcp
-  module Tools
-    module UserTools
-      def self.register(server)
-        server.register_tool(
-          name: "find_user",
-          description: "Look up a user by email",
-          input_schema: {
-            type: "object",
-            properties: { email: { type: "string" } },
-            required: ["email"]
-          }
-        ) do |args, _session|
-          user = User.find_by(email: args["email"])
-          user ? { id: user.id, name: user.name } : { error: "Not found" }
-        end
-      end
+  module Setup
+    TOOLS = [
+      Tools::FindUser,
+      Tools::SearchUsers,
+      Tools::UpdateUser
+    ].freeze
+
+    def self.configure(server)
+      TOOLS.each { |klass| server.register(klass) }
+
+      Resources::SchemaResources.register(server)
+      Prompts::OrderPrompts.register(server)
     end
   end
 end
@@ -448,10 +607,30 @@ MCP_APP = MCP_SERVER.rack_app
 
 ## Full Example Initializer
 
-A complete production-ready initializer:
+A complete production-ready initializer with a class-based tool:
+
+```ruby
+# app/mcp/tools/search_users.rb
+require "vector_mcp/rails/tool"
+
+class SearchUsers < VectorMCP::Rails::Tool
+  tool_name   "search_users"
+  description "Search users by name or email"
+
+  param :query, type: :string,  desc: "Search term", required: true
+  param :limit, type: :integer, desc: "Max results", default: 10
+
+  def call(args, _session)
+    User.where("name ILIKE :q OR email ILIKE :q", q: "%#{args[:query]}%")
+        .limit(args[:limit] || 10)
+        .map { |u| { id: u.id, name: u.name, email: u.email } }
+  end
+end
+```
 
 ```ruby
 # config/initializers/mcp_server.rb
+require_relative "../../app/mcp/tools/search_users"
 
 MCP_SERVER = VectorMCP::Server.new(
   name: Rails.application.class.module_parent_name,
@@ -467,22 +646,7 @@ if Rails.env.production?
 end
 
 # --- Tools ---
-MCP_SERVER.register_tool(
-  name: "search_users",
-  description: "Search users by name or email",
-  input_schema: {
-    type: "object",
-    properties: {
-      query: { type: "string", description: "Search term" },
-      limit: { type: "integer", description: "Max results", default: 10 }
-    },
-    required: ["query"]
-  }
-) do |args, _session|
-  User.where("name ILIKE :q OR email ILIKE :q", q: "%#{args['query']}%")
-      .limit(args["limit"] || 10)
-      .map { |u| { id: u.id, name: u.name, email: u.email } }
-end
+MCP_SERVER.register(SearchUsers)
 
 # --- Resources ---
 MCP_SERVER.register_resource(

@@ -191,7 +191,7 @@ module VectorMCP
       # @param required_parameters [Array<String>] List of required parameter names.
       # @param block [Proc] The tool handler block.
       # @return [VectorMCP::Definitions::Tool] The registered tool.
-      def register_image_tool(name:, description:, image_parameter: "image", additional_parameters: {}, required_parameters: [], &block)
+      def register_image_tool(name:, description:, image_parameter: "image", additional_parameters: {}, required_parameters: [], &)
         # Build the input schema with image support
         image_property = {
           type: "string",
@@ -212,7 +212,7 @@ module VectorMCP
           name: name,
           description: description,
           input_schema: input_schema,
-          &block
+          &
         )
       end
 
@@ -224,13 +224,13 @@ module VectorMCP
       # @param additional_arguments [Array<Hash>] Additional prompt arguments.
       # @param block [Proc] The prompt handler block.
       # @return [VectorMCP::Definitions::Prompt] The registered prompt.
-      def register_image_prompt(name:, description:, image_argument: "image", additional_arguments: [], &block)
+      def register_image_prompt(name:, description:, image_argument: "image", additional_arguments: [], &)
         prompt = VectorMCP::Definitions::Prompt.with_image_support(
           name: name,
           description: description,
           image_argument_name: image_argument,
           additional_arguments: additional_arguments,
-          &block
+          &
         )
 
         register_prompt(

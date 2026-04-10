@@ -574,7 +574,7 @@ server.use_middleware(MyMiddleware, :before_tool_call)
 ### Development Configuration
 
 **RuboCop Configuration** (`.rubocop.yml`):
-- Target Ruby version: 3.0.6
+- Target Ruby version: 3.2
 - Relaxed documentation requirements
 - Increased method/class length limits for examples
 - Double-quoted string literals enforced

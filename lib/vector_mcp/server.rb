@@ -142,12 +142,12 @@ module VectorMCP
     #   These are passed to the transport's constructor if a symbol is provided for `transport`.
     # @return [void]
     # @raise [ArgumentError] if an unsupported transport symbol is given.
-    def run(transport: :http_stream, **options)
+    def run(transport: :http_stream, **)
       active_transport = case transport
                          when :http_stream
                            begin
                              require_relative "transport/http_stream"
-                             VectorMCP::Transport::HttpStream.new(self, **options)
+                             VectorMCP::Transport::HttpStream.new(self, **)
                            rescue LoadError => e
                              logger.fatal("HttpStream transport requires additional dependencies.")
                              raise NotImplementedError, "HttpStream transport dependencies not available: #{e.message}"
@@ -176,9 +176,9 @@ module VectorMCP
     #
     # @param options [Hash] Transport options (e.g., :session_timeout, :event_retention, :allowed_origins)
     # @return [VectorMCP::Transport::HttpStream] A Rack-compatible app
-    def rack_app(**options)
+    def rack_app(**)
       require_relative "transport/http_stream"
-      active_transport = VectorMCP::Transport::HttpStream.new(self, mounted: true, **options)
+      active_transport = VectorMCP::Transport::HttpStream.new(self, mounted: true, **)
       self.transport = active_transport
       active_transport
     end
@@ -223,9 +223,9 @@ module VectorMCP
     # Enable authorization with optional policy configuration block
     # @param block [Proc] optional block for configuring authorization policies
     # @return [void]
-    def enable_authorization!(&block)
+    def enable_authorization!(&)
       @authorization.enable!
-      instance_eval(&block) if block_given?
+      instance_eval(&) if block_given?
       @logger.info("Authorization enabled")
     end
 
@@ -239,29 +239,29 @@ module VectorMCP
     # Add authorization policy for tools
     # @param block [Proc] policy block that receives (user, action, tool)
     # @return [void]
-    def authorize_tools(&block)
-      @authorization.add_policy(:tool, &block)
+    def authorize_tools(&)
+      @authorization.add_policy(:tool, &)
     end
 
     # Add authorization policy for resources
     # @param block [Proc] policy block that receives (user, action, resource)
     # @return [void]
-    def authorize_resources(&block)
-      @authorization.add_policy(:resource, &block)
+    def authorize_resources(&)
+      @authorization.add_policy(:resource, &)
     end
 
     # Add authorization policy for prompts
     # @param block [Proc] policy block that receives (user, action, prompt)
     # @return [void]
-    def authorize_prompts(&block)
-      @authorization.add_policy(:prompt, &block)
+    def authorize_prompts(&)
+      @authorization.add_policy(:prompt, &)
     end
 
     # Add authorization policy for roots
     # @param block [Proc] policy block that receives (user, action, root)
     # @return [void]
-    def authorize_roots(&block)
-      @authorization.add_policy(:root, &block)
+    def authorize_roots(&)
+      @authorization.add_policy(:root, &)
     end
 
     # Check if security features are enabled
@@ -338,8 +338,8 @@ module VectorMCP
     # Add custom authentication strategy
     # @param handler [Proc] custom authentication handler block
     # @return [void]
-    def add_custom_auth(&block)
-      strategy = Security::Strategies::Custom.new(&block)
+    def add_custom_auth(&)
+      strategy = Security::Strategies::Custom.new(&)
       @auth_manager.add_strategy(:custom, strategy)
     end
 

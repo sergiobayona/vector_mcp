@@ -66,8 +66,8 @@ module VectorMCP
     # Any positional or keyword arguments are forwarded verbatim to the underlying
     # constructor, so refer to {VectorMCP::Server#initialize} for the full list of
     # accepted parameters.
-    def new(*args, **kwargs)
-      Server.new(*args, **kwargs)
+    def new(*, **)
+      Server.new(*, **)
     end
   end
 end

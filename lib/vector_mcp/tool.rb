@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+require "date"
+require "time"
+require_relative "errors"
+
 module VectorMCP
   # Abstract base class for declarative tool definitions.
   #
@@ -24,14 +28,27 @@ module VectorMCP
   #   server.register(ListProviders)
   #
   class Tool
-    # Maps Ruby symbol types to JSON Schema type strings.
+    # Maps Ruby symbol types to JSON Schema property fragments.
+    # Each value is merged into the generated property hash, so it may carry
+    # both +type+ and +format+ (or any other JSON Schema keyword).
     TYPE_MAP = {
-      string: "string",
-      integer: "integer",
-      number: "number",
-      boolean: "boolean",
-      array: "array",
-      object: "object"
+      string: { "type" => "string" },
+      integer: { "type" => "integer" },
+      number: { "type" => "number" },
+      boolean: { "type" => "boolean" },
+      array: { "type" => "array" },
+      object: { "type" => "object" },
+      date: { "type" => "string", "format" => "date" },
+      datetime: { "type" => "string", "format" => "date-time" }
+    }.freeze
+
+    # Maps Ruby symbol types to a coercer lambda. Types not listed here
+    # pass their values through unchanged. Coercers receive the raw value
+    # (or nil) and return the coerced value. They must be total over the
+    # values JSON Schema validation would accept.
+    COERCERS = {
+      date: ->(v) { v.nil? || v.is_a?(Date) ? v : Date.parse(v.to_s) },
+      datetime: ->(v) { v.nil? || v.is_a?(Time) ? v : Time.parse(v.to_s) }
     }.freeze
 
     # Ensures each subclass gets its own +@params+ array so sibling
@@ -128,11 +145,47 @@ module VectorMCP
     private_class_method :validate_tool_class!
 
     # Builds a 2-arity handler lambda. A new instance is created per invocation.
+    # Arguments are coerced based on the declared param types before the
+    # handler sees them (e.g. :date param strings become Date objects).
     def self.build_handler
       klass = self
-      ->(args, session) { klass.new.call(args, session) }
+      params = @params
+      ->(args, session) { klass.new.call(klass.coerce_args(args, params), session) }
     end
     private_class_method :build_handler
+
+    # Applies coercers to the raw argument hash. Returns a new hash; does
+    # not mutate the original. Keys without a coercible type pass through.
+    # Keys that are absent from +args+ stay absent — coercion only fires
+    # for keys actually present.
+    #
+    # A parse failure on a client-supplied value is translated into
+    # +VectorMCP::InvalidParamsError+ (JSON-RPC -32602) so the client sees
+    # a "bad request" response instead of a generic internal error.
+    # This is needed because the +json-schema+ gem does not enforce
+    # +format: date+ upstream (it does enforce +format: date-time+), so
+    # malformed +:date+ values would otherwise crash inside +Date.parse+.
+    def self.coerce_args(args, params)
+      coerced = args.dup
+      params.each do |param|
+        name = param[:name]
+        next unless coerced.key?(name)
+
+        coercer = COERCERS[param[:type]]
+        next unless coercer
+
+        begin
+          coerced[name] = coercer.call(coerced[name])
+        rescue ArgumentError, TypeError => e
+          # Date::Error < ArgumentError in Ruby 3.2+, so ArgumentError alone covers Date.parse failures.
+          raise VectorMCP::InvalidParamsError.new(
+            "Invalid #{param[:type]} value for param '#{name}': #{e.message}",
+            details: { param: name, type: param[:type], message: e.message }
+          )
+        end
+      end
+      coerced
+    end
 
     # Builds a JSON Schema hash from the declared params.
     def self.build_input_schema
@@ -140,12 +193,12 @@ module VectorMCP
       required = []
 
       @params.each do |param|
-        json_type = TYPE_MAP.fetch(param[:type]) do
+        type_fragment = TYPE_MAP.fetch(param[:type]) do
           raise ArgumentError, "Unknown param type :#{param[:type]} for param '#{param[:name]}' in #{name}. " \
                                "Valid types: #{TYPE_MAP.keys.join(", ")}"
         end
 
-        prop = { "type" => json_type }
+        prop = type_fragment.dup
         prop["description"] = param[:desc] if param[:desc]
 
         param[:options].each do |key, value|

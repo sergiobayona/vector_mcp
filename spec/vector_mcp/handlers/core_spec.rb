@@ -388,9 +388,9 @@ RSpec.describe VectorMCP::Handlers::Core do
     context "when auth is not required" do
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: true,
-          session_context: anonymous_context
-        })
+                                                                             success: true,
+                                                                             session_context: anonymous_context
+                                                                           })
         allow(server).to receive(:respond_to?).with(:auth_manager).and_return(false)
         allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
       end
@@ -407,9 +407,9 @@ RSpec.describe VectorMCP::Handlers::Core do
 
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: true,
-          session_context: authenticated_context
-        })
+                                                                             success: true,
+                                                                             session_context: authenticated_context
+                                                                           })
         allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
         allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
         allow(server).to receive(:auth_manager).and_return(auth_manager)
@@ -428,9 +428,9 @@ RSpec.describe VectorMCP::Handlers::Core do
 
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: false,
-          session_context: anonymous_context
-        })
+                                                                             success: false,
+                                                                             session_context: anonymous_context
+                                                                           })
         allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
         allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
         allow(server).to receive(:auth_manager).and_return(auth_manager)
@@ -458,9 +458,9 @@ RSpec.describe VectorMCP::Handlers::Core do
     context "when authorization succeeds via legacy path" do
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: true,
-          session_context: VectorMCP::Security::SessionContext.anonymous
-        })
+                                                                             success: true,
+                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
+                                                                           })
       end
 
       it "executes the tool handler" do
@@ -493,9 +493,9 @@ RSpec.describe VectorMCP::Handlers::Core do
     context "when server supports authorize_action method" do
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: true,
-          session_context: VectorMCP::Security::SessionContext.anonymous
-        })
+                                                                             success: true,
+                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
+                                                                           })
         allow(security_middleware).to receive(:respond_to?) do |method_name|
           %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
         end
@@ -512,9 +512,9 @@ RSpec.describe VectorMCP::Handlers::Core do
     context "when authorize_action denies access" do
       before do
         allow(security_middleware).to receive(:process_request).and_return({
-          success: true,
-          session_context: VectorMCP::Security::SessionContext.anonymous
-        })
+                                                                             success: true,
+                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
+                                                                           })
         allow(security_middleware).to receive(:respond_to?) do |method_name|
           %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
         end

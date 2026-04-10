@@ -902,8 +902,8 @@ module VectorMCP
       #
       # @param obj [Object] The object to transform (Hash, Array, or other)
       # @return [Object] The transformed object
-      def deep_transform_keys(obj, &block)
-        transform_object_keys(obj, &block)
+      def deep_transform_keys(obj, &)
+        transform_object_keys(obj, &)
       end
 
       # Core transformation logic extracted for better maintainability

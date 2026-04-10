@@ -6,6 +6,7 @@ source "https://rubygems.org"
 gemspec
 
 group :development, :test do
+  gem "activerecord", "~> 8.0"
   gem "bundler", "~> 2.0"
   gem "irb"
   gem "rack-test", "~> 2.1"
@@ -16,5 +17,6 @@ group :development, :test do
   gem "rubocop-rake", "~> 0.6"
   gem "ruby-lsp"
   gem "simplecov"
+  gem "sqlite3", "~> 2.0"
   gem "yard", "~> 0.9"
 end

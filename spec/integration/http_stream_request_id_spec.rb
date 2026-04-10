@@ -225,7 +225,7 @@ RSpec.describe "HttpStream Request ID Generation Integration", type: :integratio
         end
 
         # No ID collisions between sessions
-        expect((session1_ids & session2_ids).empty?).to be true
+        expect(session1_ids.intersect?(session2_ids)).to be false
       end
     end
 
