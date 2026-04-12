@@ -373,7 +373,7 @@ RSpec.describe VectorMCP::Handlers::Core do
     end
   end
 
-  describe "authenticate_session! flow" do
+  describe "authenticate_request! flow" do
     let(:tool) { double("tool", handler: proc { |_args| "ok" }, input_schema: nil) }
     let(:authenticated_context) do
       VectorMCP::Security::SessionContext.new(user: { user_id: "user-1" }, authenticated: true)

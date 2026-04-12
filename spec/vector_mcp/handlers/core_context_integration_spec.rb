@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe VectorMCP::Handlers::Core, "context integration" do
-  describe ".extract_request_from_session" do
+  describe ".extract_auth_credentials" do
     let(:server) { instance_double(VectorMCP::Server, logger: logger) }
     let(:logger) { instance_double(Logger, info: nil, warn: nil) }
     let(:transport) { instance_double(VectorMCP::Transport::Base) }
@@ -36,7 +36,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "extracts request context using public interface" do
-        result = described_class.send(:extract_request_from_session, session)
+        result = described_class.send(:extract_auth_credentials, session)
 
         expect(result).to be_a(Hash)
         expect(result[:headers]).to eq({
@@ -60,7 +60,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
           request_context: VectorMCP::RequestContext.minimal("test")
         )
 
-        result = described_class.send(:extract_request_from_session, minimal_session)
+        result = described_class.send(:extract_auth_credentials, minimal_session)
 
         expect(result).to be_a(Hash)
         expect(result[:headers]).to eq({})
@@ -71,7 +71,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       it "handles session with empty context" do
         empty_session = VectorMCP::Session.new(server, transport, id: "empty-session")
 
-        result = described_class.send(:extract_request_from_session, empty_session)
+        result = described_class.send(:extract_auth_credentials, empty_session)
 
         expect(result).to be_a(Hash)
         expect(result[:headers]).to eq({})
@@ -82,7 +82,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       it "does not log deprecation warnings for new interface" do
         allow(VectorMCP).to receive(:logger_for).and_return(logger)
 
-        described_class.send(:extract_request_from_session, session)
+        described_class.send(:extract_auth_credentials, session)
 
         expect(logger).not_to have_received(:warn)
       end
@@ -99,7 +99,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
 
       it "raises error for sessions without request_context" do
         expect do
-          described_class.send(:extract_request_from_session, legacy_session)
+          described_class.send(:extract_auth_credentials, legacy_session)
         end.to raise_error(VectorMCP::InternalError, /Session missing request_context/)
       end
 
@@ -110,7 +110,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         allow(session_with_nil_context).to receive(:id).and_return("nil-context-session")
 
         expect do
-          described_class.send(:extract_request_from_session, session_with_nil_context)
+          described_class.send(:extract_auth_credentials, session_with_nil_context)
         end.to raise_error(VectorMCP::InternalError, /Session missing request_context/)
       end
     end
@@ -120,7 +120,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         # Normal session with empty but valid request context
         session_with_empty_context = VectorMCP::Session.new(server, transport, id: "empty-context-session")
 
-        result = described_class.send(:extract_request_from_session, session_with_empty_context)
+        result = described_class.send(:extract_auth_credentials, session_with_empty_context)
 
         expect(result).to be_a(Hash)
         expect(result[:headers]).to eq({})
@@ -154,7 +154,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "extracts context suitable for security middleware" do
-        result = described_class.send(:extract_request_from_session, http_session)
+        result = described_class.send(:extract_auth_credentials, http_session)
 
         expect(result[:headers]["Authorization"]).to eq("Bearer token123")
         expect(result[:headers]["X-API-Key"]).to eq("secret456")
@@ -164,7 +164,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "provides context that works with API key authentication" do
-        result = described_class.send(:extract_request_from_session, http_session)
+        result = described_class.send(:extract_auth_credentials, http_session)
 
         # Simulate API key extraction like security middleware would do
         api_key_from_header = result[:headers]["X-API-Key"]
@@ -175,7 +175,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "provides context that works with bearer token authentication" do
-        result = described_class.send(:extract_request_from_session, http_session)
+        result = described_class.send(:extract_auth_credentials, http_session)
 
         # Simulate bearer token extraction like security middleware would do
         auth_header = result[:headers]["Authorization"]
@@ -203,7 +203,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "extracts context suitable for HTTP-specific authentication" do
-        result = described_class.send(:extract_request_from_session, http_session)
+        result = described_class.send(:extract_auth_credentials, http_session)
 
         expect(result[:headers]["Accept"]).to eq("text/event-stream")
         expect(result[:headers]["X-Custom-Auth"]).to eq("custom-secret")
@@ -224,7 +224,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "extracts minimal context for non-HTTP transport" do
-        result = described_class.send(:extract_request_from_session, minimal_transport_session)
+        result = described_class.send(:extract_auth_credentials, minimal_transport_session)
 
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
@@ -232,7 +232,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       end
 
       it "works with authentication disabled scenarios" do
-        result = described_class.send(:extract_request_from_session, minimal_transport_session)
+        result = described_class.send(:extract_auth_credentials, minimal_transport_session)
 
         expect(result[:headers]["Authorization"]).to be_nil
         expect(result[:headers]["X-API-Key"]).to be_nil
@@ -258,8 +258,8 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       )
 
       # Multiple calls should be efficient
-      result1 = described_class.send(:extract_request_from_session, session)
-      result2 = described_class.send(:extract_request_from_session, session)
+      result1 = described_class.send(:extract_auth_credentials, session)
+      result2 = described_class.send(:extract_auth_credentials, session)
 
       expect(result1).to eq(result2)
       expect(result1[:headers]["X-Performance-Test"]).to eq("value")
@@ -286,7 +286,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         }
       )
 
-      result = described_class.send(:extract_request_from_session, session)
+      result = described_class.send(:extract_auth_credentials, session)
 
       expect(result[:headers].keys.length).to eq(100)
       expect(result[:params].keys.length).to eq(100)

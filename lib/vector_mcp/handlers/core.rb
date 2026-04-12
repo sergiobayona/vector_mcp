@@ -55,7 +55,7 @@ module VectorMCP
         context = create_tool_context(tool_name, params, session, server)
 
         begin
-          session_context = authenticate_session!(session, server, operation_type: :tool_call, operation_name: tool_name)
+          session_context = authenticate_request!(session, server, operation_type: :tool_call, operation_name: tool_name)
 
           context = server.middleware_manager.execute_hooks(:before_tool_call, context)
           return handle_middleware_error(context) if context.error?
@@ -64,7 +64,7 @@ module VectorMCP
           arguments = context.params["arguments"] || {}
           tool = find_tool!(tool_name, server)
           authorize_action!(session_context, :call, tool, server)
-          validate_input_arguments!(tool_name, tool, arguments)
+          validate_tool_arguments!(tool_name, tool, arguments)
 
           result = execute_tool_handler(tool, arguments, session)
           context.result = build_tool_result(result)
@@ -105,7 +105,7 @@ module VectorMCP
         context = create_resource_context(uri_s, params, session, server)
 
         begin
-          session_context = authenticate_session!(session, server, operation_type: :resource_read, operation_name: uri_s)
+          session_context = authenticate_request!(session, server, operation_type: :resource_read, operation_name: uri_s)
 
           context = server.middleware_manager.execute_hooks(:before_resource_read, context)
           return handle_middleware_error(context) if context.error?
@@ -206,7 +206,7 @@ module VectorMCP
           prompt = fetch_prompt(prompt_name, server)
 
           arguments = context_params["arguments"] || {}
-          validate_arguments!(prompt_name, prompt, arguments)
+          validate_prompt_arguments!(prompt_name, prompt, arguments)
 
           # Call the registered handler after arguments were validated
           result_data = prompt.handler.call(arguments)
@@ -280,7 +280,7 @@ module VectorMCP
       # @param arguments [Hash] The arguments supplied by the client.
       # @return [void]
       # @raise [VectorMCP::InvalidParamsError] if arguments are invalid (e.g., missing, unknown, wrong type).
-      def self.validate_arguments!(prompt_name, prompt, arguments)
+      def self.validate_prompt_arguments!(prompt_name, prompt, arguments)
         ensure_hash!(prompt_name, arguments, "arguments")
 
         arg_defs = prompt.respond_to?(:arguments) ? (prompt.arguments || []) : []
@@ -291,7 +291,7 @@ module VectorMCP
         raise VectorMCP::InvalidParamsError.new("Invalid arguments",
                                                 details: build_invalid_arg_details(prompt_name, missing, unknown))
       end
-      private_class_method :validate_arguments!
+      private_class_method :validate_prompt_arguments!
 
       # Ensures a given value is a Hash.
       # @api private
@@ -369,7 +369,7 @@ module VectorMCP
       # @param arguments [Hash] The arguments supplied by the client.
       # @return [void]
       # @raise [VectorMCP::InvalidParamsError] if arguments fail validation.
-      def self.validate_input_arguments!(tool_name, tool, arguments)
+      def self.validate_tool_arguments!(tool_name, tool, arguments)
         return unless tool.input_schema.is_a?(Hash)
         return if tool.input_schema.empty?
 
@@ -397,14 +397,14 @@ module VectorMCP
           }
         )
       end
-      private_class_method :validate_input_arguments!
+      private_class_method :validate_tool_arguments!
       private_class_method :raise_tool_validation_error
 
       # Extract request context from session for security processing
       # @api private
       # @param session [VectorMCP::Session] The current session
       # @return [Hash] Request context for security middleware
-      def self.extract_request_from_session(session)
+      def self.extract_auth_credentials(session)
         # All sessions should have a request_context - this is enforced by Session initialization
         unless session.respond_to?(:request_context) && session.request_context
           raise VectorMCP::InternalError,
@@ -417,25 +417,7 @@ module VectorMCP
           session_id: session.id
         }
       end
-      private_class_method :extract_request_from_session
-
-      # Handle security failure by raising appropriate error
-      # @api private
-      # @param security_result [Hash] The security check result
-      # @return [void]
-      # @raise [VectorMCP::UnauthorizedError, VectorMCP::ForbiddenError]
-      def self.handle_security_failure(security_result)
-        case security_result[:error_code]
-        when "AUTHENTICATION_REQUIRED"
-          raise VectorMCP::UnauthorizedError, security_result[:error]
-        when "AUTHORIZATION_FAILED"
-          raise VectorMCP::ForbiddenError, security_result[:error]
-        else
-          # Fallback to generic unauthorized error
-          raise VectorMCP::UnauthorizedError, security_result[:error] || "Security check failed"
-        end
-      end
-      private_class_method :handle_security_failure
+      private_class_method :extract_auth_credentials
 
       # Handle middleware error by returning appropriate response or raising error
       # @api private
@@ -472,9 +454,9 @@ module VectorMCP
         tool
       end
 
-      # Resolve the session authentication state before operation middleware runs.
-      def self.authenticate_session!(session, server, operation_type:, operation_name:)
-        request = extract_request_from_session(session)
+      # Authenticate the current request and return the caller's identity.
+      def self.authenticate_request!(session, server, operation_type:, operation_name:)
+        request = extract_auth_credentials(session)
         context = create_auth_context(operation_type, operation_name, request, session, server)
         context = server.middleware_manager.execute_hooks(:before_auth, context)
         raise context.error if context.error?
@@ -538,7 +520,7 @@ module VectorMCP
         server.resources[uri_s]
       end
 
-      # Validate resource security
+      # Check authorization and raise ForbiddenError if denied
       def self.authorize_action!(session_context, action, resource, server)
         return if server.security_middleware.authorize_action(session_context, action, resource)
 
@@ -593,7 +575,7 @@ module VectorMCP
         raise error
       end
 
-      private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :authenticate_session!,
+      private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :authenticate_request!,
                            :execute_tool_handler, :build_tool_result, :handle_tool_error, :create_resource_context,
                            :find_resource!, :authorize_action!, :execute_resource_handler,
                            :process_resource_content, :handle_resource_error, :create_auth_context,
