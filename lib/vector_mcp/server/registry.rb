@@ -131,114 +131,74 @@ module VectorMCP
       end
 
       # Helper method to register an image resource from a file path.
+      # Thin wrapper: delegates schema-building to Definitions::Resource.from_image_file,
+      # then stores the result via register_resource.
       #
       # @param uri [String] Unique URI for the resource.
       # @param file_path [String] Path to the image file.
       # @param name [String, nil] Human-readable name (auto-generated if nil).
       # @param description [String, nil] Description (auto-generated if nil).
-      # @return [VectorMCP::Definitions::Resource] The registered resource.
+      # @return [self]
       # @raise [ArgumentError] If the file doesn't exist or isn't a valid image.
       def register_image_resource(uri:, file_path:, name: nil, description: nil)
         resource = VectorMCP::Definitions::Resource.from_image_file(
-          uri: uri,
-          file_path: file_path,
-          name: name,
-          description: description
+          uri: uri, file_path: file_path, name: name, description: description
         )
-
-        register_resource(
-          uri: resource.uri,
-          name: resource.name,
-          description: resource.description,
-          mime_type: resource.mime_type,
-          &resource.handler
-        )
+        register_resource(uri: resource.uri, name: resource.name,
+                          description: resource.description, mime_type: resource.mime_type, &resource.handler)
       end
 
       # Helper method to register an image resource from binary data.
+      # Thin wrapper: delegates to Definitions::Resource.from_image_data.
       #
       # @param uri [String] Unique URI for the resource.
       # @param image_data [String] Binary image data.
       # @param name [String] Human-readable name.
       # @param description [String, nil] Description (auto-generated if nil).
       # @param mime_type [String, nil] MIME type (auto-detected if nil).
-      # @return [VectorMCP::Definitions::Resource] The registered resource.
-      # @raise [ArgumentError] If the data isn't valid image data.
+      # @return [self]
       def register_image_resource_from_data(uri:, image_data:, name:, description: nil, mime_type: nil)
         resource = VectorMCP::Definitions::Resource.from_image_data(
-          uri: uri,
-          image_data: image_data,
-          name: name,
-          description: description,
-          mime_type: mime_type
+          uri: uri, image_data: image_data, name: name, description: description, mime_type: mime_type
         )
-
-        register_resource(
-          uri: resource.uri,
-          name: resource.name,
-          description: resource.description,
-          mime_type: resource.mime_type,
-          &resource.handler
-        )
+        register_resource(uri: resource.uri, name: resource.name,
+                          description: resource.description, mime_type: resource.mime_type, &resource.handler)
       end
 
       # Helper method to register a tool that accepts image inputs.
+      # Thin wrapper: delegates schema-building to Definitions::Tool.with_image_support.
       #
       # @param name [String] Unique name for the tool.
       # @param description [String] Human-readable description.
       # @param image_parameter [String] Name of the image parameter (default: "image").
       # @param additional_parameters [Hash] Additional JSON Schema properties.
       # @param required_parameters [Array<String>] List of required parameter names.
-      # @param block [Proc] The tool handler block.
-      # @return [VectorMCP::Definitions::Tool] The registered tool.
-      def register_image_tool(name:, description:, image_parameter: "image", additional_parameters: {}, required_parameters: [], &)
-        # Build the input schema with image support
-        image_property = {
-          type: "string",
-          description: "Base64 encoded image data or file path to image",
-          contentEncoding: "base64",
-          contentMediaType: "image/*"
-        }
-
-        properties = { image_parameter => image_property }.merge(additional_parameters)
-
-        input_schema = {
-          type: "object",
-          properties: properties,
-          required: required_parameters
-        }
-
-        register_tool(
-          name: name,
-          description: description,
-          input_schema: input_schema,
-          &
+      # @return [self]
+      def register_image_tool(name:, description:, image_parameter: "image",
+                              additional_parameters: {}, required_parameters: [], &handler)
+        tool = VectorMCP::Definitions::Tool.with_image_support(
+          name: name, description: description, image_parameter: image_parameter,
+          additional_parameters: additional_parameters, required_parameters: required_parameters, &handler
         )
+        register_tool(name: tool.name, description: tool.description,
+                      input_schema: tool.input_schema, &tool.handler)
       end
 
       # Helper method to register a prompt that supports image arguments.
+      # Thin wrapper: delegates to Definitions::Prompt.with_image_support.
       #
       # @param name [String] Unique name for the prompt.
       # @param description [String] Human-readable description.
       # @param image_argument [String] Name of the image argument (default: "image").
       # @param additional_arguments [Array<Hash>] Additional prompt arguments.
-      # @param block [Proc] The prompt handler block.
-      # @return [VectorMCP::Definitions::Prompt] The registered prompt.
-      def register_image_prompt(name:, description:, image_argument: "image", additional_arguments: [], &)
+      # @return [self]
+      def register_image_prompt(name:, description:, image_argument: "image", additional_arguments: [], &handler)
         prompt = VectorMCP::Definitions::Prompt.with_image_support(
-          name: name,
-          description: description,
-          image_argument_name: image_argument,
-          additional_arguments: additional_arguments,
-          &
+          name: name, description: description, image_argument_name: image_argument,
+          additional_arguments: additional_arguments, &handler
         )
-
-        register_prompt(
-          name: prompt.name,
-          description: prompt.description,
-          arguments: prompt.arguments,
-          &prompt.handler
-        )
+        register_prompt(name: prompt.name, description: prompt.description,
+                        arguments: prompt.arguments, &prompt.handler)
       end
 
       private
@@ -262,6 +222,34 @@ module VectorMCP
         raise ArgumentError, "Invalid input_schema structure: #{e.message}"
       end
 
+      # Schema for a single prompt argument definition. Each entry names the
+      # required/optional key, whether it is required, and the rule that validates
+      # its value. Rules return nil on success or an error message fragment.
+      PROMPT_ARG_SCHEMA = {
+        "name" => {
+          required: true,
+          missing_message: "missing :name",
+          rule: lambda { |v|
+            next "must be a String or Symbol. Found: #{v.class}" unless v.is_a?(String) || v.is_a?(Symbol)
+
+            "cannot be empty." if v.to_s.strip.empty?
+          }
+        },
+        "description" => {
+          required: false,
+          rule: ->(v) { "must be a String if provided. Found: #{v.class}" unless v.nil? || v.is_a?(String) }
+        },
+        "required" => {
+          required: false,
+          rule: ->(v) { "must be true or false if provided. Found: #{v.inspect}" unless [true, false].include?(v) }
+        },
+        "type" => {
+          required: false,
+          rule: ->(v) { "must be a String if provided (e.g., JSON schema type). Found: #{v.class}" unless v.nil? || v.is_a?(String) }
+        }
+      }.freeze
+      private_constant :PROMPT_ARG_SCHEMA
+
       # Validates the structure of the `arguments` array provided to {#register_prompt}.
       # @api private
       def validate_prompt_arguments(argument_defs)
@@ -270,75 +258,37 @@ module VectorMCP
         argument_defs.each_with_index { |arg, idx| validate_single_prompt_argument(arg, idx) }
       end
 
-      # Defines the keys allowed in a prompt argument definition hash.
-      ALLOWED_PROMPT_ARG_KEYS = %w[name description required type].freeze
-      private_constant :ALLOWED_PROMPT_ARG_KEYS
-
-      # Validates a single prompt argument definition hash.
+      # Validates a single prompt argument definition hash against PROMPT_ARG_SCHEMA.
       # @api private
       def validate_single_prompt_argument(arg, idx)
         raise ArgumentError, "Prompt argument definition at index #{idx} must be a Hash. Found: #{arg.class}" unless arg.is_a?(Hash)
 
-        validate_prompt_arg_name!(arg, idx)
-        validate_prompt_arg_description!(arg, idx)
-        validate_prompt_arg_required_flag!(arg, idx)
-        validate_prompt_arg_type!(arg, idx)
-        validate_prompt_arg_unknown_keys!(arg, idx)
+        PROMPT_ARG_SCHEMA.each { |key, spec| validate_prompt_arg_field(arg, idx, key, spec) }
+        validate_prompt_arg_unknown_keys(arg, idx)
       end
 
-      # Validates the :name key of a prompt argument definition.
+      # Validates a single field of a prompt argument hash against its schema spec.
       # @api private
-      def validate_prompt_arg_name!(arg, idx)
-        name_val = arg[:name] || arg["name"]
-        raise ArgumentError, "Prompt argument at index #{idx} missing :name" if name_val.nil?
-        unless name_val.is_a?(String) || name_val.is_a?(Symbol)
-          raise ArgumentError, "Prompt argument :name at index #{idx} must be a String or Symbol. Found: #{name_val.class}"
-        end
-        raise ArgumentError, "Prompt argument :name at index #{idx} cannot be empty." if name_val.to_s.strip.empty?
+      def validate_prompt_arg_field(arg, idx, key, spec)
+        present = arg.key?(key.to_sym) || arg.key?(key)
+        value = arg[key.to_sym] || arg[key]
+
+        raise ArgumentError, "Prompt argument at index #{idx} #{spec[:missing_message]}" if spec[:required] && value.nil?
+        return unless present
+
+        error_fragment = spec[:rule].call(value)
+        raise ArgumentError, "Prompt argument :#{key} at index #{idx} #{error_fragment}" if error_fragment
       end
 
-      # Validates the :description key of a prompt argument definition.
+      # Checks a prompt argument hash for keys outside PROMPT_ARG_SCHEMA.
       # @api private
-      def validate_prompt_arg_description!(arg, idx)
-        return unless arg.key?(:description) || arg.key?("description")
-
-        desc_val = arg[:description] || arg["description"]
-        return if desc_val.nil? || desc_val.is_a?(String)
-
-        raise ArgumentError, "Prompt argument :description at index #{idx} must be a String if provided. Found: #{desc_val.class}"
-      end
-
-      # Validates the :required key of a prompt argument definition.
-      # @api private
-      def validate_prompt_arg_required_flag!(arg, idx)
-        return unless arg.key?(:required) || arg.key?("required")
-
-        req_val = arg[:required] || arg["required"]
-        return if [true, false].include?(req_val)
-
-        raise ArgumentError, "Prompt argument :required at index #{idx} must be true or false if provided. Found: #{req_val.inspect}"
-      end
-
-      # Validates the :type key of a prompt argument definition.
-      # @api private
-      def validate_prompt_arg_type!(arg, idx)
-        return unless arg.key?(:type) || arg.key?("type")
-
-        type_val = arg[:type] || arg["type"]
-        return if type_val.nil? || type_val.is_a?(String)
-
-        raise ArgumentError, "Prompt argument :type at index #{idx} must be a String if provided (e.g., JSON schema type). Found: #{type_val.class}"
-      end
-
-      # Checks for any unknown keys in a prompt argument definition.
-      # @api private
-      def validate_prompt_arg_unknown_keys!(arg, idx)
-        unknown_keys = arg.transform_keys(&:to_s).keys - ALLOWED_PROMPT_ARG_KEYS
+      def validate_prompt_arg_unknown_keys(arg, idx)
+        unknown_keys = arg.transform_keys(&:to_s).keys - PROMPT_ARG_SCHEMA.keys
         return if unknown_keys.empty?
 
         raise ArgumentError,
               "Prompt argument definition at index #{idx} contains unknown keys: #{unknown_keys.join(", ")}. " \
-              "Allowed: #{ALLOWED_PROMPT_ARG_KEYS.join(", ")}."
+              "Allowed: #{PROMPT_ARG_SCHEMA.keys.join(", ")}."
       end
     end
   end

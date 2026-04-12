@@ -72,11 +72,11 @@ module VectorMCP
       end
 
       # Validates that the session is properly initialized for the given request.
+      # Transports are contractually required to pass a VectorMCP::Session here —
+      # never the SessionManager wrapper struct.
       # @api private
       def validate_session_initialization(id, method, _params, session)
-        # Handle both direct VectorMCP::Session and BaseSessionManager::Session wrapper
-        actual_session = session.respond_to?(:context) ? session.context : session
-        return if actual_session.initialized?
+        return if session.initialized?
 
         # Allow "initialize" even if not marked initialized yet by server
         return if method == "initialize"
@@ -115,9 +115,7 @@ module VectorMCP
       # Internal handler for JSON-RPC notifications.
       # @api private
       def handle_notification(method, params, session)
-        # Handle both direct VectorMCP::Session and BaseSessionManager::Session wrapper
-        actual_session = session.respond_to?(:context) ? session.context : session
-        unless actual_session.initialized? || method == "initialized"
+        unless session.initialized? || method == "initialized"
           logger.warn("Ignoring notification '#{method}' before session is initialized. Params: #{params.inspect}")
           return
         end
@@ -162,9 +160,7 @@ module VectorMCP
       # @api private
       def session_method(method_name)
         lambda do |params, session, _server|
-          # Handle both direct VectorMCP::Session and BaseSessionManager::Session wrapper
-          actual_session = session.respond_to?(:context) ? session.context : session
-          actual_session.public_send(method_name, params)
+          session.public_send(method_name, params)
         end
       end
     end

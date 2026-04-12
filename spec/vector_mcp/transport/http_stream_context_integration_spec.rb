@@ -111,16 +111,17 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
       end
     end
 
-    describe "create_session_with_context" do
-      it "creates VectorMCP::Session with rack_env context" do
-        session = session_manager.send(:create_session_with_context, "test-session", rack_env)
+    describe "create_session builds a VectorMCP::Session" do
+      it "populates the request context from rack_env when provided" do
+        managed_session = session_manager.create_session("test-session", rack_env)
+        vector_session = managed_session.context
 
-        expect(session).to be_a(VectorMCP::Session)
-        expect(session.id).to eq("test-session")
-        expect(session.server).to eq(server)
-        expect(session.transport).to eq(transport)
+        expect(vector_session).to be_a(VectorMCP::Session)
+        expect(vector_session.id).to eq("test-session")
+        expect(vector_session.server).to eq(server)
+        expect(vector_session.transport).to eq(transport)
 
-        request_context = session.request_context
+        request_context = vector_session.request_context
         expect(request_context.method).to eq("POST")
         expect(request_context.path).to eq("/mcp")
         expect(request_context.header("Authorization")).to eq("Bearer token123")
@@ -128,13 +129,14 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         expect(request_context.metadata("transport_type")).to eq("http_stream")
       end
 
-      it "creates VectorMCP::Session with minimal context when rack_env is nil" do
-        session = session_manager.send(:create_session_with_context, "test-session", nil)
+      it "creates a minimal request context when rack_env is nil" do
+        managed_session = session_manager.create_session("test-session", nil)
+        vector_session = managed_session.context
 
-        expect(session).to be_a(VectorMCP::Session)
-        expect(session.id).to eq("test-session")
+        expect(vector_session).to be_a(VectorMCP::Session)
+        expect(vector_session.id).to eq("test-session")
 
-        request_context = session.request_context
+        request_context = vector_session.request_context
         expect(request_context.method).to eq("HTTP_STREAM")
         expect(request_context.path).to eq("/")
         expect(request_context.headers).to eq({})

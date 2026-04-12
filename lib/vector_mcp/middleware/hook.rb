@@ -4,10 +4,36 @@ module VectorMCP
   module Middleware
     # Represents a single middleware hook with priority and execution logic
     class Hook
-      attr_reader :middleware_class, :hook_type, :priority, :conditions
+      attr_reader :middleware_class, :hook_type, :operation_type, :priority, :conditions
 
       # Default priority for middleware (lower numbers execute first)
       DEFAULT_PRIORITY = 100
+
+      # Maps hook type strings to the operation_type a Context must have for
+      # the hook to match. `nil` means the hook is transport- or auth-level and
+      # matches any operation_type. Computed once at construction to avoid
+      # re-parsing hook name strings on every dispatch.
+      HOOK_OPERATION_TYPES = {
+        "before_tool_call" => :tool_call,
+        "after_tool_call" => :tool_call,
+        "on_tool_error" => :tool_call,
+        "before_resource_read" => :resource_read,
+        "after_resource_read" => :resource_read,
+        "on_resource_error" => :resource_read,
+        "before_prompt_get" => :prompt_get,
+        "after_prompt_get" => :prompt_get,
+        "on_prompt_error" => :prompt_get,
+        "before_sampling_request" => :sampling,
+        "after_sampling_response" => :sampling,
+        "on_sampling_error" => :sampling,
+        "before_request" => nil,
+        "after_response" => nil,
+        "on_transport_error" => nil,
+        "before_auth" => nil,
+        "after_auth" => nil,
+        "on_auth_error" => nil
+      }.freeze
+      private_constant :HOOK_OPERATION_TYPES
 
       # @param middleware_class [Class] The middleware class to execute
       # @param hook_type [String, Symbol] Type of hook (before_tool_call, etc.)
@@ -21,6 +47,8 @@ module VectorMCP
 
         validate_hook_type!
         validate_middleware_class!
+
+        @operation_type = HOOK_OPERATION_TYPES[@hook_type]
       end
 
       # Execute this hook with the given context
@@ -72,12 +100,12 @@ module VectorMCP
         raise ArgumentError, "middleware_class must inherit from VectorMCP::Middleware::Base"
       end
 
+      # Whether this hook's operation_type matches the context's. Transport- and
+      # auth-level hooks (operation_type == nil) match any context.
       def matches_operation_type?(context)
-        operation_prefix = @hook_type.split("_")[1..].join("_")
+        return true if @operation_type.nil?
 
-        return true if transport_or_auth_hook?(operation_prefix)
-
-        operation_matches?(operation_prefix, context.operation_type)
+        context.operation_type == @operation_type
       end
 
       def condition_matches?(key, value, context)
@@ -88,25 +116,6 @@ module VectorMCP
           user_condition_matches?(key, value, context)
         else
           true # Unknown conditions are ignored
-        end
-      end
-
-      def transport_or_auth_hook?(operation_prefix)
-        %w[request response transport_error auth auth_error].include?(operation_prefix)
-      end
-
-      def operation_matches?(operation_prefix, operation_type)
-        case operation_prefix
-        when "tool_call", "tool_error"
-          operation_type == :tool_call
-        when "resource_read", "resource_error"
-          operation_type == :resource_read
-        when "prompt_get", "prompt_error"
-          operation_type == :prompt_get
-        when "sampling_request", "sampling_response", "sampling_error"
-          operation_type == :sampling
-        else
-          true
         end
       end
 

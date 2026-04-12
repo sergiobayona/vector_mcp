@@ -39,19 +39,7 @@ module VectorMCP
       # Notifies connected clients that the list of available prompts has changed.
       # @return [void]
       def notify_prompts_list_changed
-        return unless transport && @prompts_list_changed
-
-        notification_method = "notifications/prompts/list_changed"
-        begin
-          if transport.respond_to?(:send_notification)
-            logger.debug("Sending prompts list changed notification.")
-            transport.send_notification(notification_method)
-          else
-            logger.warn("Transport does not support sending notifications/prompts/list_changed.")
-          end
-        rescue StandardError => e
-          logger.error("Failed to send prompts list changed notification: #{e.class.name}: #{e.message}")
-        end
+        send_list_changed_notification("prompts") if @prompts_list_changed
       end
 
       # Resets the `roots_list_changed` flag to false.
@@ -63,19 +51,7 @@ module VectorMCP
       # Notifies connected clients that the list of available roots has changed.
       # @return [void]
       def notify_roots_list_changed
-        return unless transport && @roots_list_changed
-
-        notification_method = "notifications/roots/list_changed"
-        begin
-          if transport.respond_to?(:send_notification)
-            logger.debug("Sending roots list changed notification.")
-            transport.send_notification(notification_method)
-          else
-            logger.warn("Transport does not support sending notifications/roots/list_changed.")
-          end
-        rescue StandardError => e
-          logger.error("Failed to send roots list changed notification: #{e.class.name}: #{e.message}")
-        end
+        send_list_changed_notification("roots") if @roots_list_changed
       end
 
       # Registers a session as a subscriber to prompt list changes.
@@ -86,6 +62,26 @@ module VectorMCP
       end
 
       private
+
+      # Sends a `notifications/<kind>/list_changed` notification to the transport.
+      # No-op if no transport is attached. Logs a warning if the transport does not
+      # implement `send_notification` (intentional extension point for alternate
+      # transports).
+      # @api private
+      # @param kind [String] One of "prompts" or "roots".
+      def send_list_changed_notification(kind)
+        return unless transport
+
+        notification_method = "notifications/#{kind}/list_changed"
+        if transport.respond_to?(:send_notification)
+          logger.debug("Sending #{kind} list changed notification.")
+          transport.send_notification(notification_method)
+        else
+          logger.warn("Transport does not support sending #{notification_method}.")
+        end
+      rescue StandardError => e
+        logger.error("Failed to send #{kind} list changed notification: #{e.class.name}: #{e.message}")
+      end
 
       # Configures sampling capabilities based on provided configuration.
       # @api private

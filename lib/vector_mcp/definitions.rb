@@ -29,6 +29,36 @@ module VectorMCP
         }.compact # Remove nil values
       end
 
+      # Class method to create a tool whose input_schema already declares a
+      # base64-encoded image property. Mirrors Resource.from_image_file and
+      # Prompt.with_image_support — keeps schema-building logic with the
+      # definition, not with the registry.
+      #
+      # @param name [String] Unique name for the tool.
+      # @param description [String] Human-readable description.
+      # @param image_parameter [String] Name of the image parameter.
+      # @param additional_parameters [Hash] Additional JSON Schema properties.
+      # @param required_parameters [Array<String>] Required parameter names.
+      # @param handler [Proc] Tool handler block.
+      # @return [Tool]
+      def self.with_image_support(name:, description:, image_parameter: "image",
+                                  additional_parameters: {}, required_parameters: [], &handler)
+        image_property = {
+          type: "string",
+          description: "Base64 encoded image data or file path to image",
+          contentEncoding: "base64",
+          contentMediaType: "image/*"
+        }
+
+        input_schema = {
+          type: "object",
+          properties: { image_parameter => image_property }.merge(additional_parameters),
+          required: required_parameters
+        }
+
+        new(name, description, input_schema, handler)
+      end
+
       # Checks if this tool supports image inputs based on its input schema.
       # @return [Boolean] True if the tool's input schema includes image properties.
       def supports_image_input?
