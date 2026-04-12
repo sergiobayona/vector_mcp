@@ -36,7 +36,8 @@ module VectorMCP
         def initialize(max_events)
           @max_events = max_events
           @events = Concurrent::Array.new
-          @event_index = Concurrent::Hash.new # event_id -> index for fast lookup
+          @event_index = Concurrent::Hash.new # event_id -> logical position
+          @offset = 0 # number of events shifted off the front
           @current_sequence = Concurrent::AtomicFixnum.new(0)
         end
 
@@ -53,19 +54,15 @@ module VectorMCP
 
           event = Event.new(event_id, data, type, timestamp, session_id, stream_id)
 
-          # Add to events array
+          # Add to events array and record logical position
           @events.push(event)
-
-          # Update index
-          @event_index[event_id] = @events.length - 1
+          @event_index[event_id] = @offset + @events.length - 1
 
           # Maintain circular buffer
           if @events.length > @max_events
             removed_event = @events.shift
             @event_index.delete(removed_event.id)
-
-            # Update all indices after removal
-            @event_index.transform_values! { |index| index - 1 }
+            @offset += 1
           end
 
           event_id
@@ -81,13 +78,13 @@ module VectorMCP
           events = if last_event_id.nil?
                      @events.to_a
                    else
-                     last_index = @event_index[last_event_id]
-                     return [] if last_index.nil?
+                     logical = @event_index[last_event_id]
+                     return [] if logical.nil?
 
-                     start_index = last_index + 1
-                     return [] if start_index >= @events.length
+                     physical = logical - @offset + 1
+                     return [] if physical >= @events.length
 
-                     @events[start_index..]
+                     @events[physical..]
                    end
 
           events = events.select { |e| e.session_id == session_id } if session_id
@@ -100,10 +97,10 @@ module VectorMCP
         # @param event_id [String] The event ID to look up
         # @return [Event, nil] The stored event, or nil if it is no longer retained
         def get_event(event_id)
-          index = @event_index[event_id]
-          return nil if index.nil?
+          logical = @event_index[event_id]
+          return nil if logical.nil?
 
-          @events[index]
+          @events[logical - @offset]
         end
 
         # Gets the total number of stored events.
@@ -141,6 +138,7 @@ module VectorMCP
         def clear
           @events.clear
           @event_index.clear
+          @offset = 0
         end
 
         # Gets statistics about the event store.
