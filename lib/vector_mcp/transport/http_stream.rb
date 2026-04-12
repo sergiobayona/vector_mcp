@@ -52,6 +52,8 @@ module VectorMCP
       DEFAULT_SESSION_TIMEOUT = 300 # 5 minutes
       DEFAULT_EVENT_RETENTION = 100 # Keep last 100 events for resumability
       DEFAULT_REQUEST_TIMEOUT = 30 # Default timeout for server-initiated requests
+      DEFAULT_MIN_THREADS = 4
+      DEFAULT_MAX_THREADS = 32
 
       # Default allowed origins — restrict to localhost by default for security.
       DEFAULT_ALLOWED_ORIGINS = %w[
@@ -72,6 +74,8 @@ module VectorMCP
       # @option options [String] :path_prefix ("/mcp") The base path for HTTP endpoints
       # @option options [Integer] :session_timeout (300) Session timeout in seconds
       # @option options [Integer] :event_retention (100) Number of events to retain for resumability
+      # @option options [Integer] :min_threads (4) Minimum Puma thread pool size
+      # @option options [Integer] :max_threads (32) Maximum Puma thread pool size
       # @option options [Array<String>] :allowed_origins Allowed origins for CORS validation.
       #   Defaults to localhost origins only. Pass ["*"] to allow all origins (NOT recommended for production).
       def initialize(server, options = {})
@@ -264,7 +268,7 @@ module VectorMCP
       #
       # @return [void]
       def start_puma_server
-        @puma_server = Puma::Server.new(self)
+        @puma_server = Puma::Server.new(self, nil, min_threads: @min_threads, max_threads: @max_threads)
         @puma_server.add_tcp_listener(@host, @port)
 
         @running = true
@@ -977,6 +981,8 @@ module VectorMCP
         @path_prefix = normalize_path_prefix(options[:path_prefix] || DEFAULT_PATH_PREFIX)
         @session_timeout = options[:session_timeout] || DEFAULT_SESSION_TIMEOUT
         @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
+        @min_threads = options[:min_threads] || DEFAULT_MIN_THREADS
+        @max_threads = options[:max_threads] || DEFAULT_MAX_THREADS
         @allowed_origins = options[:allowed_origins] || DEFAULT_ALLOWED_ORIGINS
         @mounted = options.fetch(:mounted, false)
 

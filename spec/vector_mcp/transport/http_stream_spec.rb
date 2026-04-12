@@ -60,6 +60,19 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       end
     end
 
+    context "with thread pool options" do
+      it "uses default thread pool sizes" do
+        expect(transport.instance_variable_get(:@min_threads)).to eq(4)
+        expect(transport.instance_variable_get(:@max_threads)).to eq(32)
+      end
+
+      it "accepts custom thread pool sizes" do
+        custom_transport = described_class.new(mock_mcp_server, min_threads: 8, max_threads: 64)
+        expect(custom_transport.instance_variable_get(:@min_threads)).to eq(8)
+        expect(custom_transport.instance_variable_get(:@max_threads)).to eq(64)
+      end
+    end
+
     context "with path prefix normalization" do
       [
         ["custom", "/custom"],
