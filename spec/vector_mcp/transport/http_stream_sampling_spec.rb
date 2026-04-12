@@ -127,22 +127,23 @@ RSpec.describe VectorMCP::Transport::HttpStream, "#send_request sampling support
     end
 
     describe "#handle_outgoing_response" do
-      it "stores response and signals waiting threads" do
+      it "delivers response to waiting IVar" do
         request_id = "test-req-1"
         response_msg = { "id" => request_id, "result" => { "text" => "Hello" } }
 
         # Set up tracking
         transport.send(:setup_request_tracking, request_id)
+        ivar = transport.instance_variable_get(:@outgoing_request_ivars)[request_id]
 
         # Handle the response
         transport.send(:handle_outgoing_response, response_msg)
 
-        # Verify response was stored
-        stored_response = transport.instance_variable_get(:@outgoing_request_responses)[request_id]
-        expect(stored_response).to eq({
-                                        id: request_id,
-                                        result: { text: "Hello" }
-                                      })
+        # Verify response was delivered via IVar
+        expect(ivar).to be_complete
+        expect(ivar.value).to eq({
+                                   id: request_id,
+                                   result: { text: "Hello" }
+                                 })
       end
     end
   end

@@ -830,15 +830,12 @@ module VectorMCP
 
       # Request tracking helpers for server-initiated requests
 
-      # Sets up tracking for an outgoing request using pooled condition variables.
+      # Sets up tracking for an outgoing request.
       #
       # @param request_id [String] The request ID to track
       # @return [void]
       def setup_request_tracking(request_id)
-        @request_mutex.synchronize do
-          # Create IVar for thread-safe request tracking (no race conditions)
-          @outgoing_request_ivars[request_id] = Concurrent::IVar.new
-        end
+        @outgoing_request_ivars[request_id] = Concurrent::IVar.new
       end
 
       # Waits for a response to an outgoing request.
@@ -849,11 +846,7 @@ module VectorMCP
       # @return [Hash] The response data
       # @raise [VectorMCP::SamplingTimeoutError] if timeout occurs
       def wait_for_response(request_id, method, timeout)
-        ivar = nil
-        @request_mutex.synchronize do
-          ivar = @outgoing_request_ivars[request_id]
-        end
-
+        ivar = @outgoing_request_ivars[request_id]
         return nil unless ivar
 
         begin
@@ -895,24 +888,11 @@ module VectorMCP
         response[:result]
       end
 
-      # Cleans up tracking for a request and returns condition variable to pool.
+      # Cleans up tracking for a request.
       #
       # @param request_id [String] The request ID to clean up
       # @return [void]
       def cleanup_request_tracking(request_id)
-        @request_mutex.synchronize do
-          cleanup_request_tracking_unsafe(request_id)
-        end
-      end
-
-      # Internal cleanup method that assumes mutex is already held.
-      # This prevents recursive locking when called from within synchronized blocks.
-      #
-      # @param request_id [String] The request ID to clean up
-      # @return [void]
-      # @api private
-      def cleanup_request_tracking_unsafe(request_id)
-        # Remove IVar for this request (no condition variable cleanup needed)
         @outgoing_request_ivars.delete(request_id)
       end
 
@@ -941,10 +921,7 @@ module VectorMCP
       def handle_outgoing_response(message)
         request_id = message["id"]
 
-        ivar = nil
-        @request_mutex.synchronize do
-          ivar = @outgoing_request_ivars[request_id]
-        end
+        ivar = @outgoing_request_ivars[request_id]
 
         unless ivar
           logger.debug { "Received response for request ID #{request_id} but no thread is waiting (likely timed out)" }
@@ -953,11 +930,6 @@ module VectorMCP
 
         # Convert keys to symbols for consistency and put response in IVar
         response_data = deep_transform_keys(message, &:to_sym)
-
-        # Store in both places for compatibility with tests
-        @outgoing_request_responses[request_id] = response_data
-
-        # IVar handles thread-safe response delivery - no race conditions possible
         if ivar.try_set(response_data)
           logger.debug { "Response delivered to waiting thread for request ID #{request_id}" }
         else
@@ -1028,11 +1000,7 @@ module VectorMCP
 
       # Initialize request tracking system and ID generation for server-initiated requests
       def initialize_request_tracking
-        # Use IVars for thread-safe request/response handling (eliminates condition variable races)
         @outgoing_request_ivars = Concurrent::Hash.new
-        # Keep compatibility with tests that expect @outgoing_request_responses
-        @outgoing_request_responses = Concurrent::Hash.new
-        @request_mutex = Mutex.new
         initialize_request_id_generation
       end
 
@@ -1076,10 +1044,7 @@ module VectorMCP
 
         logger.debug { "Cleaning up #{@outgoing_request_ivars.size} pending requests" }
 
-        @request_mutex.synchronize do
-          # IVars will timeout naturally, just clear the tracking
-          @outgoing_request_ivars.clear
-        end
+        @outgoing_request_ivars.clear
       end
 
       # Finds the first session with an active streaming connection.
