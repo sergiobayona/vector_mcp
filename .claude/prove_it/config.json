@@ -83,59 +83,21 @@
             "signal": "done",
             "sourceFilesEdited": true
           }
-        },
-        {
-          "name": "coverage-review",
-          "type": "agent",
-          "async": true,
-          "promptType": "skill",
-          "prompt": "prove-coverage",
-          "model": "haiku",
-          "ruleFile": ".claude/rules/testing.md",
-          "when": {
-            "linesChanged": 541
-          }
-        },
-        {
-          "name": "done-review",
-          "type": "agent",
-          "parallel": true,
-          "promptType": "skill",
-          "prompt": "prove-done",
-          "model": "opus",
-          "ruleFile": ".claude/rules/done.md",
-          "when": {
-            "signal": "done"
-          }
-        },
-        {
-          "name": "approach-review",
-          "type": "agent",
-          "parallel": true,
-          "promptType": "skill",
-          "prompt": "prove-approach",
-          "model": "sonnet",
-          "when": {
-            "signal": "stuck"
-          }
         }
-      ],
-      "PostToolUse": [
+      ]
+    },
+    "git": {
+      "pre-commit": [
         {
-          "name": "nag-testing-antipatterns",
-          "type": "agent",
-          "async": true,
-          "quiet": true,
-          "promptType": "skill",
-          "prompt": "prove-testing-patterns",
-          "model": "haiku",
-          "maxAgentTurns": 3,
+          "name": "full-tests",
+          "type": "script",
+          "command": "./script/test",
           "when": {
-            "testFilesEdited": true
+            "sourcesModifiedSinceLastRun": true
           }
         }
       ]
     }
   },
-  "initSeed": "a225a57e11fb"
+  "initSeed": "07bbc77acdd3"
 }
