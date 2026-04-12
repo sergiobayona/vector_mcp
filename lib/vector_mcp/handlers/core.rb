@@ -400,33 +400,6 @@ module VectorMCP
       private_class_method :validate_input_arguments!
       private_class_method :raise_tool_validation_error
 
-      # Security helper methods
-
-      # Check security for tool access
-      # @api private
-      # @param session [VectorMCP::Session] The current session
-      # @param tool [VectorMCP::Definitions::Tool] The tool being accessed
-      # @param server [VectorMCP::Server] The server instance
-      # @return [Hash] Security check result
-      def self.check_tool_security(session, tool, server)
-        # Extract request context from session for security middleware
-        request = extract_request_from_session(session)
-        server.security_middleware.process_request(request, action: :call, resource: tool)
-      end
-      private_class_method :check_tool_security
-
-      # Check security for resource access
-      # @api private
-      # @param session [VectorMCP::Session] The current session
-      # @param resource [VectorMCP::Definitions::Resource] The resource being accessed
-      # @param server [VectorMCP::Server] The server instance
-      # @return [Hash] Security check result
-      def self.check_resource_security(session, resource, server)
-        request = extract_request_from_session(session)
-        server.security_middleware.process_request(request, action: :read, resource: resource)
-      end
-      private_class_method :check_resource_security
-
       # Extract request context from session for security processing
       # @api private
       # @param session [VectorMCP::Session] The current session
@@ -506,17 +479,10 @@ module VectorMCP
         context = server.middleware_manager.execute_hooks(:before_auth, context)
         raise context.error if context.error?
 
-        request = context.params
-        session_context = if server.security_middleware.respond_to?(:authenticate_request)
-                            server.security_middleware.authenticate_request(request)
-                          else
-                            legacy_result = server.security_middleware.process_request(request)
-                            legacy_result[:session_context]
-                          end
+        session_context = server.security_middleware.authenticate_request(context.params)
         session.security_context = session_context if session.respond_to?(:security_context=)
 
-        auth_required = server.respond_to?(:auth_manager) ? server.auth_manager.required? : false
-        raise VectorMCP::UnauthorizedError, "Authentication required" if auth_required && !session_context.authenticated?
+        raise VectorMCP::UnauthorizedError, "Authentication required" if server.auth_manager.required? && !session_context.authenticated?
 
         context.result = session_context
         server.middleware_manager.execute_hooks(:after_auth, context)
@@ -574,13 +540,7 @@ module VectorMCP
 
       # Validate resource security
       def self.authorize_action!(session_context, action, resource, server)
-        authorized = if server.security_middleware.respond_to?(:authorize_action)
-                       server.security_middleware.authorize_action(session_context, action, resource)
-                     else
-                       legacy_result = server.security_middleware.process_request({}, action: action, resource: resource)
-                       legacy_result[:success]
-                     end
-        return if authorized
+        return if server.security_middleware.authorize_action(session_context, action, resource)
 
         raise VectorMCP::ForbiddenError, "Access denied"
       end

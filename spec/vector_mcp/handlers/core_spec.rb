@@ -10,13 +10,14 @@ RSpec.describe VectorMCP::Handlers::Core do
   let(:session) { VectorMCP::Session.new(mock_server_instance, mock_transport, id: "test-session-id") }
   let(:security_middleware) { double("security_middleware") }
   let(:middleware_manager) { double("middleware_manager") }
+  let(:auth_manager) { double("auth_manager", required?: false) }
   let(:server) do
     # Default empty registries
     tools = {}
     resources = {}
     prompts = {}
     double("server", tools: tools, resources: resources, prompts: prompts, logger: logger, security_middleware: security_middleware,
-                     middleware_manager: middleware_manager)
+                     middleware_manager: middleware_manager, auth_manager: auth_manager)
   end
 
   before do
@@ -31,10 +32,9 @@ RSpec.describe VectorMCP::Handlers::Core do
     allow(logger).to receive(:level=)
 
     # Mock security middleware to allow all requests by default
-    allow(security_middleware).to receive(:process_request).and_return({
-                                                                         success: true,
-                                                                         session_context: double("session_context")
-                                                                       })
+    allow(security_middleware).to receive(:authenticate_request)
+      .and_return(VectorMCP::Security::SessionContext.anonymous)
+    allow(security_middleware).to receive(:authorize_action).and_return(true)
   end
 
   describe ".ping" do
@@ -386,13 +386,10 @@ RSpec.describe VectorMCP::Handlers::Core do
     end
 
     context "when auth is not required" do
+      let(:auth_manager) { double("auth_manager", required?: false) }
+
       before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: true,
-                                                                             session_context: anonymous_context
-                                                                           })
-        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(false)
-        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+        allow(security_middleware).to receive(:authenticate_request).and_return(anonymous_context)
       end
 
       it "allows unauthenticated sessions through without error" do
@@ -406,13 +403,7 @@ RSpec.describe VectorMCP::Handlers::Core do
       let(:auth_manager) { double("auth_manager", required?: true) }
 
       before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: true,
-                                                                             session_context: authenticated_context
-                                                                           })
-        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
-        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
-        allow(server).to receive(:auth_manager).and_return(auth_manager)
+        allow(security_middleware).to receive(:authenticate_request).and_return(authenticated_context)
       end
 
       it "allows the request and stores security context on session" do
@@ -427,13 +418,7 @@ RSpec.describe VectorMCP::Handlers::Core do
       let(:auth_manager) { double("auth_manager", required?: true) }
 
       before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: false,
-                                                                             session_context: anonymous_context
-                                                                           })
-        allow(server).to receive(:respond_to?).with(:auth_manager).and_return(true)
-        allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
-        allow(server).to receive(:auth_manager).and_return(auth_manager)
+        allow(security_middleware).to receive(:authenticate_request).and_return(anonymous_context)
       end
 
       it "raises UnauthorizedError" do
@@ -451,16 +436,13 @@ RSpec.describe VectorMCP::Handlers::Core do
     before do
       server.tools["authz_tool"] = tool
       allow(VectorMCP::Util).to receive(:convert_to_mcp_content).with("ok").and_return(["ok"])
-      allow(server).to receive(:respond_to?).with(:auth_manager).and_return(false)
-      allow(server).to receive(:respond_to?).with(:middleware_manager).and_return(true)
+      allow(security_middleware).to receive(:authenticate_request)
+        .and_return(VectorMCP::Security::SessionContext.anonymous)
     end
 
-    context "when authorization succeeds via legacy path" do
+    context "when authorization succeeds" do
       before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: true,
-                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
-                                                                           })
+        allow(security_middleware).to receive(:authorize_action).and_return(true)
       end
 
       it "executes the tool handler" do
@@ -470,54 +452,8 @@ RSpec.describe VectorMCP::Handlers::Core do
       end
     end
 
-    context "when authorization is denied via legacy path" do
+    context "when authorization is denied" do
       before do
-        # Auth passes
-        allow(security_middleware).to receive(:process_request)
-          .with(anything)
-          .and_return({ success: true, session_context: VectorMCP::Security::SessionContext.anonymous })
-        # But authz fails
-        allow(security_middleware).to receive(:process_request)
-          .with({}, action: :call, resource: tool)
-          .and_return({ success: false })
-      end
-
-      it "raises ForbiddenError" do
-        params = { "name" => "authz_tool", "arguments" => {} }
-        expect do
-          described_class.call_tool(params, session, server)
-        end.to raise_error(VectorMCP::ForbiddenError, "Access denied")
-      end
-    end
-
-    context "when server supports authorize_action method" do
-      before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: true,
-                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
-                                                                           })
-        allow(security_middleware).to receive(:respond_to?) do |method_name|
-          %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
-        end
-        allow(security_middleware).to receive(:authorize_action).and_return(true)
-      end
-
-      it "uses the new authorize_action interface" do
-        params = { "name" => "authz_tool", "arguments" => {} }
-        described_class.call_tool(params, session, server)
-        expect(security_middleware).to have_received(:authorize_action)
-      end
-    end
-
-    context "when authorize_action denies access" do
-      before do
-        allow(security_middleware).to receive(:process_request).and_return({
-                                                                             success: true,
-                                                                             session_context: VectorMCP::Security::SessionContext.anonymous
-                                                                           })
-        allow(security_middleware).to receive(:respond_to?) do |method_name|
-          %i[authenticate_request authorize_action].include?(method_name) ? (method_name == :authorize_action) : false
-        end
         allow(security_middleware).to receive(:authorize_action).and_return(false)
       end
 
