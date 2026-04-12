@@ -9,32 +9,6 @@ module VectorMCP
       # Default priority for middleware (lower numbers execute first)
       DEFAULT_PRIORITY = 100
 
-      # Maps hook type strings to the operation_type a Context must have for
-      # the hook to match. `nil` means the hook is transport- or auth-level and
-      # matches any operation_type. Computed once at construction to avoid
-      # re-parsing hook name strings on every dispatch.
-      HOOK_OPERATION_TYPES = {
-        "before_tool_call" => :tool_call,
-        "after_tool_call" => :tool_call,
-        "on_tool_error" => :tool_call,
-        "before_resource_read" => :resource_read,
-        "after_resource_read" => :resource_read,
-        "on_resource_error" => :resource_read,
-        "before_prompt_get" => :prompt_get,
-        "after_prompt_get" => :prompt_get,
-        "on_prompt_error" => :prompt_get,
-        "before_sampling_request" => :sampling,
-        "after_sampling_response" => :sampling,
-        "on_sampling_error" => :sampling,
-        "before_request" => nil,
-        "after_response" => nil,
-        "on_transport_error" => nil,
-        "before_auth" => nil,
-        "after_auth" => nil,
-        "on_auth_error" => nil
-      }.freeze
-      private_constant :HOOK_OPERATION_TYPES
-
       # @param middleware_class [Class] The middleware class to execute
       # @param hook_type [String, Symbol] Type of hook (before_tool_call, etc.)
       # @param priority [Integer] Execution priority (lower numbers execute first)
