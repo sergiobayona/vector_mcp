@@ -38,11 +38,7 @@ module VectorMCP
           return false unless api_key&.length&.positive?
 
           if secure_key_match?(api_key)
-            {
-              api_key: api_key,
-              strategy: "api_key",
-              authenticated_at: Time.now
-            }
+            { api_key: api_key }
           else
             false
           end

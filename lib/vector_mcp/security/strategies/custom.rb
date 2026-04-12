@@ -16,20 +16,20 @@ module VectorMCP
           @handler = handler
         end
 
-        # Authenticate a request using the custom handler
+        # Authenticate a request using the custom handler.
+        # If the handler returns a Hash with a :user key, the value is extracted
+        # so that AuthManager receives the user data directly.
         # @param request [Hash] the request object
-        # @return [Object, false] result from custom handler or false if authentication failed
+        # @return [Object, nil, false] user data or false if authentication failed.
+        #   A return of nil (from { user: nil }) signals "authenticated, no user object."
         def authenticate(request)
           result = @handler.call(request)
+          return false unless result && result != false
 
-          # Ensure result includes strategy info if it's successful
-          if result && result != false
-            format_successful_result(result)
-          else
-            false
-          end
-        rescue NoMemoryError, StandardError
-          # Log error but return false for security
+          return result unless result.is_a?(Hash) && result.key?(:user)
+
+          result[:user]
+        rescue StandardError, NoMemoryError
           false
         end
 
@@ -37,33 +37,6 @@ module VectorMCP
         # @return [Boolean] true if handler is present
         def configured?
           !@handler.nil?
-        end
-
-        private
-
-        # Format successful authentication result with strategy metadata
-        # @param result [Object] the result from the custom handler
-        # @return [Object] formatted result with strategy metadata
-        def format_successful_result(result)
-          case result
-          when Hash
-            # If result has a :user key, extract it and use as main user data
-            if result.key?(:user)
-              user_data = result[:user]
-              # For nil user, return a marker that will become nil in session context
-              return :authenticated_nil_user if user_data.nil?
-
-              user_data
-            else
-              result.merge(strategy: "custom", authenticated_at: Time.now)
-            end
-          else
-            {
-              user: result,
-              strategy: "custom",
-              authenticated_at: Time.now
-            }
-          end
         end
       end
     end

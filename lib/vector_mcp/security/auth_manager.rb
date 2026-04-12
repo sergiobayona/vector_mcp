@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "auth_result"
+
 module VectorMCP
   module Security
     # Manages authentication strategies for VectorMCP servers
@@ -42,25 +44,22 @@ module VectorMCP
       # Authenticate a request using the specified or default strategy
       # @param request [Hash] the request object containing headers, params, etc.
       # @param strategy [Symbol] optional strategy override
-      # @return [Object, false] authentication result or false if failed
+      # @return [AuthResult] the authentication outcome
       def authenticate(request, strategy: nil)
-        return { authenticated: true, user: nil } unless @enabled
+        return AuthResult.passthrough unless @enabled
 
         strategy_name = strategy || @default_strategy
         auth_strategy = @strategies[strategy_name]
+        return AuthResult.failure unless auth_strategy
 
-        return { authenticated: false, error: "Unknown strategy: #{strategy_name}" } unless auth_strategy
-
-        begin
-          result = auth_strategy.authenticate(request)
-          if result
-            { authenticated: true, user: result }
-          else
-            { authenticated: false, error: "Authentication failed" }
-          end
-        rescue StandardError => e
-          { authenticated: false, error: "Authentication error: #{e.message}" }
+        result = auth_strategy.authenticate(request)
+        if result == false
+          AuthResult.failure
+        else
+          AuthResult.success(user: result, strategy: strategy_name.to_s)
         end
+      rescue StandardError
+        AuthResult.failure
       end
 
       # Check if authentication is required

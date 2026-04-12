@@ -197,30 +197,10 @@ module VectorMCP
     #   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
     # @return [void]
     def enable_authentication!(strategy: :api_key, **options, &block)
-      # Clear existing strategies when switching to a new configuration
       clear_auth_strategies unless @auth_manager.strategies.empty?
-
-      # Extract OAuth resource metadata URL before forwarding options to strategy constructors
-      @oauth_resource_metadata_url = options.delete(:resource_metadata_url)
-      warn_on_insecure_oauth_metadata_url(@oauth_resource_metadata_url)
-
+      extract_oauth_metadata!(options)
       @auth_manager.enable!(default_strategy: strategy)
-
-      case strategy
-      when :api_key
-        add_api_key_auth(options[:keys] || [], allow_query_params: options[:allow_query_params] || false)
-      when :jwt
-        add_jwt_auth(options)
-      when :custom
-        handler = block || options[:handler]
-        raise ArgumentError, "Custom authentication strategy requires a handler block" unless handler
-
-        add_custom_auth(&handler)
-
-      else
-        raise ArgumentError, "Unknown authentication strategy: #{strategy}"
-      end
-
+      register_auth_strategy(strategy, options, block || options.delete(:handler))
       @logger.info("Authentication enabled with strategy: #{strategy}")
     end
 
@@ -329,6 +309,34 @@ module VectorMCP
     end
 
     private
+
+    # Extract OAuth resource metadata URL from options before they reach strategy constructors
+    # @param options [Hash] the options hash (mutated — :resource_metadata_url is removed)
+    # @return [void]
+    def extract_oauth_metadata!(options)
+      @oauth_resource_metadata_url = options.delete(:resource_metadata_url)
+      warn_on_insecure_oauth_metadata_url(@oauth_resource_metadata_url)
+    end
+
+    # Register the appropriate auth strategy based on the strategy name
+    # @param strategy [Symbol] the strategy type
+    # @param options [Hash] strategy-specific options
+    # @param handler [Proc, nil] custom handler block (for :custom strategy)
+    # @return [void]
+    def register_auth_strategy(strategy, options, handler)
+      case strategy
+      when :api_key
+        add_api_key_auth(options[:keys] || [], allow_query_params: options[:allow_query_params] || false)
+      when :jwt
+        add_jwt_auth(options)
+      when :custom
+        raise ArgumentError, "Custom authentication strategy requires a handler block" unless handler
+
+        add_custom_auth(&handler)
+      else
+        raise ArgumentError, "Unknown authentication strategy: #{strategy}"
+      end
+    end
 
     # Add API key authentication strategy
     # @param keys [Array<String>] array of valid API keys

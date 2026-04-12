@@ -20,17 +20,18 @@ module VectorMCP
         method = message["method"]
         params = message["params"] || {}
 
-        if id && method # Request
+        case classify_message(id, method)
+        when :request
           logger.debug("[#{session_id}] Request [#{id}]: #{method} with params: #{VectorMCP::LogFilter.filter_hash(params).inspect}")
           handle_request(id, method, params, session)
-        elsif method # Notification
+        when :notification
           logger.debug("[#{session_id}] Notification: #{method} with params: #{VectorMCP::LogFilter.filter_hash(params).inspect}")
           handle_notification(method, params, session)
-          nil # Notifications do not have a return value to send back to client
-        elsif id # Invalid: Has ID but no method
+          nil
+        when :invalid_missing_method
           logger.warn("[#{session_id}] Invalid message: Has ID [#{id}] but no method. #{message.inspect}")
           raise VectorMCP::InvalidRequestError.new("Request object must include a 'method' member.", request_id: id)
-        else # Invalid: No ID and no method
+        when :invalid_missing_both
           logger.warn("[#{session_id}] Invalid message: Missing both 'id' and 'method'. #{message.inspect}")
           raise VectorMCP::InvalidRequestError.new("Invalid message format", request_id: nil)
         end
@@ -59,6 +60,16 @@ module VectorMCP
       end
 
       private
+
+      # Classify a JSON-RPC message based on presence of id and method fields.
+      # @api private
+      def classify_message(id, method)
+        return :request if id && method
+        return :notification if method
+        return :invalid_missing_method if id
+
+        :invalid_missing_both
+      end
 
       # Internal handler for JSON-RPC requests.
       # @api private

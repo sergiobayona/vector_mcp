@@ -82,15 +82,12 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     context "with valid JWT token" do
       let(:request) { base_request.merge(headers: { "Authorization" => "Bearer valid.jwt.token" }) }
 
-      it "returns user information on successful authentication" do
+      it "returns the decoded JWT payload" do
         result = strategy.authenticate(request)
 
         expect(result).to be_a(Hash)
         expect(result["user_id"]).to eq(123)
         expect(result["email"]).to eq("test@example.com")
-        expect(result[:strategy]).to eq("jwt")
-        expect(result[:authenticated_at]).to be_a(Time)
-        expect(result[:jwt_headers]).to eq({ "alg" => "HS256" })
       end
     end
 

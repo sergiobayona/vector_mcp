@@ -10,6 +10,7 @@ module VectorMCP
       def initialize
         @policies = {}
         @enabled = false
+        @logger = VectorMCP.logger_for("authorization")
       end
 
       # Enable authorization system
@@ -45,17 +46,12 @@ module VectorMCP
 
         resource_type = determine_resource_type(resource)
         policy = @policies[resource_type]
-
-        # If no policy is defined, allow access (opt-in authorization)
         return true unless policy
 
-        begin
-          policy_result = policy.call(user, action, resource)
-          policy_result ? true : false
-        rescue StandardError
-          # Log error but deny access for safety
-          false
-        end
+        !!policy.call(user, action, resource)
+      rescue StandardError => e
+        @logger.error("Authorization policy error for #{resource_type}: #{e.message}")
+        false
       end
 
       # Check if authorization is required

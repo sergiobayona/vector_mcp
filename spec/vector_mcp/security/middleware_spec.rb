@@ -16,7 +16,7 @@ RSpec.describe VectorMCP::Security::Middleware do
   end
 
   describe "#authenticate_request" do
-    let(:auth_result) { { authenticated: true, user: { user_id: 123 } } }
+    let(:auth_result) { VectorMCP::Security::AuthResult.success(user: { user_id: 123 }, strategy: "api_key") }
 
     before do
       allow(auth_manager).to receive(:authenticate).with(request, strategy: nil).and_return(auth_result)

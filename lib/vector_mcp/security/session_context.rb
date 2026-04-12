@@ -113,34 +113,18 @@ module VectorMCP
         new(authenticated: false)
       end
 
-      # Create an authenticated session context from auth result
-      # @param auth_result [Hash] the authentication result
-      # @return [SessionContext] an authenticated session
+      # Create an authenticated session context from an AuthResult
+      # @param auth_result [VectorMCP::Security::AuthResult] the authentication outcome
+      # @return [SessionContext] an authenticated or anonymous session
       def self.from_auth_result(auth_result)
-        return anonymous unless auth_result&.dig(:authenticated)
+        return anonymous unless auth_result&.authenticated?
 
-        user_data = auth_result[:user]
-
-        # Handle special marker for authenticated nil user
-        if user_data == :authenticated_nil_user
-          new(
-            user: nil,
-            authenticated: true,
-            auth_strategy: "custom",
-            authenticated_at: Time.now
-          )
-        else
-          # Extract strategy and authenticated_at only if user_data is a Hash
-          strategy = user_data.is_a?(Hash) ? user_data[:strategy] : nil
-          auth_time = user_data.is_a?(Hash) ? user_data[:authenticated_at] : nil
-
-          new(
-            user: user_data,
-            authenticated: true,
-            auth_strategy: strategy,
-            authenticated_at: auth_time
-          )
-        end
+        new(
+          user: auth_result.user,
+          authenticated: true,
+          auth_strategy: auth_result.strategy,
+          authenticated_at: auth_result.authenticated_at
+        )
       end
     end
   end

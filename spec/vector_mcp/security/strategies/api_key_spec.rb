@@ -38,8 +38,6 @@ RSpec.describe VectorMCP::Security::Strategies::ApiKey do
 
         expect(result).to be_truthy
         expect(result[:api_key]).to eq("valid-key-1")
-        expect(result[:strategy]).to eq("api_key")
-        expect(result[:authenticated_at]).to be_a(Time)
       end
 
       it "rejects invalid key" do

@@ -43,16 +43,7 @@ module VectorMCP
 
           begin
             decoded = JWT.decode(token, @secret, true, @options)
-            payload = decoded[0] # First element is the payload
-            headers = decoded[1] # Second element is the headers
-
-            # Return user info from JWT payload
-            {
-              **payload,
-              strategy: "jwt",
-              authenticated_at: Time.now,
-              jwt_headers: headers
-            }
+            decoded[0]
           rescue JWT::ExpiredSignature, JWT::InvalidIssuerError, JWT::InvalidAudienceError,
                  JWT::VerificationError, JWT::DecodeError, StandardError
             false # Token validation failed

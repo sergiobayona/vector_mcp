@@ -49,10 +49,12 @@ RSpec.describe VectorMCP::Security::AuthManager do
     let(:strategy) { instance_double("Strategy") }
 
     context "when disabled" do
-      it "returns success without authentication" do
+      it "returns a passthrough AuthResult" do
         result = auth_manager.authenticate(request)
-        expect(result[:authenticated]).to be true
-        expect(result[:user]).to be_nil
+        expect(result).to be_a(VectorMCP::Security::AuthResult)
+        expect(result.authenticated?).to be true
+        expect(result.user).to be_nil
+        expect(result.strategy).to be_nil
       end
     end
 
@@ -66,30 +68,29 @@ RSpec.describe VectorMCP::Security::AuthManager do
         allow(strategy).to receive(:authenticate).with(request).and_return({ user_id: 123 })
 
         result = auth_manager.authenticate(request)
-        expect(result[:authenticated]).to be true
-        expect(result[:user]).to eq({ user_id: 123 })
+        expect(result).to be_a(VectorMCP::Security::AuthResult)
+        expect(result.authenticated?).to be true
+        expect(result.user).to eq({ user_id: 123 })
+        expect(result.strategy).to eq("api_key")
       end
 
       it "handles authentication failure" do
         allow(strategy).to receive(:authenticate).with(request).and_return(false)
 
         result = auth_manager.authenticate(request)
-        expect(result[:authenticated]).to be false
-        expect(result[:error]).to eq("Authentication failed")
+        expect(result.authenticated?).to be false
       end
 
       it "handles unknown strategy" do
         result = auth_manager.authenticate(request, strategy: :unknown)
-        expect(result[:authenticated]).to be false
-        expect(result[:error]).to include("Unknown strategy")
+        expect(result.authenticated?).to be false
       end
 
       it "handles strategy errors" do
         allow(strategy).to receive(:authenticate).and_raise(StandardError, "Auth error")
 
         result = auth_manager.authenticate(request)
-        expect(result[:authenticated]).to be false
-        expect(result[:error]).to include("Authentication error")
+        expect(result.authenticated?).to be false
       end
     end
   end

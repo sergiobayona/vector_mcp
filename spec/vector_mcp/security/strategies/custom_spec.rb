@@ -27,15 +27,10 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
         end
       end
 
-      it "returns handler result with strategy metadata" do
+      it "returns the handler result directly" do
         result = strategy.authenticate(request)
 
-        expect(result).to include(
-          user_id: 123,
-          email: "test@example.com",
-          strategy: "custom"
-        )
-        expect(result[:authenticated_at]).to be_a(Time)
+        expect(result).to eq(user_id: 123, email: "test@example.com")
       end
     end
 
@@ -44,14 +39,10 @@ RSpec.describe VectorMCP::Security::Strategies::Custom do
         described_class.new { |_req| "user123" }
       end
 
-      it "wraps string in user field" do
+      it "returns the string directly" do
         result = strategy.authenticate(request)
 
-        expect(result).to include(
-          user: "user123",
-          strategy: "custom"
-        )
-        expect(result[:authenticated_at]).to be_a(Time)
+        expect(result).to eq("user123")
       end
     end
 

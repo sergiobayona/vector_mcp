@@ -349,28 +349,25 @@ RSpec.describe VectorMCP::Security::SessionContext do
   describe ".from_auth_result" do
     context "with successful authentication" do
       let(:auth_result) do
-        {
-          authenticated: true,
-          user: {
-            user_id: "123",
-            strategy: "api_key",
-            authenticated_at: auth_time
-          }
-        }
+        VectorMCP::Security::AuthResult.success(
+          user: { user_id: "123" },
+          strategy: "api_key",
+          authenticated_at: auth_time
+        )
       end
 
       it "creates authenticated session context" do
         context = described_class.from_auth_result(auth_result)
 
         expect(context.authenticated?).to be true
-        expect(context.user).to eq(auth_result[:user])
+        expect(context.user).to eq({ user_id: "123" })
         expect(context.auth_strategy).to eq("api_key")
         expect(context.authenticated_at).to eq(auth_time)
       end
     end
 
     context "with failed authentication" do
-      let(:auth_result) { { authenticated: false } }
+      let(:auth_result) { VectorMCP::Security::AuthResult.failure }
 
       it "creates anonymous session context" do
         context = described_class.from_auth_result(auth_result)
@@ -385,6 +382,32 @@ RSpec.describe VectorMCP::Security::SessionContext do
         context = described_class.from_auth_result(nil)
 
         expect(context.authenticated?).to be false
+      end
+    end
+
+    context "with passthrough (auth disabled)" do
+      let(:auth_result) { VectorMCP::Security::AuthResult.passthrough }
+
+      it "creates authenticated session context with no user" do
+        context = described_class.from_auth_result(auth_result)
+
+        expect(context.authenticated?).to be true
+        expect(context.user).to be_nil
+        expect(context.auth_strategy).to be_nil
+      end
+    end
+
+    context "with nil user (authenticated without user object)" do
+      let(:auth_result) do
+        VectorMCP::Security::AuthResult.success(user: nil, strategy: "custom")
+      end
+
+      it "creates authenticated session context with nil user" do
+        context = described_class.from_auth_result(auth_result)
+
+        expect(context.authenticated?).to be true
+        expect(context.user).to be_nil
+        expect(context.auth_strategy).to eq("custom")
       end
     end
   end
