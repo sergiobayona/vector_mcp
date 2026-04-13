@@ -2,6 +2,11 @@
 
 ### Added
 
+* **Token-Based Field Anonymization**: Added a general-purpose anonymization pipeline that substitutes sensitive string fields with stable opaque tokens before tool results reach the LLM and restores them on inbound tool invocations.
+  - `VectorMCP::TokenStore` — thread-safe bidirectional value ↔ token store with idempotent tokenization.
+  - `VectorMCP::Util::TokenSweeper` — stateless recursive traversal utility for parsed JSON structures.
+  - `VectorMCP::Middleware::Anonymizer` — middleware wiring the store and sweeper with application-supplied field rules and optional atomic-key handling; registers via `anonymizer.install_on(server)`.
+
 * **OAuth 2.1 Resource Server mode (HTTP Stream transport)**: `enable_authentication!` now accepts a `resource_metadata_url:` option. When set, unauthenticated requests to `/mcp` return HTTP `401` with a `WWW-Authenticate: Bearer realm="mcp", resource_metadata="<url>"` header (RFC 9728), enabling MCP clients such as Claude Desktop to discover the authorization server and initiate OAuth 2.1 + PKCE flows. Opt-in: when `resource_metadata_url` is not set, the existing JSON-RPC `-32401` behavior is unchanged. See [docs/oauth_resource_server.md](docs/oauth_resource_server.md) and [docs/rails_oauth_integration.md](docs/rails_oauth_integration.md) for end-to-end guidance.
 
 ## [0.4.0] – 2026-04-10
