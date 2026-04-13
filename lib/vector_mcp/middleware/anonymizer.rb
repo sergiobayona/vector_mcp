@@ -176,7 +176,7 @@ module VectorMCP
 
       def canonicalize(obj)
         case obj
-        when Hash  then obj.keys.map(&:to_s).sort.each_with_object({}) { |k, h| h[k] = canonicalize(obj[k] || obj[k.to_sym]) }
+        when Hash  then obj.keys.map(&:to_s).sort.to_h { |k| [k, canonicalize(obj[k] || obj[k.to_sym])] }
         when Array then obj.map { |element| canonicalize(element) }
         else obj
         end
