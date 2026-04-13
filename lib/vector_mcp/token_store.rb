@@ -34,8 +34,10 @@ module VectorMCP
         return existing if existing
 
         token = generate_token(prefix)
-        @forward[key] = token
+        # Populate the reverse map first so any thread that observes the
+        # token in @forward can always resolve it.
         @reverse[token] = value
+        @forward[key] = token
         token
       end
     end

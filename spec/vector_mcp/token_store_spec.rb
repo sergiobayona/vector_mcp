@@ -83,5 +83,21 @@ RSpec.describe VectorMCP::TokenStore do
       tokens = threads.map(&:value)
       expect(tokens.uniq.size).to eq(1)
     end
+
+    it "guarantees a token returned from tokenize is immediately resolvable" do
+      # If @reverse is populated after @forward, a thread that observes the
+      # token in @forward (e.g., via a concurrent tokenize) could resolve it
+      # to nil. This test pins the consistency invariant.
+      results = Concurrent::Array.new
+      writers = Array.new(50) { Thread.new { results << store.tokenize("v", prefix: "P") } }
+      readers = Array.new(50) do
+        Thread.new do
+          token = store.tokenize("v", prefix: "P")
+          results << store.resolve(token)
+        end
+      end
+      (writers + readers).each(&:join)
+      expect(results.compact.uniq).to contain_exactly(a_string_matching(/\AP_/), "v")
+    end
   end
 end
