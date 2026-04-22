@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.5.0] – 2026-04-22
 
 ### Added
 
@@ -8,6 +8,20 @@
   - `VectorMCP::Middleware::Anonymizer` — middleware wiring the store and sweeper with application-supplied field rules and optional atomic-key handling; registers via `anonymizer.install_on(server)`.
 
 * **OAuth 2.1 Resource Server mode (HTTP Stream transport)**: `enable_authentication!` now accepts a `resource_metadata_url:` option. When set, unauthenticated requests to `/mcp` return HTTP `401` with a `WWW-Authenticate: Bearer realm="mcp", resource_metadata="<url>"` header (RFC 9728), enabling MCP clients such as Claude Desktop to discover the authorization server and initiate OAuth 2.1 + PKCE flows. Opt-in: when `resource_metadata_url` is not set, the existing JSON-RPC `-32401` behavior is unchanged. See [docs/oauth_resource_server.md](docs/oauth_resource_server.md) and [docs/rails_oauth_integration.md](docs/rails_oauth_integration.md) for end-to-end guidance.
+
+### Changed
+
+* **Auth Result Value Object**: Replaced the internal authentication result hashes with a dedicated `AuthResult` value object for clearer, type-safe handoff between auth strategies and the security middleware.
+* **Consolidated Middleware Hook Types**: `HOOK_TYPES` and `HOOK_OPERATION_TYPES` are now derived from a single source of truth, eliminating drift between the two lists.
+* **Puma Thread Pool Tuning**: Standalone HTTP stream transport now configures the Puma thread pool explicitly for more predictable concurrency behavior.
+* **Event Store Offset Tracking**: Replaced the O(n) event store index rebuild with O(1) offset tracking, reducing overhead for sessions with long event histories.
+* **HTTP Stream Request Tracking**: Removed the redundant `@request_mutex` from HTTP stream request tracking and simplified the surrounding locking.
+* **Handlers::Core Cleanup**: Renamed misleading identifiers and removed dead legacy branches in `Handlers::Core`.
+* **General Complexity Reduction**: Reduced accidental complexity across six refactoring targets in the core request path.
+
+### Fixed
+
+* **TokenStore Read-After-Write Consistency**: Closed a read-after-write consistency hole in `TokenStore` so concurrent tokenization and resolution no longer race.
 
 ## [0.4.0] – 2026-04-10
 

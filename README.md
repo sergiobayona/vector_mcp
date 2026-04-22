@@ -15,6 +15,7 @@ VectorMCP is a Ruby implementation of the Model Context Protocol (MCP) server-si
 - Rack and Rails mounting through `server.rack_app`
 - Opt-in authentication and authorization, structured logging, and middleware hooks
 - Image-aware tools/resources/prompts, roots, and server-initiated sampling
+- Token-based field anonymization middleware to keep sensitive values out of LLM context
 
 ## Requirements
 
@@ -193,6 +194,21 @@ For MCP clients that speak OAuth 2.1 (e.g. Claude Desktop), pass a `resource_met
 Middleware can hook into tool, resource, prompt, sampling, auth, and transport events, including `before_auth`, `after_auth`, `on_auth_error`, `before_request`, `after_response`, and `on_transport_error`.
 
 See [security/README.md](./security/README.md) for the full security guide.
+
+### Field Anonymization
+
+Keep sensitive string values out of the LLM context by substituting them with stable opaque tokens. Values are tokenized on outbound tool results and restored on inbound tool arguments, so the LLM sees only tokens while your handlers receive the original data.
+
+```ruby
+anonymizer = VectorMCP::Middleware::Anonymizer.new(
+  store: VectorMCP::TokenStore.new,
+  field_rules: [
+    { pattern: /email/i, prefix: "EMAIL" },
+    { pattern: /\bssn\b/i, prefix: "SSN" }
+  ]
+)
+anonymizer.install_on(server)
+```
 
 ## Transport Notes
 
