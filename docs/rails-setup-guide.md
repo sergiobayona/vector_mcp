@@ -418,6 +418,37 @@ MCP_SERVER.enable_authentication!(strategy: :custom) do |request|
 end
 ```
 
+### OAuth 2.1 Resource Server Mode
+
+If your Rails app already issues OAuth tokens (via Doorkeeper, Rodauth-OAuth,
+etc.), VectorMCP can advertise itself as an OAuth 2.1 protected resource so
+clients like Claude Desktop auto-discover your authorization server and run
+the full OAuth + PKCE flow:
+
+```ruby
+MCP_SERVER.enable_authentication!(
+  strategy: :custom,
+  resource_metadata_url: "https://myapp.com/.well-known/oauth-protected-resource"
+) do |request|
+  token = request[:headers]["Authorization"]&.sub(/\ABearer /, "")
+  access_token = Doorkeeper::AccessToken.by_token(token)
+  next nil unless access_token&.acceptable?(nil)
+
+  user = User.find(access_token.resource_owner_id)
+  { user_id: user.id, role: user.role, scopes: access_token.scopes.to_a }
+end
+```
+
+With `resource_metadata_url:` set, unauthenticated requests to `/mcp` receive
+HTTP `401` with `WWW-Authenticate: Bearer realm="mcp", resource_metadata="<url>"`
+(RFC 9728) instead of the default JSON-RPC `-32401` error. The `GET /mcp/health`
+endpoint stays unauthenticated.
+
+See [docs/oauth_resource_server.md](oauth_resource_server.md) for the feature
+reference and [docs/rails_oauth_integration.md](rails_oauth_integration.md) for
+a full Rails + Doorkeeper recipe, including how to serve the required
+`.well-known/oauth-protected-resource` metadata document.
+
 ### Authorization Policies
 
 Control which users can access which tools and resources:
@@ -443,6 +474,55 @@ MCP_SERVER.enable_authorization! do
   end
 end
 ```
+
+## Anonymizing Sensitive Data
+
+When your tools return records that contain PII (names, emails, addresses,
+account numbers), you often want the LLM to reason about the data without
+ever seeing the raw values. VectorMCP ships a token-based anonymization
+middleware that rewrites outbound string fields into opaque tokens like
+`EMAIL_A1B2C3D4` and automatically restores the original values when a
+client echoes a token back in a follow-up tool call.
+
+```ruby
+# config/initializers/mcp_server.rb
+require "vector_mcp/middleware/anonymizer"
+require "vector_mcp/token_store"
+
+TOKEN_STORE = VectorMCP::TokenStore.new
+
+VectorMCP::Middleware::Anonymizer.new(
+  store: TOKEN_STORE,
+  field_rules: [
+    { pattern: /\bname\b/i,  prefix: "NAME"  },
+    { pattern: /email/i,     prefix: "EMAIL" },
+    { pattern: /phone/i,     prefix: "PHONE" }
+  ],
+  atomic_keys: /address/i
+).install_on(MCP_SERVER)
+```
+
+How the rules work:
+
+- `field_rules` — each rule matches a Hash key (case-insensitive by default
+  via the regex). Any String value under a matching key is replaced with a
+  token whose prefix you control. Arrays inherit the parent key's rule.
+- `atomic_keys` — Hash values under a matching key are serialized and
+  tokenized as one opaque blob instead of being recursed into. Useful for
+  structured-but-indivisible data like addresses, where you don't want
+  street/city/zip tokenized separately.
+
+Round-tripping is automatic. If `find_user` returns
+`{ email: "EMAIL_A1B2C3D4" }` and the client later calls `send_message`
+with `{ to: "EMAIL_A1B2C3D4" }`, the middleware resolves the token back to
+the original email before your handler runs. Tokens the store doesn't
+recognize pass through unchanged, so clients can't fish for values they
+were never shown.
+
+The store is in-memory and per-process. For multi-process deployments (Puma
+workers, multiple servers), back it with a shared store by subclassing
+`VectorMCP::TokenStore` and overriding `#tokenize`/`#resolve` to read and
+write from Redis or your database.
 
 ## Graceful Shutdown
 
