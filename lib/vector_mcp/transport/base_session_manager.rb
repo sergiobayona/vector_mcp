@@ -58,19 +58,18 @@ module VectorMCP
       end
 
       # Gets an existing session or creates a new one.
+      # When a session_id is provided but not found (expired or unknown), returns
+      # nil instead of creating a session with the client-supplied ID — session
+      # IDs are always server-generated (prevents session fixation).
       #
       # @param session_id [String, nil] The session ID (optional)
-      # @return [Session] The existing or newly created session
+      # @return [Session, nil] The existing session, a newly created one, or nil
       def get_or_create_session(session_id = nil)
         if session_id
-          session = get_session(session_id)
-          return session if session
-
-          # If session_id was provided but not found, create with that ID
-          return create_session(session_id)
+          get_session(session_id)
+        else
+          create_session
         end
-
-        create_session
       end
 
       # Creates a new session.
