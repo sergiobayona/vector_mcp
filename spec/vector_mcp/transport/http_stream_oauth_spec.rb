@@ -183,7 +183,7 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
       expect(last_response.headers["WWW-Authenticate"]).to eq(expected_www_authenticate)
     end
 
-    it "passes a normalized request hash (not a raw Rack env) to the custom handler" do
+    it "passes a hash-accessible request context (not a raw Rack env) to the custom handler" do
       post "/mcp",
            initialize_body,
            request_headers.merge("HTTP_AUTHORIZATION" => "Bearer #{valid_token}")
@@ -191,7 +191,7 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
       expect(captured_requests).not_to be_empty
       received = captured_requests.first
 
-      expect(received).to be_a(Hash)
+      expect(received).to be_a(VectorMCP::RequestContext)
       expect(received).to have_key(:headers)
       expect(received[:headers]).to be_a(Hash)
       expect(received[:headers]["Authorization"]).to eq("Bearer #{valid_token}")

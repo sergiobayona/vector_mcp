@@ -258,4 +258,75 @@ RSpec.describe VectorMCP::RequestContext do
       expect(context.transport_metadata).to eq({})
     end
   end
+
+  describe ".coerce" do
+    it "returns a RequestContext unchanged" do
+      context = described_class.new(headers: { "X-API-Key" => "k" })
+      expect(described_class.coerce(context)).to be(context)
+    end
+
+    it "builds a context from a Rack environment" do
+      env = {
+        "REQUEST_METHOD" => "POST",
+        "PATH_INFO" => "/mcp",
+        "QUERY_STRING" => "api_key=q",
+        "HTTP_X_API_KEY" => "k"
+      }
+      context = described_class.coerce(env)
+
+      expect(context.header("X-API-Key")).to eq("k")
+      expect(context.param("api_key")).to eq("q")
+      expect(context.method).to eq("POST")
+      expect(context.path).to eq("/mcp")
+    end
+
+    it "builds a context from a normalized hash with symbol keys" do
+      context = described_class.coerce({ headers: { "X-API-Key" => "k" }, params: { "a" => "1" } })
+
+      expect(context.header("X-API-Key")).to eq("k")
+      expect(context.param("a")).to eq("1")
+    end
+
+    it "builds a context from a normalized hash with string keys" do
+      context = described_class.coerce({ "headers" => { "Authorization" => "Bearer t" } })
+
+      expect(context.header("Authorization")).to eq("Bearer t")
+    end
+
+    it "raises for un-coercible input" do
+      expect { described_class.coerce(42) }.to raise_error(ArgumentError, /coerce/)
+    end
+  end
+
+  describe "hash-style read access" do
+    let(:context) do
+      described_class.new(
+        headers: { "X-API-Key" => "k" },
+        params: { "q" => "1" },
+        method: "POST",
+        path: "/mcp"
+      )
+    end
+
+    it "supports [] with symbol and string keys" do
+      expect(context[:headers]).to eq("X-API-Key" => "k")
+      expect(context["headers"]).to eq("X-API-Key" => "k")
+      expect(context[:params]).to eq("q" => "1")
+      expect(context[:method]).to eq("POST")
+      expect(context[:path]).to eq("/mcp")
+      expect(context[:nonexistent]).to be_nil
+    end
+
+    it "supports dig into nested values" do
+      expect(context.dig(:headers, "X-API-Key")).to eq("k")
+      expect(context.dig(:headers, "Missing")).to be_nil
+      expect(context.dig(:missing, "X")).to be_nil
+    end
+
+    it "supports key?" do
+      expect(context.key?(:headers)).to be(true)
+      expect(context.key?("params")).to be(true)
+      expect(context.key?(:rack_env)).to be(false)
+    end
+  end
 end

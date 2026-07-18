@@ -31,10 +31,10 @@ module VectorMCP
         end
 
         # Authenticate a request using API key
-        # @param request [Hash] the request object
+        # @param request [VectorMCP::RequestContext, Hash] the request
         # @return [Hash, false] user info hash or false if authentication failed
         def authenticate(request)
-          api_key = extract_api_key(request)
+          api_key = extract_api_key(VectorMCP::RequestContext.coerce(request))
           return false unless api_key&.length&.positive?
 
           if secure_key_match?(api_key)
@@ -72,57 +72,16 @@ module VectorMCP
           matched
         end
 
-        # Extract API key from various request formats
-        # @param request [Hash] the request object
+        # Extract API key from the request context
+        # @param request [VectorMCP::RequestContext] the request context
         # @return [String, nil] the extracted API key
         def extract_api_key(request)
-          headers = normalize_headers(request)
-
-          from_headers = extract_from_headers(headers)
+          from_headers = extract_from_headers(request.headers)
           return from_headers if from_headers
 
           return nil unless @allow_query_params
 
-          params = normalize_params(request)
-          extract_from_params(params)
-        end
-
-        # Normalize headers to handle different formats
-        # @param request [Hash] the request object
-        # @return [Hash] normalized headers
-        def normalize_headers(request)
-          # Check if it's a Rack environment (has REQUEST_METHOD)
-          if request["REQUEST_METHOD"]
-            extract_headers_from_rack_env(request)
-          else
-            request[:headers] || request["headers"] || {}
-          end
-        end
-
-        # Normalize params to handle different formats
-        # @param request [Hash] the request object
-        # @return [Hash] normalized params
-        def normalize_params(request)
-          # Check if it's a Rack environment (has REQUEST_METHOD)
-          if request["REQUEST_METHOD"]
-            extract_params_from_rack_env(request)
-          else
-            request[:params] || request["params"] || {}
-          end
-        end
-
-        # Extract headers from Rack environment
-        # @param env [Hash] the Rack environment
-        # @return [Hash] normalized headers
-        def extract_headers_from_rack_env(env)
-          VectorMCP::Util.extract_headers_from_rack_env(env)
-        end
-
-        # Extract params from Rack environment
-        # @param env [Hash] the Rack environment
-        # @return [Hash] normalized params
-        def extract_params_from_rack_env(env)
-          VectorMCP::Util.extract_params_from_rack_env(env)
+          extract_from_params(request.params)
         end
 
         # Extract API key from headers

@@ -65,7 +65,7 @@ RSpec.describe VectorMCP::Security::AuthManager do
       end
 
       it "authenticates using default strategy" do
-        allow(strategy).to receive(:authenticate).with(request).and_return({ user_id: 123 })
+        allow(strategy).to receive(:authenticate).with(an_instance_of(VectorMCP::RequestContext)).and_return({ user_id: 123 })
 
         result = auth_manager.authenticate(request)
         expect(result).to be_a(VectorMCP::Security::AuthResult)
@@ -75,7 +75,7 @@ RSpec.describe VectorMCP::Security::AuthManager do
       end
 
       it "handles authentication failure" do
-        allow(strategy).to receive(:authenticate).with(request).and_return(false)
+        allow(strategy).to receive(:authenticate).with(an_instance_of(VectorMCP::RequestContext)).and_return(false)
 
         result = auth_manager.authenticate(request)
         expect(result.authenticated?).to be false

@@ -35,10 +35,10 @@ module VectorMCP
         end
 
         # Authenticate a request using JWT token
-        # @param request [Hash] the request object
+        # @param request [VectorMCP::RequestContext, Hash] the request
         # @return [Hash, false] decoded JWT payload or false if authentication failed
         def authenticate(request)
-          token = extract_token(request)
+          token = extract_token(VectorMCP::RequestContext.coerce(request))
           return false unless token
 
           begin
@@ -70,19 +70,18 @@ module VectorMCP
 
         private
 
-        # Extract JWT token from request
-        # @param request [Hash] the request object
+        # Extract JWT token from the request context
+        # @param request [VectorMCP::RequestContext] the request context
         # @return [String, nil] the extracted token
         def extract_token(request)
-          headers = request[:headers] || request["headers"] || {}
+          headers = request.headers
 
           from_headers = extract_from_auth_header(headers) || extract_from_jwt_header(headers)
           return from_headers if from_headers
 
           return nil unless @allow_query_params
 
-          params = request[:params] || request["params"] || {}
-          extract_from_params(params)
+          extract_from_params(request.params)
         end
 
         # Extract token from Authorization header

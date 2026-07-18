@@ -144,52 +144,6 @@ RSpec.describe VectorMCP::Security::Middleware do
     end
   end
 
-  describe "#normalize_request" do
-    context "with hash request" do
-      it "returns request as-is" do
-        hash_request = { headers: {}, params: {} }
-        result = middleware.normalize_request(hash_request)
-
-        expect(result).to eq(hash_request)
-      end
-    end
-
-    context "with rack environment" do
-      let(:rack_env) do
-        {
-          "REQUEST_METHOD" => "POST",
-          "PATH_INFO" => "/test",
-          "HTTP_X_API_KEY" => "test-key",
-          "HTTP_AUTHORIZATION" => "Bearer token",
-          "CONTENT_TYPE" => "application/json",
-          "QUERY_STRING" => "param1=value1&param2=value2"
-        }
-      end
-
-      it "extracts request data from rack environment" do
-        result = middleware.normalize_request(rack_env)
-
-        expect(result[:headers]["X-API-Key"]).to eq("test-key")
-        expect(result[:headers]["Authorization"]).to eq("Bearer token")
-        expect(result[:headers]["Content-Type"]).to eq("application/json")
-        expect(result[:params]["param1"]).to eq("value1")
-        expect(result[:params]["param2"]).to eq("value2")
-        expect(result[:method]).to eq("POST")
-        expect(result[:path]).to eq("/test")
-        expect(result[:rack_env]).to eq(rack_env)
-      end
-    end
-
-    context "with unknown request type" do
-      it "returns default request structure" do
-        unknown_request = "unknown"
-        result = middleware.normalize_request(unknown_request)
-
-        expect(result).to eq({ headers: {}, params: {} })
-      end
-    end
-  end
-
   describe "#security_enabled?" do
     it "returns true when authentication is required" do
       allow(auth_manager).to receive(:required?).and_return(true)
@@ -230,63 +184,6 @@ RSpec.describe VectorMCP::Security::Middleware do
       expect(status[:authentication][:default_strategy]).to eq(:api_key)
       expect(status[:authorization][:enabled]).to be true
       expect(status[:authorization][:policy_types]).to eq(%i[tool resource])
-    end
-  end
-
-  describe "private methods" do
-    describe "#extract_from_rack_env" do
-      let(:env) do
-        {
-          "REQUEST_METHOD" => "GET",
-          "PATH_INFO" => "/api/test",
-          "HTTP_X_CUSTOM_HEADER" => "custom-value",
-          "HTTP_AUTHORIZATION" => "Bearer token123",
-          "CONTENT_TYPE" => "application/json",
-          "QUERY_STRING" => "key1=value1&key2=value2"
-        }
-      end
-
-      it "extracts headers correctly" do
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:headers]["X-Custom-Header"]).to eq("custom-value")
-        expect(result[:headers]["Authorization"]).to eq("Bearer token123")
-        expect(result[:headers]["Content-Type"]).to eq("application/json")
-      end
-
-      it "extracts query parameters" do
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:params]["key1"]).to eq("value1")
-        expect(result[:params]["key2"]).to eq("value2")
-      end
-
-      it "extracts method and path" do
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:method]).to eq("GET")
-        expect(result[:path]).to eq("/api/test")
-      end
-
-      it "includes original rack environment" do
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:rack_env]).to eq(env)
-      end
-
-      it "handles missing query string" do
-        env.delete("QUERY_STRING")
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:params]).to eq({})
-      end
-
-      it "handles empty query string" do
-        env["QUERY_STRING"] = ""
-        result = middleware.send(:extract_from_rack_env, env)
-
-        expect(result[:params]).to eq({})
-      end
     end
   end
 end

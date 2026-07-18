@@ -384,20 +384,17 @@ module VectorMCP
       end
 
       # Runs the configured authentication strategy against the Rack env and returns
-      # the resulting SessionContext. The request is normalized into the
-      # +{ headers:, params:, method:, path:, rack_env: }+ hash shape that the rest
-      # of the codebase's authentication pipeline uses (see
-      # +VectorMCP::Handlers::Core.extract_request_from_session+), so +:custom+
-      # strategy handlers see the same contract here as they do on the in-handler
-      # auth path. Errors in the strategy are logged and treated as unauthenticated
-      # rather than propagated, so a malformed token can never crash the request
-      # pipeline.
+      # the resulting SessionContext. The request is carried as a
+      # {VectorMCP::RequestContext} — the same type the in-handler auth path uses —
+      # so +:custom+ strategy handlers see one contract everywhere. Errors in the
+      # strategy are logged and treated as unauthenticated rather than propagated,
+      # so a malformed token can never crash the request pipeline.
       #
       # @param env [Hash] The Rack environment
       # @return [VectorMCP::Security::SessionContext]
       def authenticate_transport_request(env)
-        normalized_request = @server.security_middleware.normalize_request(env)
-        @server.security_middleware.authenticate_request(normalized_request)
+        request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+        @server.security_middleware.authenticate_request(request_context)
       rescue StandardError => e
         VectorMCP.logger_for("security").warn do
           "OAuth transport auth strategy raised #{e.class}: #{e.message}"

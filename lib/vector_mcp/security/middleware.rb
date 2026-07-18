@@ -73,25 +73,6 @@ module VectorMCP
         }
       end
 
-      # Create a request object from different transport formats
-      # @param transport_request [Object] the transport-specific request
-      # @return [Hash] normalized request object
-      def normalize_request(transport_request)
-        case transport_request
-        when Hash
-          # Check if it's a Rack environment (has REQUEST_METHOD key)
-          if transport_request.key?("REQUEST_METHOD")
-            extract_from_rack_env(transport_request)
-          else
-            # Already normalized
-            transport_request
-          end
-        else
-          # Extract from transport-specific request (e.g., custom objects)
-          extract_request_data(transport_request)
-        end
-      end
-
       # Check if security is enabled
       # @return [Boolean] true if any security features are enabled
       def security_enabled?
@@ -111,34 +92,6 @@ module VectorMCP
             enabled: @authorization.required?,
             policy_types: @authorization.policy_types
           }
-        }
-      end
-
-      private
-
-      # Extract request data from transport-specific formats
-      # @param transport_request [Object] the transport request
-      # @return [Hash] extracted request data
-      def extract_request_data(transport_request)
-        # Handle Rack environment (for HTTP transports)
-        if transport_request.respond_to?(:[]) && transport_request["REQUEST_METHOD"]
-          extract_from_rack_env(transport_request)
-        else
-          # Default fallback for non-HTTP request formats
-          { headers: {}, params: {} }
-        end
-      end
-
-      # Extract data from Rack environment
-      # @param env [Hash] the Rack environment
-      # @return [Hash] extracted request data
-      def extract_from_rack_env(env)
-        {
-          headers: VectorMCP::Util.extract_headers_from_rack_env(env),
-          params: VectorMCP::Util.extract_params_from_rack_env(env),
-          method: env["REQUEST_METHOD"],
-          path: env["PATH_INFO"],
-          rack_env: env
         }
       end
     end

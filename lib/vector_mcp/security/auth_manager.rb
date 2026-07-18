@@ -42,7 +42,9 @@ module VectorMCP
       end
 
       # Authenticate a request using the specified or default strategy
-      # @param request [Hash] the request object containing headers, params, etc.
+      # @param request [VectorMCP::RequestContext, Hash] the request. Legacy hash
+      #   shapes (raw Rack env, {headers:, params:}) are coerced here — the single
+      #   normalization boundary for the authentication pipeline.
       # @param strategy [Symbol] optional strategy override
       # @return [AuthResult] the authentication outcome
       def authenticate(request, strategy: nil)
@@ -52,7 +54,7 @@ module VectorMCP
         auth_strategy = @strategies[strategy_name]
         return AuthResult.failure unless auth_strategy
 
-        result = auth_strategy.authenticate(request)
+        result = auth_strategy.authenticate(VectorMCP::RequestContext.coerce(request))
         if result == false
           AuthResult.failure
         else

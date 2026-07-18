@@ -106,6 +106,73 @@ module VectorMCP
       )
     end
 
+    # Coerce an arbitrary request representation into a RequestContext.
+    # This is the single boundary where legacy request shapes (raw Rack
+    # environments, `{headers:, params:}` hashes with symbol or string keys)
+    # are converted; everything downstream of authentication trusts this type.
+    #
+    # @param request [RequestContext, Hash] the request to coerce
+    # @param transport_type [String] transport identifier used when building from a Rack env
+    # @return [RequestContext]
+    # @raise [ArgumentError] if the input cannot be coerced
+    def self.coerce(request, transport_type = "http")
+      case request
+      when RequestContext
+        request
+      when Hash
+        return from_rack_env(request, transport_type) if request.key?("REQUEST_METHOD")
+
+        from_normalized_hash(request)
+      else
+        raise ArgumentError, "Cannot coerce #{request.class} into a VectorMCP::RequestContext"
+      end
+    end
+
+    # Build a context from a legacy `{headers:, params:, ...}` hash with either
+    # symbol or string keys.
+    # @api private
+    def self.from_normalized_hash(hash)
+      fetch = ->(key) { hash[key] || hash[key.to_s] }
+      new(
+        headers: fetch.call(:headers) || {},
+        params: fetch.call(:params) || {},
+        method: fetch.call(:method),
+        path: fetch.call(:path),
+        transport_metadata: fetch.call(:transport_metadata) || {}
+      )
+    end
+    private_class_method :from_normalized_hash
+
+    # Hash-style read access for compatibility with custom authentication
+    # handlers written against the legacy `{headers:, params:}` request hash.
+    #
+    # @param key [String, Symbol] one of :headers, :params, :method, :path, :transport_metadata
+    # @return [Object, nil]
+    def [](key)
+      hash_view[key.to_sym]
+    end
+
+    # @param key [String, Symbol] the top-level key to check
+    # @return [Boolean]
+    def key?(key)
+      hash_view.key?(key.to_sym)
+    end
+    alias has_key? key?
+    alias include? key?
+    alias member? key?
+
+    # Dig into the context like a nested hash, e.g. `context.dig(:headers, "X-API-Key")`.
+    #
+    # @param key [String, Symbol] the top-level key
+    # @param rest [Array] further keys passed to the nested value's #dig
+    # @return [Object, nil]
+    def dig(key, *rest)
+      value = self[key]
+      return value if rest.empty?
+
+      value&.dig(*rest)
+    end
+
     # Create a request context from a Rack environment.
     # This is a convenience method for HTTP-based transports.
     #
@@ -149,25 +216,22 @@ module VectorMCP
 
     private
 
-    # Normalize headers to ensure consistent format.
-    #
-    # @param headers [Hash] Raw headers hash
-    # @return [Hash] Normalized headers hash
-    def normalize_headers(headers)
-      return {} unless headers.is_a?(Hash)
-
-      headers.transform_keys(&:to_s).transform_values { |v| v.nil? ? "" : v.to_s }
+    # Memoized nested-hash view backing the hash-style read accessors.
+    def hash_view
+      @hash_view ||= to_h.freeze
     end
 
-    # Normalize parameters to ensure consistent format.
+    # Normalize a headers/params hash to string keys and string values.
     #
-    # @param params [Hash] Raw parameters hash
-    # @return [Hash] Normalized parameters hash
-    def normalize_params(params)
-      return {} unless params.is_a?(Hash)
+    # @param hash [Hash] Raw hash
+    # @return [Hash] Normalized hash
+    def normalize_string_map(hash)
+      return {} unless hash.is_a?(Hash)
 
-      params.transform_keys(&:to_s).transform_values { |v| v.nil? ? "" : v.to_s }
+      hash.transform_keys(&:to_s).transform_values { |v| v.nil? ? "" : v.to_s }
     end
+    alias normalize_headers normalize_string_map
+    alias normalize_params normalize_string_map
 
     # Normalize transport metadata to ensure consistent format.
     #

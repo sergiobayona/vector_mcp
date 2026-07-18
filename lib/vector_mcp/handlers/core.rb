@@ -400,10 +400,10 @@ module VectorMCP
       private_class_method :validate_tool_arguments!
       private_class_method :raise_tool_validation_error
 
-      # Extract request context from session for security processing
+      # Extract the request context from the session for security processing.
       # @api private
       # @param session [VectorMCP::Session] The current session
-      # @return [Hash] Request context for security middleware
+      # @return [VectorMCP::RequestContext] Request context for security middleware
       def self.extract_auth_credentials(session)
         # All sessions should have a request_context - this is enforced by Session initialization
         unless session.respond_to?(:request_context) && session.request_context
@@ -411,11 +411,7 @@ module VectorMCP
                 "Session missing request_context - transport layer integration error. Session ID: #{session.id}"
         end
 
-        {
-          headers: session.request_context.headers,
-          params: session.request_context.params,
-          session_id: session.id
-        }
+        session.request_context
       end
       private_class_method :extract_auth_credentials
 
@@ -457,7 +453,9 @@ module VectorMCP
       # Authenticate the current request and return the caller's identity.
       def self.authenticate_request!(session, server, operation_type:, operation_name:)
         request = extract_auth_credentials(session)
-        context = create_auth_context(operation_type, operation_name, request, session, server)
+        # before_auth middleware hooks see (and may modify) the request as a hash;
+        # AuthManager coerces it back into a RequestContext at its boundary.
+        context = create_auth_context(operation_type, operation_name, request.to_h, session, server)
         context = server.middleware_manager.execute_hooks(:before_auth, context)
         raise context.error if context.error?
 
