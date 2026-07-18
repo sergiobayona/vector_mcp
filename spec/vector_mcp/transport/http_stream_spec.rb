@@ -14,8 +14,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
   let(:mock_server_info) { instance_double("VectorMCP::ServerInfo", name: "TestServer", version: "0.1") }
   let(:mock_resource_provider_options) { instance_double("VectorMCP::ResourceProviderOptions") }
   let(:mock_server_capabilities) { instance_double("VectorMCP::ServerCapabilities", resources: mock_resource_provider_options) }
-  let(:mock_session_context) { instance_double(VectorMCP::Session, id: "test-session-123") }
-  let(:mock_session) { VectorMCP::Transport::HttpStream::SessionManager::Session.new("test-session-123", mock_session_context, Time.now, Time.now, nil) }
+  let(:mock_session_context) do
+    session = VectorMCP::Session.new(mock_mcp_server, nil, id: "test-session-123")
+    session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
+    session
+  end
+  let(:mock_session) { mock_session_context }
   let(:mock_mcp_server) do
     instance_double(
       VectorMCP::Server,
@@ -460,7 +464,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
           it "still calls the notification handler" do
             notification = { "jsonrpc" => "2.0", "method" => "initialized" }
-            expect(mock_mcp_server).to receive(:handle_message).with(notification, mock_session_context, session_id).and_return(nil)
+            expect(mock_mcp_server).to receive(:handle_message)
+              .with(notification, having_attributes(id: session_id), session_id).and_return(nil)
 
             post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
 
@@ -650,9 +655,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
         it "allows initialize requests without the header" do
           init_request = { "jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => {} }
-          new_session = VectorMCP::Transport::HttpStream::SessionManager::Session.new(
-            "new-session-456", mock_session_context, Time.now, Time.now, nil
-          )
+          new_session = VectorMCP::Session.new(mock_mcp_server, nil, id: "new-session-456")
+          new_session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
           allow(transport.session_manager).to receive(:create_session).and_return(new_session)
 
           post "/mcp", init_request.to_json, { "CONTENT_TYPE" => "application/json" }
@@ -662,9 +666,8 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
         it "skips validation for initialize requests even with bad version" do
           init_request = { "jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => {} }
-          new_session = VectorMCP::Transport::HttpStream::SessionManager::Session.new(
-            "new-session-456", mock_session_context, Time.now, Time.now, nil
-          )
+          new_session = VectorMCP::Session.new(mock_mcp_server, nil, id: "new-session-456")
+          new_session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
           allow(transport.session_manager).to receive(:create_session).and_return(new_session)
 
           post "/mcp", init_request.to_json,
@@ -809,8 +812,12 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
   describe "session management integration" do
     let(:session_id) { "test-session-456" }
-    let(:mock_new_session_context) { instance_double(VectorMCP::Session, id: session_id) }
-    let(:mock_new_session) { VectorMCP::Transport::HttpStream::SessionManager::Session.new(session_id, mock_new_session_context, Time.now, Time.now, nil) }
+    let(:mock_new_session_context) do
+      session = VectorMCP::Session.new(mock_mcp_server, nil, id: session_id)
+      session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
+      session
+    end
+    let(:mock_new_session) { mock_new_session_context }
 
     before do
       allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_new_session)

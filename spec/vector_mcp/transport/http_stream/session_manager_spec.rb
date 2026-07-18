@@ -46,15 +46,15 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
         session = session_manager.create_session(session_id, rack_env)
 
         expect(session.id).to eq(session_id)
-        expect(session.context).to be_a(VectorMCP::Session)
-        expect(session.context.server).to eq(server)
-        expect(session.context.transport).to eq(transport)
+        expect(session).to be_a(VectorMCP::Session)
+        expect(session.server).to eq(server)
+        expect(session.transport).to eq(transport)
       end
 
       it "creates session with request context from rack_env" do
         session = session_manager.create_session(session_id, rack_env)
 
-        request_context = session.context.request_context
+        request_context = session.request_context
         expect(request_context).to be_a(VectorMCP::RequestContext)
         expect(request_context.method).to eq("POST")
         expect(request_context.path).to eq("/mcp")
@@ -67,7 +67,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
       it "creates session with minimal context when rack_env is nil" do
         session = session_manager.create_session(session_id, nil)
 
-        request_context = session.context.request_context
+        request_context = session.request_context
         expect(request_context).to be_a(VectorMCP::RequestContext)
         expect(request_context.method).to eq("HTTP_STREAM")
         expect(request_context.path).to eq("/")
@@ -132,22 +132,22 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
       end
 
       it "does not overwrite the session's stored context with a later request's rack_env" do
-        original_context = existing_session.context.request_context
+        original_context = existing_session.request_context
 
         result = session_manager.get_or_create_session(session_id, rack_env)
 
         # Request-scoped data travels on the per-request Invocation, never by
         # mutating the shared session (prevents cross-request leakage).
-        expect(result.context.request_context).to be(original_context)
+        expect(result.request_context).to be(original_context)
       end
 
       it "does not update context when rack_env is nil" do
-        original_context = existing_session.context.request_context
+        original_context = existing_session.request_context
         original_method = original_context.method
 
         result = session_manager.get_or_create_session(session_id, nil)
 
-        expect(result.context.request_context.method).to eq(original_method)
+        expect(result.request_context.method).to eq(original_method)
       end
 
       it "touches session to update last_accessed" do

@@ -19,18 +19,14 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
   end
   let(:stream_handler) { described_class.new(mock_transport) }
 
-  # Mock session and connection objects
+  # Session and connection objects
   let(:session_id) { "test-session-123" }
-  let(:mock_session_context) { instance_double(VectorMCP::Session, id: session_id) }
   let(:mock_session) do
-    VectorMCP::Transport::HttpStream::SessionManager::Session.new(
-      session_id,
-      mock_session_context,
-      Time.now,
-      Time.now,
-      { streaming_connection: nil }
-    )
+    session = VectorMCP::Session.new(mock_server, nil, id: session_id)
+    session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
+    session
   end
+  let(:mock_session_context) { mock_session }
 
   describe "#initialize" do
     it "initializes with transport and logger" do

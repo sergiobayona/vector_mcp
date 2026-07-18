@@ -49,7 +49,7 @@ module VectorMCP
         # Handles a streaming request (GET request for SSE).
         #
         # @param env [Hash] The Rack environment
-        # @param session [SessionManager::Session] The session for this request
+        # @param session [VectorMCP::Session] The session for this request
         # @return [Array] Rack response triplet for SSE
         def handle_streaming_request(env, session)
           last_event_id = extract_last_event_id(env)
@@ -65,7 +65,7 @@ module VectorMCP
 
         # Sends a message to a specific session.
         #
-        # @param session [SessionManager::Session] The target session
+        # @param session [VectorMCP::Session] The target session
         # @param message [Hash] The message to send
         # @return [Boolean] True if message was sent successfully
         def send_message_to_session(session, message)
@@ -141,7 +141,7 @@ module VectorMCP
 
         # Creates an SSE stream for a session.
         #
-        # @param session [SessionManager::Session] The session
+        # @param session [VectorMCP::Session] The session
         # @param last_event_id [String, nil] The last event ID for resumability
         # @param origin [Symbol] The stream origin (:get or :post)
         # @return [Enumerator] SSE stream enumerator
@@ -172,7 +172,7 @@ module VectorMCP
 
         # Streams events to a client.
         #
-        # @param session [SessionManager::Session] The session
+        # @param session [VectorMCP::Session] The session
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String, nil] The last event ID for resumability
         # @param stream_id [String] The unique stream identifier
@@ -193,7 +193,7 @@ module VectorMCP
         #
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param last_event_id [String] The last event ID received by client
-        # @param session [SessionManager::Session] The session to filter events for
+        # @param session [VectorMCP::Session] The session to filter events for
         # @param stream_id [String] The logical stream ID being resumed
         # @return [void]
         def replay_events(yielder, last_event_id, session, stream_id)
@@ -212,7 +212,7 @@ module VectorMCP
 
         # Keeps the connection alive with periodic heartbeat events.
         #
-        # @param session [SessionManager::Session] The session
+        # @param session [VectorMCP::Session] The session
         # @param yielder [Enumerator::Yielder] The SSE yielder
         # @param stream_id [String] The stream ID for event storage
         # @return [void]
@@ -274,7 +274,7 @@ module VectorMCP
 
         # Cleans up a specific connection.
         #
-        # @param session [SessionManager::Session] The session to clean up
+        # @param session [VectorMCP::Session] The session to clean up
         # @return [void]
         def cleanup_connection(session, connection = nil)
           connection ||= session.streaming_connection

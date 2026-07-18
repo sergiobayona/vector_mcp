@@ -63,7 +63,7 @@ RSpec.describe "Handler-facing session contract" do
 
   def initialized_session(env)
     session = manager.create_session(nil, env)
-    session.context.initialize!(
+    session.initialize!(
       "protocolVersion" => "2024-11-05",
       "clientInfo" => { "name" => "contract-spec" },
       "capabilities" => {}
@@ -87,7 +87,7 @@ RSpec.describe "Handler-facing session contract" do
     expect(observations[:initialized]).to be(true)
     expect(observations[:api_key_header]).to eq("secret-key")
     expect(observations[:user]).to eq(api_key: "secret-key")
-    expect(session.context.data[:visited]).to be(true)
+    expect(session.data[:visited]).to be(true)
   end
 
   it "gives resource handlers the authenticated security context" do

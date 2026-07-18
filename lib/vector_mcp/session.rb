@@ -17,7 +17,8 @@ module VectorMCP
   # @attr_reader client_capabilities [Hash, nil] Capabilities supported by the client, received during initialization.
   # @attr_reader request_context [RequestContext] The request context for this session.
   class Session
-    attr_reader :server_info, :server_capabilities, :protocol_version, :client_info, :client_capabilities, :server, :transport, :id, :request_context
+    attr_reader :server_info, :server_capabilities, :protocol_version, :client_info, :client_capabilities, :server, :transport, :id,
+                :request_context, :created_at, :last_accessed_at, :metadata
     attr_accessor :data, :security_context # For user-defined session-specific storage and resolved auth context
 
     # Initializes a new session.
@@ -35,6 +36,9 @@ module VectorMCP
       @client_capabilities = nil
       @data = {} # Initialize user data hash
       @security_context = Security::SessionContext.anonymous
+      @created_at = Time.now
+      @last_accessed_at = @created_at
+      @metadata = {} # Transport-owned lifecycle/connection state
       @logger = server.logger
 
       # Initialize request context
@@ -88,6 +92,25 @@ module VectorMCP
     # @return [Boolean] True if the session is initialized, false otherwise.
     def initialized?
       @initialized_state == :succeeded
+    end
+
+    # --- Lifecycle (managed by the transport's session manager) ---
+
+    # Records activity on this session, deferring expiry.
+    # @return [void]
+    def touch!
+      @last_accessed_at = Time.now
+    end
+
+    # @param timeout [Numeric] Idle timeout in seconds.
+    # @return [Boolean] True when the session has been idle longer than the timeout.
+    def expired?(timeout)
+      Time.now - @last_accessed_at > timeout
+    end
+
+    # @return [Float] Seconds since the session was created.
+    def age
+      Time.now - @created_at
     end
 
     # Sets the request context for this session.

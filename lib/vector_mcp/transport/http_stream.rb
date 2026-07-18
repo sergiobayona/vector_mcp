@@ -478,7 +478,7 @@ module VectorMCP
         # request-scoped state (headers, params, resolved auth) never leaks
         # between concurrent requests on the same session.
         invocation = VectorMCP::Invocation.new(
-          session.context,
+          session,
           request_context: VectorMCP::RequestContext.from_rack_env(env, "http_stream")
         )
 
@@ -1056,7 +1056,7 @@ module VectorMCP
 
       # Finds the first session with an active streaming connection.
       #
-      # @return [SessionManager::Session, nil] The first streaming session or nil if none found
+      # @return [VectorMCP::Session, nil] The first streaming session or nil if none found
       def find_streaming_session
         @session_manager.active_session_ids.each do |session_id|
           session = @session_manager.get_session(session_id)
@@ -1067,7 +1067,7 @@ module VectorMCP
 
       # Finds the first available session (streaming or non-streaming).
       #
-      # @return [SessionManager::Session, nil] The first available session or nil if none found
+      # @return [VectorMCP::Session, nil] The first available session or nil if none found
       def find_first_session
         session_ids = @session_manager.active_session_ids
         return nil if session_ids.empty?

@@ -54,7 +54,7 @@ RSpec.describe "HttpStream per-request identity isolation" do
 
   it "authenticates each POST against its own headers when another request interleaves" do
     session = manager.create_session(nil, rack_env_with_key("key-a"))
-    session.context.initialize!(
+    session.initialize!(
       "protocolVersion" => "2024-11-05",
       "clientInfo" => { "name" => "race-spec" },
       "capabilities" => {}
