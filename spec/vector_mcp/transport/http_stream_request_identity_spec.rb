@@ -53,9 +53,6 @@ RSpec.describe "HttpStream per-request identity isolation" do
   end
 
   it "authenticates each POST against its own headers when another request interleaves" do
-    pending "Fixed by the request-scoped Invocation refactor (Phase 2) — " \
-            "request state currently lives as mutable state on the shared session"
-
     session = manager.create_session(nil, rack_env_with_key("key-a"))
     session.context.initialize!(
       "protocolVersion" => "2024-11-05",

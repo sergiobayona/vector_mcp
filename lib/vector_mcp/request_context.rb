@@ -91,6 +91,25 @@ module VectorMCP
       http_methods.include?(@method.upcase)
     end
 
+    # Return a new context with the given attributes merged in. Nested hashes
+    # (headers, params, transport_metadata) are merged key-wise; scalar
+    # attributes are replaced.
+    #
+    # @param attributes [Hash] attributes to merge
+    # @return [RequestContext] a new, merged context
+    def merge(attributes)
+      current = to_h
+      merged = current.dup
+      attributes.each do |key, value|
+        merged[key] = if value.is_a?(Hash) && current[key].is_a?(Hash)
+                        current[key].merge(value)
+                      else
+                        value
+                      end
+      end
+      RequestContext.new(**merged)
+    end
+
     # Create a minimal request context for non-HTTP transports.
     # This is useful for non-HTTP transports or testing contexts.
     #

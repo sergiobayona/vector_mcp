@@ -79,7 +79,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         expect(request_context.param("api_key")).to eq("test123")
       end
 
-      it "updates existing session context" do
+      it "does not mutate an existing session's context from a later request" do
         # Create initial session
         session_manager.create_session("existing-session", {
                                          "REQUEST_METHOD" => "GET",
@@ -91,11 +91,13 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager, "context integr
         updated_session = session_manager.get_or_create_session("existing-session", rack_env)
 
         expect(updated_session.id).to eq("existing-session")
+        # Request-scoped data travels on the per-request Invocation; the
+        # session keeps its creation-time context (prevents cross-request leakage).
         request_context = updated_session.context.request_context
-        expect(request_context.method).to eq("POST") # Updated
-        expect(request_context.path).to eq("/mcp") # Updated
-        expect(request_context.header("Authorization")).to eq("Bearer token123") # New
-        expect(request_context.header("X-Old-Header")).to be_nil # Old headers not preserved
+        expect(request_context.method).to eq("GET")
+        expect(request_context.path).to eq("/test")
+        expect(request_context.header("X-Old-Header")).to eq("old-value")
+        expect(request_context.header("Authorization")).to be_nil
       end
 
       it "returns existing session without updating context when rack_env is nil" do

@@ -474,23 +474,34 @@ module VectorMCP
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
+        # Each request is dispatched through its own Invocation so that
+        # request-scoped state (headers, params, resolved auth) never leaks
+        # between concurrent requests on the same session.
+        invocation = VectorMCP::Invocation.new(
+          session.context,
+          request_context: VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+        )
+
         # Notifications: has method, no id -> 202 Accepted with no body (MCP spec requirement)
         if message["method"] && !message.key?("id")
-          @server.handle_message(message, session.context, session.id)
+          @server.handle_message(message, invocation, session.id)
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
-        result = @server.handle_message(message, session.context, session.id)
+        result = @server.handle_message(message, invocation, session.id)
         build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
         build_protocol_error_response(env, e, session_id: session.id)
       end
 
       # Resolves or creates the session for a POST request following MCP spec rules:
-      # - session_id present and known  → return existing session (updating request context)
+      # - session_id present and known  → return existing session
       # - session_id present but unknown/expired → 404 Not Found
       # - no session_id + initialize request → create new session
       # - no session_id + other request → 400 Bad Request
+      #
+      # Request-scoped data is NOT written to the session here; each request
+      # carries its own context via the Invocation built at dispatch time.
       #
       # @param session_id [String, nil] Client-supplied Mcp-Session-Id header value
       # @param message [Hash] Parsed JSON-RPC message
@@ -500,14 +511,7 @@ module VectorMCP
         is_initialize = message.is_a?(Hash) && message["method"] == "initialize"
 
         if session_id
-          session = @session_manager.get_session(session_id)
-          return not_found_response("Unknown or expired session") unless session
-
-          if env
-            request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
-            session.context.request_context = request_context
-          end
-          session
+          @session_manager.get_session(session_id) || not_found_response("Unknown or expired session")
         elsif is_initialize
           @session_manager.create_session(nil, env)
         else

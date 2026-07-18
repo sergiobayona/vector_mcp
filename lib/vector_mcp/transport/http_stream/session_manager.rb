@@ -90,25 +90,16 @@ module VectorMCP
         end
 
         # Override to add rack_env support.
-        # Returns nil when a session_id is provided but not found (expired or unknown).
-        # Callers are responsible for returning 404 in that case.
+        # Returns nil when a session_id is provided but not found (expired or
+        # unknown) — callers are responsible for returning 404 in that case.
+        # Request-scoped data is never written onto an existing session; each
+        # request carries its own context via the Invocation built at dispatch.
         def get_or_create_session(session_id = nil, rack_env = nil)
           if session_id
-            session = get_session(session_id)
-            if session
-              # Update existing session context if rack_env is provided
-              if rack_env
-                request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-                session.context.request_context = request_context
-              end
-              return session
-            end
-
-            # Session ID provided but not found — signal 404 to caller
-            return nil
+            get_session(session_id)
+          else
+            create_session(nil, rack_env)
           end
-
-          create_session(nil, rack_env)
         end
 
         # Terminates a session by ID.

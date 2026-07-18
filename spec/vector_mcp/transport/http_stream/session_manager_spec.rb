@@ -131,16 +131,14 @@ RSpec.describe VectorMCP::Transport::HttpStream::SessionManager do
         expect(result).to eq(existing_session)
       end
 
-      it "updates existing session context when rack_env provided" do
+      it "does not overwrite the session's stored context with a later request's rack_env" do
         original_context = existing_session.context.request_context
-        expect(original_context.method).to eq("HTTP_STREAM")
 
         result = session_manager.get_or_create_session(session_id, rack_env)
 
-        updated_context = result.context.request_context
-        expect(updated_context.method).to eq("GET")
-        expect(updated_context.path).to eq("/mcp")
-        expect(updated_context.header("Authorization")).to eq("Bearer new-token")
+        # Request-scoped data travels on the per-request Invocation, never by
+        # mutating the shared session (prevents cross-request leakage).
+        expect(result.context.request_context).to be(original_context)
       end
 
       it "does not update context when rack_env is nil" do

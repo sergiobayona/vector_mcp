@@ -114,19 +114,7 @@ module VectorMCP
     # @param attributes [Hash] The attributes to merge into the request context.
     # @return [RequestContext] The updated request context.
     def update_request_context(**attributes)
-      current_attrs = @request_context.to_h
-
-      # Deep merge nested hashes like headers and params
-      merged_attrs = current_attrs.dup
-      attributes.each do |key, value|
-        merged_attrs[key] = if value.is_a?(Hash) && current_attrs[key].is_a?(Hash)
-                              current_attrs[key].merge(value)
-                            else
-                              value
-                            end
-      end
-
-      @request_context = RequestContext.new(**merged_attrs)
+      @request_context = @request_context.merge(attributes)
     end
 
     # Convenience method to check if the session has request headers.
