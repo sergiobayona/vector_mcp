@@ -37,6 +37,15 @@ module VectorMCP
                    :server_info, :server_capabilities, :protocol_version,
                    :client_info, :client_capabilities
 
+    # The resolved auth API is exposed directly so handlers written against
+    # Security::SessionContext (the legacy second argument of resource
+    # handlers) keep working when they receive the invocation instead.
+    def_delegators :@security_context,
+                   :user, :authenticated, :authenticated?, :auth_strategy, :authenticated_at,
+                   :permissions, :can?, :can_access?, :add_permission, :add_permissions,
+                   :remove_permission, :clear_permissions, :user_identifier, :auth_method,
+                   :auth_recent?
+
     # @param session [VectorMCP::Session] the session the request arrived on
     # @param request_context [RequestContext, Hash, nil] this request's context;
     #   defaults to the session's stored context when not provided

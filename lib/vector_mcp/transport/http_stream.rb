@@ -484,11 +484,11 @@ module VectorMCP
 
         # Notifications: has method, no id -> 202 Accepted with no body (MCP spec requirement)
         if message["method"] && !message.key?("id")
-          @server.handle_message(message, invocation, session.id)
+          @server.handle_message(message, invocation)
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
-        result = @server.handle_message(message, invocation, session.id)
+        result = @server.handle_message(message, invocation)
         build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
         build_protocol_error_response(env, e, session_id: session.id)

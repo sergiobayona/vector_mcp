@@ -114,13 +114,14 @@ module VectorMCP
     end
 
     # Sets the request context for this session.
-    # This method should be called by transport layers to populate request-specific data.
     #
+    # @deprecated Will be removed in 0.7. Request-scoped data travels on the
+    #   per-request {VectorMCP::Invocation} passed to handlers.
     # @param context [RequestContext, Hash] The request context to set.
-    #   Can be a RequestContext object or a hash of attributes.
     # @return [RequestContext] The newly set request context.
     # @raise [ArgumentError] If the context is not a RequestContext or Hash.
     def request_context=(context)
+      deprecated_request_api(:request_context=)
       @request_context = case context
                          when RequestContext
                            context
@@ -132,41 +133,47 @@ module VectorMCP
     end
 
     # Updates the request context with new data.
-    # This merges the provided attributes with the existing context.
     #
+    # @deprecated Will be removed in 0.7. Use the per-request invocation's
+    #   {VectorMCP::Invocation#update_request_context} instead.
     # @param attributes [Hash] The attributes to merge into the request context.
     # @return [RequestContext] The updated request context.
     def update_request_context(**attributes)
+      deprecated_request_api(:update_request_context)
       @request_context = @request_context.merge(attributes)
     end
 
-    # Convenience method to check if the session has request headers.
-    #
-    # @return [Boolean] True if the request context has headers, false otherwise.
+    # @deprecated Will be removed in 0.7. Use the per-request invocation's
+    #   {VectorMCP::Invocation#request_headers?} instead.
+    # @return [Boolean] True if the request context has headers.
     def request_headers?
+      deprecated_request_api(:request_headers?)
       @request_context.headers?
     end
 
-    # Convenience method to check if the session has request parameters.
-    #
-    # @return [Boolean] True if the request context has parameters, false otherwise.
+    # @deprecated Will be removed in 0.7. Use the per-request invocation's
+    #   {VectorMCP::Invocation#request_params?} instead.
+    # @return [Boolean] True if the request context has parameters.
     def request_params?
+      deprecated_request_api(:request_params?)
       @request_context.params?
     end
 
-    # Convenience method to get a request header value.
-    #
+    # @deprecated Will be removed in 0.7. Use the per-request invocation's
+    #   {VectorMCP::Invocation#request_header} instead.
     # @param name [String] The header name.
     # @return [String, nil] The header value or nil if not found.
     def request_header(name)
+      deprecated_request_api(:request_header)
       @request_context.header(name)
     end
 
-    # Convenience method to get a request parameter value.
-    #
+    # @deprecated Will be removed in 0.7. Use the per-request invocation's
+    #   {VectorMCP::Invocation#request_param} instead.
     # @param name [String] The parameter name.
     # @return [String, nil] The parameter value or nil if not found.
     def request_param(name)
+      deprecated_request_api(:request_param)
       @request_context.param(name)
     end
 
@@ -230,6 +237,16 @@ module VectorMCP
     end
 
     private
+
+    # Emit the standard deprecation warning for the request-scoped Session API.
+    # @api private
+    def deprecated_request_api(method_name)
+      VectorMCP.deprecation_warning(
+        "Session##{method_name} is deprecated and will be removed in 0.7; " \
+        "request-scoped data lives on the per-request invocation passed to handlers " \
+        "(e.g. invocation.request_header)"
+      )
+    end
 
     # Validates that sampling can be performed on this session.
     # @api private

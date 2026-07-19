@@ -43,6 +43,10 @@ RSpec.describe "Handler-facing session contract" do
     ) do |_params, session_context|
       obs[:resource_authenticated] = session_context.authenticated?
       obs[:resource_user] = session_context.user
+      # Unified handler interface: the second argument is the invocation, so
+      # resource handlers can also reach session identity and request data.
+      obs[:resource_session_id] = session_context.id
+      obs[:resource_header] = session_context.request_header("X-API-Key")
       "resource-content"
     end
   end
@@ -104,5 +108,7 @@ RSpec.describe "Handler-facing session contract" do
 
     expect(observations[:resource_authenticated]).to be(true)
     expect(observations[:resource_user]).to eq(api_key: "secret-key")
+    expect(observations[:resource_session_id]).to eq(session.id)
+    expect(observations[:resource_header]).to eq("secret-key")
   end
 end

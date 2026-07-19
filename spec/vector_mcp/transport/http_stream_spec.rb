@@ -465,7 +465,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           it "still calls the notification handler" do
             notification = { "jsonrpc" => "2.0", "method" => "initialized" }
             expect(mock_mcp_server).to receive(:handle_message)
-              .with(notification, having_attributes(id: session_id), session_id).and_return(nil)
+              .with(notification, having_attributes(id: session_id)).and_return(nil)
 
             post "/mcp", notification.to_json, valid_headers.merge("CONTENT_TYPE" => "application/json")
 

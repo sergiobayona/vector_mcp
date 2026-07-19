@@ -62,6 +62,14 @@ module VectorMCP
       @logger ||= Logger.for("vectormcp")
     end
 
+    # Emit a deprecation warning. Centralized so tests and applications can
+    # intercept or silence deprecations in one place.
+    # @param message [String] description of the deprecated usage and its replacement
+    # @return [void]
+    def deprecation_warning(message)
+      warn("[DEPRECATION] VectorMCP: #{message}")
+    end
+
     # Creates a new {VectorMCP::Server} instance. This is a **thin wrapper** around
     # `VectorMCP::Server.new`; it exists purely for syntactic sugar so you can write
     # `VectorMCP.new` instead of `VectorMCP::Server.new`.

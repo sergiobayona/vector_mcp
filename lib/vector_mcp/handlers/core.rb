@@ -114,7 +114,7 @@ module VectorMCP
           resource = find_resource!(uri_s, server)
           authorize_action!(session_context, :read, resource, server)
 
-          content_raw = execute_resource_handler(resource, context.params, session_context)
+          content_raw = execute_resource_handler(resource, context.params, session)
           contents = process_resource_content(content_raw, resource, uri_s)
 
           context.result = { contents: contents }
@@ -460,7 +460,7 @@ module VectorMCP
         raise context.error if context.error?
 
         session_context = server.security_middleware.authenticate_request(context.params)
-        session.security_context = session_context if session.respond_to?(:security_context=)
+        session.security_context = session_context
 
         raise VectorMCP::UnauthorizedError, "Authentication required" if server.auth_manager.required? && !session_context.authenticated?
 
@@ -525,12 +525,15 @@ module VectorMCP
         raise VectorMCP::ForbiddenError, "Access denied"
       end
 
-      # Execute resource handler with proper arity handling
-      def self.execute_resource_handler(resource, params, session_context)
+      # Execute resource handler with proper arity handling.
+      # The second argument is the per-request invocation, which also exposes
+      # the SessionContext auth API for handlers written against the legacy
+      # (params, session_context) signature.
+      def self.execute_resource_handler(resource, params, invocation)
         if [1, -1].include?(resource.handler.arity)
           resource.handler.call(params)
         else
-          resource.handler.call(params, session_context)
+          resource.handler.call(params, invocation)
         end
       end
 

@@ -58,6 +58,33 @@ RSpec.describe VectorMCP::Invocation do
     end
   end
 
+  describe "security context forwarding" do
+    it "exposes the resolved auth API directly, so handlers written against SessionContext keep working" do
+      invocation = described_class.new(session)
+      invocation.security_context = VectorMCP::Security::SessionContext.new(
+        user: { api_key: "k" }, authenticated: true, auth_strategy: "api_key"
+      )
+
+      expect(invocation.user).to eq(api_key: "k")
+      expect(invocation.authenticated?).to be(true)
+      expect(invocation.auth_strategy).to eq("api_key")
+      expect(invocation.user_identifier).to eq("k")
+
+      invocation.add_permission("read:resources")
+      expect(invocation.can?("read:resources")).to be(true)
+      expect(invocation.can_access?(:read, :resources)).to be(true)
+    end
+
+    it "forwards to the current security context after reassignment" do
+      invocation = described_class.new(session)
+      expect(invocation.authenticated?).to be(false)
+
+      invocation.security_context = VectorMCP::Security::SessionContext.new(user: "u", authenticated: true)
+      expect(invocation.authenticated?).to be(true)
+      expect(invocation.user).to eq("u")
+    end
+  end
+
   describe "equality" do
     it "treats invocations of the same session as equal (for subscriber dedup)" do
       invocation_a = described_class.new(session)
