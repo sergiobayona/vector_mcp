@@ -114,7 +114,7 @@ module VectorMCP
           resource = find_resource!(uri_s, server)
           authorize_action!(session_context, :read, resource, server)
 
-          content_raw = execute_resource_handler(resource, context.params, session_context)
+          content_raw = execute_resource_handler(resource, context.params, session)
           contents = process_resource_content(content_raw, resource, uri_s)
 
           context.result = { contents: contents }
@@ -400,10 +400,10 @@ module VectorMCP
       private_class_method :validate_tool_arguments!
       private_class_method :raise_tool_validation_error
 
-      # Extract request context from session for security processing
+      # Extract the request context from the session for security processing.
       # @api private
       # @param session [VectorMCP::Session] The current session
-      # @return [Hash] Request context for security middleware
+      # @return [VectorMCP::RequestContext] Request context for security middleware
       def self.extract_auth_credentials(session)
         # All sessions should have a request_context - this is enforced by Session initialization
         unless session.respond_to?(:request_context) && session.request_context
@@ -411,11 +411,7 @@ module VectorMCP
                 "Session missing request_context - transport layer integration error. Session ID: #{session.id}"
         end
 
-        {
-          headers: session.request_context.headers,
-          params: session.request_context.params,
-          session_id: session.id
-        }
+        session.request_context
       end
       private_class_method :extract_auth_credentials
 
@@ -457,12 +453,14 @@ module VectorMCP
       # Authenticate the current request and return the caller's identity.
       def self.authenticate_request!(session, server, operation_type:, operation_name:)
         request = extract_auth_credentials(session)
-        context = create_auth_context(operation_type, operation_name, request, session, server)
+        # before_auth middleware hooks see (and may modify) the request as a hash;
+        # AuthManager coerces it back into a RequestContext at its boundary.
+        context = create_auth_context(operation_type, operation_name, request.to_h, session, server)
         context = server.middleware_manager.execute_hooks(:before_auth, context)
         raise context.error if context.error?
 
         session_context = server.security_middleware.authenticate_request(context.params)
-        session.security_context = session_context if session.respond_to?(:security_context=)
+        session.security_context = session_context
 
         raise VectorMCP::UnauthorizedError, "Authentication required" if server.auth_manager.required? && !session_context.authenticated?
 
@@ -527,12 +525,15 @@ module VectorMCP
         raise VectorMCP::ForbiddenError, "Access denied"
       end
 
-      # Execute resource handler with proper arity handling
-      def self.execute_resource_handler(resource, params, session_context)
+      # Execute resource handler with proper arity handling.
+      # The second argument is the per-request invocation, which also exposes
+      # the SessionContext auth API for handlers written against the legacy
+      # (params, session_context) signature.
+      def self.execute_resource_handler(resource, params, invocation)
         if [1, -1].include?(resource.handler.arity)
           resource.handler.call(params)
         else
-          resource.handler.call(params, session_context)
+          resource.handler.call(params, invocation)
         end
       end
 

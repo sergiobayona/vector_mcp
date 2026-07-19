@@ -384,20 +384,17 @@ module VectorMCP
       end
 
       # Runs the configured authentication strategy against the Rack env and returns
-      # the resulting SessionContext. The request is normalized into the
-      # +{ headers:, params:, method:, path:, rack_env: }+ hash shape that the rest
-      # of the codebase's authentication pipeline uses (see
-      # +VectorMCP::Handlers::Core.extract_request_from_session+), so +:custom+
-      # strategy handlers see the same contract here as they do on the in-handler
-      # auth path. Errors in the strategy are logged and treated as unauthenticated
-      # rather than propagated, so a malformed token can never crash the request
-      # pipeline.
+      # the resulting SessionContext. The request is carried as a
+      # {VectorMCP::RequestContext} — the same type the in-handler auth path uses —
+      # so +:custom+ strategy handlers see one contract everywhere. Errors in the
+      # strategy are logged and treated as unauthenticated rather than propagated,
+      # so a malformed token can never crash the request pipeline.
       #
       # @param env [Hash] The Rack environment
       # @return [VectorMCP::Security::SessionContext]
       def authenticate_transport_request(env)
-        normalized_request = @server.security_middleware.normalize_request(env)
-        @server.security_middleware.authenticate_request(normalized_request)
+        request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+        @server.security_middleware.authenticate_request(request_context)
       rescue StandardError => e
         VectorMCP.logger_for("security").warn do
           "OAuth transport auth strategy raised #{e.class}: #{e.message}"
@@ -477,23 +474,34 @@ module VectorMCP
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
+        # Each request is dispatched through its own Invocation so that
+        # request-scoped state (headers, params, resolved auth) never leaks
+        # between concurrent requests on the same session.
+        invocation = VectorMCP::Invocation.new(
+          session,
+          request_context: VectorMCP::RequestContext.from_rack_env(env, "http_stream")
+        )
+
         # Notifications: has method, no id -> 202 Accepted with no body (MCP spec requirement)
         if message["method"] && !message.key?("id")
-          @server.handle_message(message, session.context, session.id)
+          @server.handle_message(message, invocation)
           return [202, { "Mcp-Session-Id" => session.id }, []]
         end
 
-        result = @server.handle_message(message, session.context, session.id)
+        result = @server.handle_message(message, invocation)
         build_rpc_response(env, result, message["id"], session.id)
       rescue VectorMCP::ProtocolError => e
         build_protocol_error_response(env, e, session_id: session.id)
       end
 
       # Resolves or creates the session for a POST request following MCP spec rules:
-      # - session_id present and known  → return existing session (updating request context)
+      # - session_id present and known  → return existing session
       # - session_id present but unknown/expired → 404 Not Found
       # - no session_id + initialize request → create new session
       # - no session_id + other request → 400 Bad Request
+      #
+      # Request-scoped data is NOT written to the session here; each request
+      # carries its own context via the Invocation built at dispatch time.
       #
       # @param session_id [String, nil] Client-supplied Mcp-Session-Id header value
       # @param message [Hash] Parsed JSON-RPC message
@@ -503,14 +511,7 @@ module VectorMCP
         is_initialize = message.is_a?(Hash) && message["method"] == "initialize"
 
         if session_id
-          session = @session_manager.get_session(session_id)
-          return not_found_response("Unknown or expired session") unless session
-
-          if env
-            request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
-            session.context.request_context = request_context
-          end
-          session
+          @session_manager.get_session(session_id) || not_found_response("Unknown or expired session")
         elsif is_initialize
           @session_manager.create_session(nil, env)
         else
@@ -1055,7 +1056,7 @@ module VectorMCP
 
       # Finds the first session with an active streaming connection.
       #
-      # @return [SessionManager::Session, nil] The first streaming session or nil if none found
+      # @return [VectorMCP::Session, nil] The first streaming session or nil if none found
       def find_streaming_session
         @session_manager.active_session_ids.each do |session_id|
           session = @session_manager.get_session(session_id)
@@ -1066,7 +1067,7 @@ module VectorMCP
 
       # Finds the first available session (streaming or non-streaming).
       #
-      # @return [SessionManager::Session, nil] The first available session or nil if none found
+      # @return [VectorMCP::Session, nil] The first available session or nil if none found
       def find_first_session
         session_ids = @session_manager.active_session_ids
         return nil if session_ids.empty?

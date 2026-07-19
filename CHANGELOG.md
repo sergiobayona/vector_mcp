@@ -1,3 +1,24 @@
+## [Unreleased]
+
+### Added
+
+* **Per-request `VectorMCP::Invocation`**: Each incoming request is now dispatched through its own request-scoped view of the session, carrying that request's `RequestContext` and resolved `Security::SessionContext`. Handlers receive it as their `session` argument; it delegates all session-lived state (`id`, `data`, `initialize!`, `sample`, ...) and additionally exposes the resolved auth API directly (`user`, `authenticated?`, `can?`, ...).
+* **`RequestContext.coerce` and hash-style access**: `RequestContext` is now the single normalization boundary for authentication. It coerces legacy request shapes (raw Rack env, `{headers:, params:}` hashes) in one place and supports `[]`/`dig`/`key?` so custom auth handlers written against the legacy request hash keep working unchanged.
+* **Session lifecycle on `VectorMCP::Session`**: `created_at`, `last_accessed_at`, `touch!`, `expired?(timeout)`, `age`, and a transport-owned `metadata` hash.
+
+### Changed
+
+* **Security fix — request identity isolation**: Concurrent POSTs on one session could previously be authenticated against each other's headers, because request data was stored as mutable state on the shared session. Request-scoped data now travels on the per-request `Invocation` and is never written onto the session.
+* **One `Session` class**: The transport-internal `Session` wrapper structs (in `BaseSessionManager` and `HttpStream::SessionManager`) are gone; session managers store and return `VectorMCP::Session` directly. HTTP streaming connection state lives in the `SessionManager::SessionStreaming` module.
+* **Unified handler interface**: Resource handlers' second argument is now the per-request invocation instead of a bare `Security::SessionContext`. Existing handlers keep working — the invocation forwards the full auth API (`user`, `authenticated?`, `can?`, `user_identifier`, ...; note: not `to_h`) — and additionally gain access to session identity and request data.
+* **Session managers no longer auto-create sessions from client-supplied IDs** (session-fixation hardening in `BaseSessionManager`, matching the existing HTTP stream behavior).
+* Authentication strategies consume `RequestContext` directly; the auth request no longer carries the undocumented `:session_id` key.
+
+### Deprecated (removal in 0.7)
+
+* The request-scoped API on `Session`: `request_context=`, `update_request_context`, `request_headers?`, `request_params?`, `request_header`, `request_param`. These now emit warnings via `VectorMCP.deprecation_warning`; use the per-request invocation passed to handlers instead.
+* The third `session_id` argument of `Server#handle_message` (now optional, defaults to `session.id`; silent deprecation).
+
 ## [0.5.0] – 2026-04-22
 
 ### Added

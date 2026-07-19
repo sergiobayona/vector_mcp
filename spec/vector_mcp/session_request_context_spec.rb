@@ -7,6 +7,31 @@ RSpec.describe VectorMCP::Session, "request context integration" do
   let(:logger) { instance_double(Logger, info: nil) }
   let(:transport) { instance_double(VectorMCP::Transport::Base) }
 
+  # The request-scoped Session API is deprecated (removal in 0.7) in favor of
+  # the per-request Invocation; behavior tests below still pin it until then.
+  before { allow(VectorMCP).to receive(:deprecation_warning) }
+
+  describe "deprecated request-scoped API (removal in 0.7)" do
+    let(:session) do
+      described_class.new(server, transport,
+                          request_context: { headers: { "X-API-Key" => "k" }, params: { "q" => "1" } })
+    end
+
+    {
+      "request_context=": ->(s) { s.request_context = { headers: {} } },
+      update_request_context: ->(s) { s.update_request_context(headers: { "A" => "b" }) },
+      request_headers?: lambda(&:request_headers?),
+      request_params?: lambda(&:request_params?),
+      request_header: ->(s) { s.request_header("X-API-Key") },
+      request_param: ->(s) { s.request_param("q") }
+    }.each do |method_name, invoke|
+      it "warns that Session##{method_name} is deprecated" do
+        expect(VectorMCP).to receive(:deprecation_warning).with(/Session##{Regexp.escape(method_name.to_s)}.*0\.7/m)
+        invoke.call(session)
+      end
+    end
+  end
+
   describe "#initialize with request_context" do
     it "initializes with default empty request context" do
       session = described_class.new(server, transport)

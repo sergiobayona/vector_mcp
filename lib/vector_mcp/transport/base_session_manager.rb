@@ -11,21 +11,6 @@ module VectorMCP
     #
     # @abstract Subclass and implement transport-specific methods
     class BaseSessionManager
-      # Session data structure for unified session management
-      Session = Struct.new(:id, :context, :created_at, :last_accessed_at, :metadata) do
-        def touch!
-          self.last_accessed_at = Time.now
-        end
-
-        def expired?(timeout)
-          Time.now - last_accessed_at > timeout
-        end
-
-        def age
-          Time.now - created_at
-        end
-      end
-
       attr_reader :transport, :session_timeout, :logger
 
       # Initializes a new session manager.
@@ -46,7 +31,7 @@ module VectorMCP
       # Gets an existing session by ID.
       #
       # @param session_id [String] The session ID
-      # @return [Session, nil] The session if found and valid
+      # @return [VectorMCP::Session, nil] The session if found and valid
       def get_session(session_id)
         return nil unless session_id
 
@@ -58,40 +43,29 @@ module VectorMCP
       end
 
       # Gets an existing session or creates a new one.
+      # When a session_id is provided but not found (expired or unknown), returns
+      # nil instead of creating a session with the client-supplied ID — session
+      # IDs are always server-generated (prevents session fixation).
       #
       # @param session_id [String, nil] The session ID (optional)
-      # @return [Session] The existing or newly created session
+      # @return [VectorMCP::Session, nil] The existing session, a newly created one, or nil
       def get_or_create_session(session_id = nil)
         if session_id
-          session = get_session(session_id)
-          return session if session
-
-          # If session_id was provided but not found, create with that ID
-          return create_session(session_id)
+          get_session(session_id)
+        else
+          create_session
         end
-
-        create_session
       end
 
       # Creates a new session.
       #
       # @param session_id [String, nil] Optional specific session ID to use
-      # @return [Session] The newly created session
+      # @return [VectorMCP::Session] The newly created session
       def create_session(session_id = nil)
         session_id ||= generate_session_id
-        now = Time.now
 
-        # Create VectorMCP session context
-        session_context = VectorMCP::Session.new(@transport.server, @transport, id: session_id)
-
-        # Create internal session record with transport-specific metadata
-        session = Session.new(
-          session_id,
-          session_context,
-          now,
-          now,
-          create_session_metadata
-        )
+        session = VectorMCP::Session.new(@transport.server, @transport, id: session_id)
+        session.metadata.merge!(create_session_metadata)
 
         @sessions[session_id] = session
 

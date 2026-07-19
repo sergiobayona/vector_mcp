@@ -19,20 +19,9 @@ module VectorMCP
       #
       # @api private
       class SessionManager < BaseSessionManager
-        # HTTP stream session data structure extending base session
-        Session = Struct.new(:id, :context, :created_at, :last_accessed_at, :metadata) do
-          def touch!
-            self.last_accessed_at = Time.now
-          end
-
-          def expired?(timeout)
-            Time.now - last_accessed_at > timeout
-          end
-
-          def age
-            Time.now - created_at
-          end
-
+        # HTTP-streaming connection state, kept in the session's transport
+        # metadata. New sessions are extended with this module at creation.
+        module SessionStreaming
           def streaming?
             !streaming_connection.nil? || !streaming_connections.empty?
           end
@@ -65,24 +54,21 @@ module VectorMCP
           end
         end
 
-        # Initializes a new HTTP stream session manager.
-        #
-        # @param transport [HttpStream] The parent transport instance
-        # @param session_timeout [Integer] Session timeout in seconds
-
         # Creates a new session. RequestContext.from_rack_env handles nil
         # rack_env by falling back to a minimal context, so we don't need to
         # branch here.
+        #
+        # @return [VectorMCP::Session] The newly created session
         def create_session(session_id = nil, rack_env = nil)
           session_id ||= generate_session_id
-          now = Time.now
 
           request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-          session_context = VectorMCP::Session.new(
+          session = VectorMCP::Session.new(
             @transport.server, @transport, id: session_id, request_context: request_context
           )
+          session.extend(SessionStreaming)
+          session.metadata.merge!(create_session_metadata)
 
-          session = Session.new(session_id, session_context, now, now, create_session_metadata)
           @sessions[session_id] = session
 
           logger.info { "Session created: #{session_id}" }
@@ -90,25 +76,16 @@ module VectorMCP
         end
 
         # Override to add rack_env support.
-        # Returns nil when a session_id is provided but not found (expired or unknown).
-        # Callers are responsible for returning 404 in that case.
+        # Returns nil when a session_id is provided but not found (expired or
+        # unknown) — callers are responsible for returning 404 in that case.
+        # Request-scoped data is never written onto an existing session; each
+        # request carries its own context via the Invocation built at dispatch.
         def get_or_create_session(session_id = nil, rack_env = nil)
           if session_id
-            session = get_session(session_id)
-            if session
-              # Update existing session context if rack_env is provided
-              if rack_env
-                request_context = VectorMCP::RequestContext.from_rack_env(rack_env, "http_stream")
-                session.context.request_context = request_context
-              end
-              return session
-            end
-
-            # Session ID provided but not found — signal 404 to caller
-            return nil
+            get_session(session_id)
+          else
+            create_session(nil, rack_env)
           end
-
-          create_session(nil, rack_env)
         end
 
         # Terminates a session by ID.

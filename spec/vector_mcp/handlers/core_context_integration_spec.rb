@@ -38,7 +38,7 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
       it "extracts request context using public interface" do
         result = described_class.send(:extract_auth_credentials, session)
 
-        expect(result).to be_a(Hash)
+        expect(result).to be_a(VectorMCP::RequestContext)
         expect(result[:headers]).to eq({
                                          "Authorization" => "Bearer token123",
                                          "X-API-Key" => "secret456",
@@ -49,7 +49,6 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
                                         "format" => "json",
                                         "limit" => "100"
                                       })
-        expect(result[:session_id]).to eq("test-session")
       end
 
       it "handles session with minimal context" do
@@ -62,10 +61,9 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
 
         result = described_class.send(:extract_auth_credentials, minimal_session)
 
-        expect(result).to be_a(Hash)
+        expect(result).to be_a(VectorMCP::RequestContext)
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("minimal-session")
       end
 
       it "handles session with empty context" do
@@ -73,10 +71,9 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
 
         result = described_class.send(:extract_auth_credentials, empty_session)
 
-        expect(result).to be_a(Hash)
+        expect(result).to be_a(VectorMCP::RequestContext)
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("empty-session")
       end
 
       it "does not log deprecation warnings for new interface" do
@@ -122,10 +119,9 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
 
         result = described_class.send(:extract_auth_credentials, session_with_empty_context)
 
-        expect(result).to be_a(Hash)
+        expect(result).to be_a(VectorMCP::RequestContext)
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("empty-context-session")
       end
     end
   end
@@ -160,7 +156,6 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         expect(result[:headers]["X-API-Key"]).to eq("secret456")
         expect(result[:headers]["User-Agent"]).to eq("TestClient/1.0")
         expect(result[:params]["api_key"]).to eq("test123")
-        expect(result[:session_id]).to eq("http-session")
       end
 
       it "provides context that works with API key authentication" do
@@ -209,7 +204,6 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
         expect(result[:headers]["X-Custom-Auth"]).to eq("custom-secret")
         expect(result[:params]["session_id"]).to eq("http-123")
         expect(result[:params]["auth_token"]).to eq("http-token")
-        expect(result[:session_id]).to eq("http-session")
       end
     end
 
@@ -228,7 +222,6 @@ RSpec.describe VectorMCP::Handlers::Core, "context integration" do
 
         expect(result[:headers]).to eq({})
         expect(result[:params]).to eq({})
-        expect(result[:session_id]).to eq("minimal-transport-session")
       end
 
       it "works with authentication disabled scenarios" do

@@ -7,6 +7,7 @@ require_relative "vector_mcp/version"
 require_relative "vector_mcp/errors"
 require_relative "vector_mcp/definitions"
 require_relative "vector_mcp/session"
+require_relative "vector_mcp/invocation"
 require_relative "vector_mcp/util"
 require_relative "vector_mcp/util/token_sweeper"
 require_relative "vector_mcp/token_store"
@@ -59,6 +60,14 @@ module VectorMCP
     # @return [VectorMCP::Logger] default logger
     def logger
       @logger ||= Logger.for("vectormcp")
+    end
+
+    # Emit a deprecation warning. Centralized so tests and applications can
+    # intercept or silence deprecations in one place.
+    # @param message [String] description of the deprecated usage and its replacement
+    # @return [void]
+    def deprecation_warning(message)
+      warn("[DEPRECATION] VectorMCP: #{message}")
     end
 
     # Creates a new {VectorMCP::Server} instance. This is a **thin wrapper** around

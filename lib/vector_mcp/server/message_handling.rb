@@ -10,12 +10,14 @@ module VectorMCP
       # This is the main dispatch point for messages received by a transport.
       #
       # @param message [Hash] The parsed JSON-RPC message object.
-      # @param session [VectorMCP::Session] The client session associated with this message.
-      # @param session_id [String] A unique identifier for the underlying transport connection.
+      # @param session [VectorMCP::Session, VectorMCP::Invocation] The session (or per-request
+      #   invocation view of it) this message belongs to.
+      # @param session_id [String, nil] Deprecated: defaults to session.id; used only for log prefixes.
       # @return [Object, nil] For requests, returns the result data to be sent in the JSON-RPC response.
       #   For notifications, returns `nil`.
       # @raise [VectorMCP::ProtocolError] if the message is invalid or an error occurs during handling.
-      def handle_message(message, session, session_id)
+      def handle_message(message, session, session_id = nil)
+        session_id ||= session.id
         id = message["id"]
         method = message["method"]
         params = message["params"] || {}
@@ -83,8 +85,6 @@ module VectorMCP
       end
 
       # Validates that the session is properly initialized for the given request.
-      # Transports are contractually required to pass a VectorMCP::Session here —
-      # never the SessionManager wrapper struct.
       # @api private
       def validate_session_initialization(id, method, _params, session)
         return if session.initialized?

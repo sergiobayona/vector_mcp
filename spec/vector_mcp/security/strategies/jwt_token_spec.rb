@@ -226,21 +226,21 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     context "from Authorization header" do
       it "extracts bearer token" do
         request = { headers: { "Authorization" => "Bearer test.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("test.jwt.token")
       end
 
       it "handles case-insensitive headers" do
         request = { headers: { "authorization" => "Bearer test.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("test.jwt.token")
       end
 
       it "returns nil for non-bearer authorization" do
         request = { headers: { "Authorization" => "Basic dGVzdDp0ZXN0" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to be_nil
       end
@@ -249,14 +249,14 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     context "from custom JWT header" do
       it "extracts from X-JWT-Token header" do
         request = { headers: { "X-JWT-Token" => "custom.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("custom.jwt.token")
       end
 
       it "handles case-insensitive custom header" do
         request = { headers: { "x-jwt-token" => "custom.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("custom.jwt.token")
       end
@@ -265,14 +265,14 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     context "from query parameters (disabled by default, SECURITY-002)" do
       it "rejects jwt_token from query params when allow_query_params is false" do
         request = { params: { "jwt_token" => "query.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to be_nil
       end
 
       it "rejects token from query params when allow_query_params is false" do
         request = { params: { "token" => "query.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to be_nil
       end
@@ -283,21 +283,21 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
 
       it "extracts from jwt_token parameter" do
         request = { params: { "jwt_token" => "query.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("query.jwt.token")
       end
 
       it "extracts from token parameter" do
         request = { params: { "token" => "query.jwt.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("query.jwt.token")
       end
 
       it "prefers jwt_token over token parameter" do
         request = { params: { "jwt_token" => "preferred.token", "token" => "fallback.token" } }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("preferred.token")
       end
@@ -311,7 +311,7 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
             "X-JWT-Token" => "custom.token"
           }
         }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("auth.token")
       end
@@ -322,7 +322,7 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
           headers: { "X-JWT-Token" => "custom.token" },
           params: { "jwt_token" => "query.token" }
         }
-        token = strategy_with_params.send(:extract_token, request)
+        token = strategy_with_params.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to eq("custom.token")
       end
@@ -331,14 +331,14 @@ RSpec.describe VectorMCP::Security::Strategies::JwtToken do
     context "with no token found" do
       it "returns nil when no token sources are present" do
         request = { headers: {}, params: {} }
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to be_nil
       end
 
       it "returns nil when headers and params are missing" do
         request = {}
-        token = strategy.send(:extract_token, request)
+        token = strategy.send(:extract_token, VectorMCP::RequestContext.coerce(request))
 
         expect(token).to be_nil
       end

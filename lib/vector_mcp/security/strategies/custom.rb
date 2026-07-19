@@ -17,13 +17,16 @@ module VectorMCP
         end
 
         # Authenticate a request using the custom handler.
+        # The handler receives a {VectorMCP::RequestContext}, which supports
+        # hash-style access (`request[:headers]`, `request[:params]`) for
+        # compatibility with handlers written against the legacy request hash.
         # If the handler returns a Hash with a :user key, the value is extracted
         # so that AuthManager receives the user data directly.
-        # @param request [Hash] the request object
+        # @param request [VectorMCP::RequestContext, Hash] the request
         # @return [Object, nil, false] user data or false if authentication failed.
         #   A return of nil (from { user: nil }) signals "authenticated, no user object."
         def authenticate(request)
-          result = @handler.call(request)
+          result = @handler.call(VectorMCP::RequestContext.coerce(request))
           return false unless result && result != false
 
           return result unless result.is_a?(Hash) && result.key?(:user)
