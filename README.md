@@ -14,6 +14,7 @@ VectorMCP is a Ruby implementation of the Model Context Protocol (MCP) server-si
 - Class-based tools via `VectorMCP::Tool`, plus the original block-based `register_tool` API
 - Rack and Rails mounting through `server.rack_app`
 - Opt-in authentication and authorization, structured logging, and middleware hooks
+- Request-scoped identity: every request is dispatched through its own invocation, so concurrent requests on one session can never observe each other's headers or auth
 - Image-aware tools/resources/prompts, roots, and server-initiated sampling
 - Token-based field anonymization middleware to keep sensitive values out of LLM context
 
@@ -161,6 +162,24 @@ end
 ```
 
 `VectorMCP::Tool` also supports `type: :date` and `type: :datetime`, which are validated as strings in JSON Schema and coerced to `Date` and `Time` before `#call` runs.
+
+Handlers that take a second argument receive the per-request invocation, which exposes session identity, the request's headers/params, and the authenticated user in one place:
+
+```ruby
+server.register_tool(
+  name: "whoami",
+  description: "Reports the caller's identity",
+  input_schema: { type: "object", properties: {} }
+) do |_args, invocation|
+  {
+    session: invocation.id,
+    user: invocation.user,
+    api_key_header: invocation.request_header("X-API-Key")
+  }
+end
+```
+
+Resource handlers get the same invocation as their second argument (it also answers the familiar `user` / `authenticated?` / `can?` queries, so handlers written against the older security-context argument keep working unchanged).
 
 ## Security and Middleware
 
