@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  Class: VectorMCP::Middleware::Anonymizer
+  
+    &mdash; VectorMCP Documentation
+  
+</title>
+
+  <link rel="stylesheet" href="../../css/style.css" type="text/css" />
+
+  <link rel="stylesheet" href="../../css/common.css" type="text/css" />
+
+<script type="text/javascript">
+  pathId = "VectorMCP::Middleware::Anonymizer";
+  relpath = '../../';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="../../js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="../../js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div class="nav_wrap">
+      <iframe id="nav" src="../../class_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="../../_index.html">Index (A)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span> &raquo; <span class='title'><span class='object_link'><a href="../Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span>
+     &raquo; 
+    <span class="title">Anonymizer</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="../../class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><h1>Class: VectorMCP::Middleware::Anonymizer
+  
+  
+  
+</h1>
+<div class="box_info">
+  
+  <dl>
+    <dt>Inherits:</dt>
+    <dd>
+      <span class="inheritName">Object</span>
+      
+        <ul class="fullTree">
+          <li>Object</li>
+          
+            <li class="next">VectorMCP::Middleware::Anonymizer</li>
+          
+        </ul>
+        <a href="#" class="inheritanceTree">show all</a>
+      
+    </dd>
+  </dl>
+  
+
+  
+  
+  
+  
+  
+
+  
+
+  
+  <dl>
+    <dt>Defined in:</dt>
+    <dd>lib/vector_mcp/middleware/anonymizer.rb</dd>
+  </dl>
+  
+</div>
+
+<h2>Overview</h2><div class="docstring">
+  <div class="discussion">
+    <p>Middleware that rewrites selected string fields in outbound tool
+results into opaque tokens and restores them on inbound tool
+invocations. All domain knowledge (which keys to match, token
+prefixes, which keys to treat as atomic blobs) is supplied by the
+application via the constructor.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+  <div class="examples">
+    <h4 class="tag_title">Examples:</h4>
+    
+      
+        <h5 class="example_title"><div class='inline'><p>Wiring on a server</p>
+</div></h5>
+      
+      <pre class="example code"><code><span class='id identifier rubyid_anonymizer'>anonymizer</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'>Anonymizer</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="VectorMCP::Middleware::Anonymizer#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+  <span class='label'>store:</span>       <span class='const'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../TokenStore.html" title="VectorMCP::TokenStore (class)">TokenStore</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="../../VectorMCP.html#new-class_method" title="VectorMCP.new (method)">new</a></span></span><span class='comma'>,</span>
+  <span class='label'>field_rules:</span> <span class='lbracket'>[</span>
+    <span class='lbrace'>{</span> <span class='label'>pattern:</span> <span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\bname\b</span><span class='regexp_end'>/i</span></span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>NAME</span><span class='tstring_end'>&quot;</span></span>  <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='lbrace'>{</span> <span class='label'>pattern:</span> <span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>email</span><span class='regexp_end'>/i</span></span><span class='comma'>,</span>    <span class='label'>prefix:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>EMAIL</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span>
+  <span class='rbracket'>]</span><span class='comma'>,</span>
+  <span class='label'>atomic_keys:</span> <span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>address</span><span class='regexp_end'>/i</span></span>
+<span class='rparen'>)</span>
+<span class='id identifier rubyid_anonymizer'>anonymizer</span><span class='period'>.</span><span class='id identifier rubyid_install_on'>install_on</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span></code></pre>
+    
+  </div>
+
+
+</div>
+
+
+
+
+
+
+  
+    <h2>
+      Instance Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#after_tool_call-instance_method" title="#after_tool_call (instance method)">#<strong>after_tool_call</strong>(context)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Middleware hook: tokenize matched fields in the tool result.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#before_tool_call-instance_method" title="#before_tool_call (instance method)">#<strong>before_tool_call</strong>(context)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Middleware hook: rewrite tool arguments before the handler runs.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(store:, field_rules:, atomic_keys: nil)  &#x21d2; Anonymizer </a>
+    
+
+    
+  </span>
+  
+  
+    <span class="note title constructor">constructor</span>
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>A new instance of Anonymizer.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#install_on-instance_method" title="#install_on (instance method)">#<strong>install_on</strong>(server, priority: Hook::DEFAULT_PRIORITY)  &#x21d2; Class </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Register this anonymizer instance on +server+ for the tool call lifecycle.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#sweep_inbound-instance_method" title="#sweep_inbound (instance method)">#<strong>sweep_inbound</strong>(obj)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Resolve tokens in an inbound payload back to their original values.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#sweep_outbound-instance_method" title="#sweep_outbound (instance method)">#<strong>sweep_outbound</strong>(obj)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Tokenize sensitive string fields in an outbound payload.</p>
+</div></span>
+  
+</li>
+
+      
+    </ul>
+  
+
+<div id="constructor_details" class="method_details_list">
+  <h2>Constructor Details</h2>
+  
+    <div class="method_details first">
+  <h3 class="signature first" id="initialize-instance_method">
+  
+    #<strong>initialize</strong>(store:, field_rules:, atomic_keys: nil)  &#x21d2; <tt><span class='object_link'><a href="" title="VectorMCP::Middleware::Anonymizer (class)">Anonymizer</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns a new instance of Anonymizer.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>store</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="../TokenStore.html" title="VectorMCP::TokenStore (class)">VectorMCP::TokenStore</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the backing token store.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>field_rules</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;Hash&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>an array of +{ pattern: Regexp, prefix: String }+
+hashes. The pattern is matched against each Hash key whose value is a String.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>atomic_keys</span>
+      
+      
+        <span class='type'>(<tt>Regexp</tt>, <tt>nil</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>nil</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>optional pattern; Hash values whose parent
+key matches are serialized and tokenized as a single opaque unit instead
+of recursed into.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>ArgumentError</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 34</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='label'>store:</span><span class='comma'>,</span> <span class='label'>field_rules:</span><span class='comma'>,</span> <span class='label'>atomic_keys:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>store is required</span><span class='tstring_end'>&quot;</span></span>       <span class='kw'>if</span> <span class='id identifier rubyid_store'>store</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>field_rules is required</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_field_rules'>field_rules</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
+
+  <span class='ivar'>@store</span> <span class='op'>=</span> <span class='id identifier rubyid_store'>store</span>
+  <span class='ivar'>@field_rules</span> <span class='op'>=</span> <span class='id identifier rubyid_field_rules'>field_rules</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_rule'>rule</span><span class='op'>|</span> <span class='id identifier rubyid_validate_rule!'>validate_rule!</span><span class='lparen'>(</span><span class='id identifier rubyid_rule'>rule</span><span class='rparen'>)</span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
+  <span class='ivar'>@atomic_keys</span> <span class='op'>=</span> <span class='id identifier rubyid_atomic_keys'>atomic_keys</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+  
+</div>
+
+
+  <div id="instance_method_details" class="method_details_list">
+    <h2>Instance Method Details</h2>
+
+    
+      <div class="method_details first">
+  <h3 class="signature first" id="after_tool_call-instance_method">
+  
+    #<strong>after_tool_call</strong>(context)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Middleware hook: tokenize matched fields in the tool result.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>context</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Context.html" title="VectorMCP::Middleware::Context (class)">VectorMCP::Middleware::Context</a></span></tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+85
+86
+87
+88
+89</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 85</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_after_tool_call'>after_tool_call</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_result'>result</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span>
+
+  <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_result'>result</span> <span class='op'>=</span> <span class='id identifier rubyid_sweep_outbound'>sweep_outbound</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_result'>result</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="before_tool_call-instance_method">
+  
+    #<strong>before_tool_call</strong>(context)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Middleware hook: rewrite tool arguments before the handler runs.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>context</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Context.html" title="VectorMCP::Middleware::Context (class)">VectorMCP::Middleware::Context</a></span></tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+74
+75
+76
+77
+78
+79
+80
+81</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 74</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_before_tool_call'>before_tool_call</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_params'>params</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Hash</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_arguments'>arguments</span> <span class='op'>=</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_params'>params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>arguments</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_arguments'>arguments</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Hash</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_arguments'>arguments</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_params'>params</span> <span class='op'>=</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_params'>params</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>arguments</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_sweep_inbound'>sweep_inbound</span><span class='lparen'>(</span><span class='id identifier rubyid_arguments'>arguments</span><span class='rparen'>)</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="install_on-instance_method">
+  
+    #<strong>install_on</strong>(server, priority: Hook::DEFAULT_PRIORITY)  &#x21d2; <tt>Class</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Register this anonymizer instance on +server+ for the tool call
+lifecycle. Creates a thin adapter class so the middleware manager&#39;s
+argumentless instantiation can still deliver the configured instance.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>server</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="../Server.html" title="VectorMCP::Server (class)">VectorMCP::Server</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the server instance.</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>priority</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>Hook::DEFAULT_PRIORITY</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>middleware priority.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Class</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the adapter class registered with the server.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+98
+99
+100
+101
+102
+103
+104
+105
+106</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 98</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_install_on'>install_on</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='const'><span class='object_link'><a href="Hook.html" title="VectorMCP::Middleware::Hook (class)">Hook</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Hook.html#DEFAULT_PRIORITY-constant" title="VectorMCP::Middleware::Hook::DEFAULT_PRIORITY (constant)">DEFAULT_PRIORITY</a></span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_instance'>instance</span> <span class='op'>=</span> <span class='kw'>self</span>
+  <span class='id identifier rubyid_adapter'>adapter</span> <span class='op'>=</span> <span class='const'>Class</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Base.html" title="VectorMCP::Middleware::Base (class)">Base</a></span></span><span class='rparen'>)</span> <span class='kw'>do</span>
+    <span class='id identifier rubyid_define_method'>define_method</span><span class='lparen'>(</span><span class='symbol'>:before_tool_call</span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_context'>context</span><span class='op'>|</span> <span class='id identifier rubyid_instance'>instance</span><span class='period'>.</span><span class='id identifier rubyid_before_tool_call'>before_tool_call</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+    <span class='id identifier rubyid_define_method'>define_method</span><span class='lparen'>(</span><span class='symbol'>:after_tool_call</span><span class='rparen'>)</span>  <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_context'>context</span><span class='op'>|</span> <span class='id identifier rubyid_instance'>instance</span><span class='period'>.</span><span class='id identifier rubyid_after_tool_call'>after_tool_call</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
+  <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_use_middleware'>use_middleware</span><span class='lparen'>(</span><span class='id identifier rubyid_adapter'>adapter</span><span class='comma'>,</span> <span class='qsymbols_beg'>%i[</span><span class='tstring_content'>before_tool_call</span><span class='words_sep'> </span><span class='tstring_content'>after_tool_call</span><span class='tstring_end'>]</span></span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='id identifier rubyid_priority'>priority</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_adapter'>adapter</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="sweep_inbound-instance_method">
+  
+    #<strong>sweep_inbound</strong>(obj)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Resolve tokens in an inbound payload back to their original values.
+Unknown token-shaped strings pass through unchanged.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>obj</span>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>a parsed JSON-like Ruby structure.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>a new structure with tokens resolved to original values.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 61</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_sweep_inbound'>sweep_inbound</span><span class='lparen'>(</span><span class='id identifier rubyid_obj'>obj</span><span class='rparen'>)</span>
+  <span class='const'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Util.html" title="VectorMCP::Util (module)">Util</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Util/TokenSweeper.html" title="VectorMCP::Util::TokenSweeper (module)">TokenSweeper</a></span></span><span class='period'>.</span><span class='id identifier rubyid_sweep'><span class='object_link'><a href="../Util/TokenSweeper.html#sweep-class_method" title="VectorMCP::Util::TokenSweeper.sweep (method)">sweep</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_obj'>obj</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='id identifier rubyid__parent_key'>_parent_key</span><span class='op'>|</span>
+    <span class='kw'>if</span> <span class='ivar'>@store</span><span class='period'>.</span><span class='id identifier rubyid_token?'>token?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_resolved'>resolved</span> <span class='op'>=</span> <span class='ivar'>@store</span><span class='period'>.</span><span class='id identifier rubyid_resolve'>resolve</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_resolved'>resolved</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>?</span> <span class='id identifier rubyid_value'>value</span> <span class='op'>:</span> <span class='id identifier rubyid_resolved'>resolved</span>
+    <span class='kw'>else</span>
+      <span class='id identifier rubyid_value'>value</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="sweep_outbound-instance_method">
+  
+    #<strong>sweep_outbound</strong>(obj)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Tokenize sensitive string fields in an outbound payload.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>obj</span>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>a parsed JSON-like Ruby structure.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>a new structure with matched values replaced by tokens.</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+47
+48
+49
+50
+51
+52
+53
+54</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/middleware/anonymizer.rb', line 47</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_sweep_outbound'>sweep_outbound</span><span class='lparen'>(</span><span class='id identifier rubyid_obj'>obj</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_replace_atomic_nodes'>replace_atomic_nodes</span><span class='lparen'>(</span><span class='id identifier rubyid_obj'>obj</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_then'>then</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_shaped'>shaped</span><span class='op'>|</span>
+    <span class='const'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Util.html" title="VectorMCP::Util (module)">Util</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Util/TokenSweeper.html" title="VectorMCP::Util::TokenSweeper (module)">TokenSweeper</a></span></span><span class='period'>.</span><span class='id identifier rubyid_sweep'><span class='object_link'><a href="../Util/TokenSweeper.html#sweep-class_method" title="VectorMCP::Util::TokenSweeper.sweep (method)">sweep</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_shaped'>shaped</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='id identifier rubyid_parent_key'>parent_key</span><span class='op'>|</span>
+      <span class='id identifier rubyid_rule'>rule</span> <span class='op'>=</span> <span class='id identifier rubyid_rule_for'>rule_for</span><span class='lparen'>(</span><span class='id identifier rubyid_parent_key'>parent_key</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_rule'>rule</span> <span class='op'>?</span> <span class='ivar'>@store</span><span class='period'>.</span><span class='id identifier rubyid_tokenize'>tokenize</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='id identifier rubyid_rule'>rule</span><span class='lbracket'>[</span><span class='symbol'>:prefix</span><span class='rbracket'>]</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='id identifier rubyid_value'>value</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+</div>
+
+      <div id="footer">
+  Generated on Sun Jul 19 11:59:36 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.38 (ruby-3.3.8).
+</div>
+
+    </div>
+  </body>
+</html>

@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  Class: VectorMCP::Security::Middleware
+  
+    &mdash; VectorMCP Documentation
+  
+</title>
+
+  <link rel="stylesheet" href="../../css/style.css" type="text/css" />
+
+  <link rel="stylesheet" href="../../css/common.css" type="text/css" />
+
+<script type="text/javascript">
+  pathId = "VectorMCP::Security::Middleware";
+  relpath = '../../';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="../../js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="../../js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div class="nav_wrap">
+      <iframe id="nav" src="../../class_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="../../_index.html">Index (M)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../../VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span> &raquo; <span class='title'><span class='object_link'><a href="../Security.html" title="VectorMCP::Security (module)">Security</a></span></span>
+     &raquo; 
+    <span class="title">Middleware</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="../../class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><h1>Class: VectorMCP::Security::Middleware
+  
+  
+  
+</h1>
+<div class="box_info">
+  
+  <dl>
+    <dt>Inherits:</dt>
+    <dd>
+      <span class="inheritName">Object</span>
+      
+        <ul class="fullTree">
+          <li>Object</li>
+          
+            <li class="next">VectorMCP::Security::Middleware</li>
+          
+        </ul>
+        <a href="#" class="inheritanceTree">show all</a>
+      
+    </dd>
+  </dl>
+  
+
+  
+  
+  
+  
+  
+
+  
+
+  
+  <dl>
+    <dt>Defined in:</dt>
+    <dd>lib/vector_mcp/security/middleware.rb</dd>
+  </dl>
+  
+</div>
+
+<h2>Overview</h2><div class="docstring">
+  <div class="discussion">
+    <p>Security middleware for request authentication and authorization
+Integrates with transport layers to provide security controls</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div>
+
+
+
+  <h2>Instance Attribute Summary <small><a href="#" class="summary_toggle">collapse</a></small></h2>
+  <ul class="summary">
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#auth_manager-instance_method" title="#auth_manager (instance method)">#<strong>auth_manager</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+      <span class="note title readonly">readonly</span>
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns the value of attribute auth_manager.</p>
+</div></span>
+  
+</li>
+
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#authorization-instance_method" title="#authorization (instance method)">#<strong>authorization</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+      <span class="note title readonly">readonly</span>
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns the value of attribute authorization.</p>
+</div></span>
+  
+</li>
+
+    
+  </ul>
+
+
+
+
+  
+    <h2>
+      Instance Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#authenticate_request-instance_method" title="#authenticate_request (instance method)">#<strong>authenticate_request</strong>(request, strategy: nil)  &#x21d2; SessionContext </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Authenticate a request and return session context.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#authorize_action-instance_method" title="#authorize_action (instance method)">#<strong>authorize_action</strong>(session_context, action, resource)  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Check if a session is authorized for an action on a resource.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(auth_manager, authorization)  &#x21d2; Middleware </a>
+    
+
+    
+  </span>
+  
+  
+    <span class="note title constructor">constructor</span>
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Initialize middleware with auth components.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#process_request-instance_method" title="#process_request (instance method)">#<strong>process_request</strong>(request, action: :access, resource: nil)  &#x21d2; Hash </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Process a request through the complete security pipeline.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#security_enabled%3F-instance_method" title="#security_enabled? (instance method)">#<strong>security_enabled?</strong>  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Check if security is enabled.</p>
+</div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#security_status-instance_method" title="#security_status (instance method)">#<strong>security_status</strong>  &#x21d2; Hash </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Get security status for debugging/monitoring.</p>
+</div></span>
+  
+</li>
+
+      
+    </ul>
+  
+
+<div id="constructor_details" class="method_details_list">
+  <h2>Constructor Details</h2>
+  
+    <div class="method_details first">
+  <h3 class="signature first" id="initialize-instance_method">
+  
+    #<strong>initialize</strong>(auth_manager, authorization)  &#x21d2; <tt><span class='object_link'><a href="" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Initialize middleware with auth components</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>auth_manager</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="AuthManager.html" title="VectorMCP::Security::AuthManager (class)">AuthManager</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the authentication manager</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>authorization</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the authorization manager</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+13
+14
+15
+16</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 13</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_auth_manager'>auth_manager</span><span class='comma'>,</span> <span class='id identifier rubyid_authorization'>authorization</span><span class='rparen'>)</span>
+  <span class='ivar'>@auth_manager</span> <span class='op'>=</span> <span class='id identifier rubyid_auth_manager'>auth_manager</span>
+  <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='id identifier rubyid_authorization'>authorization</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+  
+</div>
+
+  <div id="instance_attr_details" class="attr_details">
+    <h2>Instance Attribute Details</h2>
+    
+      
+      <span id=""></span>
+      <div class="method_details first">
+  <h3 class="signature first" id="auth_manager-instance_method">
+  
+    #<strong>auth_manager</strong>  &#x21d2; <tt>Object</tt>  <span class="extras">(readonly)</span>
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns the value of attribute auth_manager.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+8
+9
+10</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 8</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_auth_manager'>auth_manager</span>
+  <span class='ivar'>@auth_manager</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      
+      <span id=""></span>
+      <div class="method_details ">
+  <h3 class="signature " id="authorization-instance_method">
+  
+    #<strong>authorization</strong>  &#x21d2; <tt>Object</tt>  <span class="extras">(readonly)</span>
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns the value of attribute authorization.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+8
+9
+10</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 8</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_authorization'>authorization</span>
+  <span class='ivar'>@authorization</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+
+  <div id="instance_method_details" class="method_details_list">
+    <h2>Instance Method Details</h2>
+
+    
+      <div class="method_details first">
+  <h3 class="signature first" id="authenticate_request-instance_method">
+  
+    #<strong>authenticate_request</strong>(request, strategy: nil)  &#x21d2; <tt><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Authenticate a request and return session context</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>request</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the request object</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>strategy</span>
+      
+      
+        <span class='type'>(<tt>Symbol</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>nil</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>optional authentication strategy override</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the session context for the request</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+22
+23
+24
+25</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 22</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_authenticate_request'>authenticate_request</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>strategy:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_auth_result'>auth_result</span> <span class='op'>=</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_authenticate'>authenticate</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
+  <span class='const'><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_from_auth_result'><span class='object_link'><a href="SessionContext.html#from_auth_result-class_method" title="VectorMCP::Security::SessionContext.from_auth_result (method)">from_auth_result</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_auth_result'>auth_result</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="authorize_action-instance_method">
+  
+    #<strong>authorize_action</strong>(session_context, action, resource)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Check if a session is authorized for an action on a resource</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>session_context</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the session context</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>action</span>
+      
+      
+        <span class='type'>(<tt>Symbol</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the action being attempted</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>resource</span>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the resource being accessed</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>true if authorized</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+32
+33
+34
+35
+36
+37
+38</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 32</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_authorize_action'>authorize_action</span><span class='lparen'>(</span><span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_action'>action</span><span class='comma'>,</span> <span class='id identifier rubyid_resource'>resource</span><span class='rparen'>)</span>
+  <span class='comment'># Always allow if authorization is disabled
+</span>  <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>unless</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span>
+
+  <span class='comment'># Check authorization policy
+</span>  <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_authorize'>authorize</span><span class='lparen'>(</span><span class='id identifier rubyid_session_context'>session_context</span><span class='period'>.</span><span class='id identifier rubyid_user'>user</span><span class='comma'>,</span> <span class='id identifier rubyid_action'>action</span><span class='comma'>,</span> <span class='id identifier rubyid_resource'>resource</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="process_request-instance_method">
+  
+    #<strong>process_request</strong>(request, action: :access, resource: nil)  &#x21d2; <tt>Hash</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Process a request through the complete security pipeline</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>request</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the request object</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>action</span>
+      
+      
+        <span class='type'>(<tt>Symbol</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>:access</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>the action being attempted</p>
+</div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>resource</span>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>nil</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>the resource being accessed</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>result with session_context and authorization status</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 45</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_process_request'>process_request</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>action:</span> <span class='symbol'>:access</span><span class='comma'>,</span> <span class='label'>resource:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
+  <span class='comment'># Step 1: Authenticate the request
+</span>  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='id identifier rubyid_authenticate_request'>authenticate_request</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='rparen'>)</span>
+
+  <span class='comment'># Step 2: Check if authentication is required but failed
+</span>  <span class='kw'>if</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_session_context'>session_context</span><span class='period'>.</span><span class='id identifier rubyid_authenticated?'>authenticated?</span>
+    <span class='kw'>return</span> <span class='lbrace'>{</span>
+      <span class='label'>success:</span> <span class='kw'>false</span><span class='comma'>,</span>
+      <span class='label'>error:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication required</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+      <span class='label'>error_code:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>AUTHENTICATION_REQUIRED</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+      <span class='label'>session_context:</span> <span class='id identifier rubyid_session_context'>session_context</span>
+    <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Step 3: Check authorization if resource is provided
+</span>  <span class='kw'>if</span> <span class='id identifier rubyid_resource'>resource</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_authorize_action'>authorize_action</span><span class='lparen'>(</span><span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_action'>action</span><span class='comma'>,</span> <span class='id identifier rubyid_resource'>resource</span><span class='rparen'>)</span>
+    <span class='kw'>return</span> <span class='lbrace'>{</span>
+      <span class='label'>success:</span> <span class='kw'>false</span><span class='comma'>,</span>
+      <span class='label'>error:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Access denied</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+      <span class='label'>error_code:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>AUTHORIZATION_FAILED</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+      <span class='label'>session_context:</span> <span class='id identifier rubyid_session_context'>session_context</span>
+    <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Step 4: Success
+</span>  <span class='lbrace'>{</span>
+    <span class='label'>success:</span> <span class='kw'>true</span><span class='comma'>,</span>
+    <span class='label'>session_context:</span> <span class='id identifier rubyid_session_context'>session_context</span>
+  <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="security_enabled?-instance_method">
+  
+    #<strong>security_enabled?</strong>  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Check if security is enabled</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>true if any security features are enabled</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+78
+79
+80</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 78</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
+  <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span> <span class='op'>||</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="security_status-instance_method">
+  
+    #<strong>security_status</strong>  &#x21d2; <tt>Hash</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Get security status for debugging/monitoring</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>current security configuration status</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 84</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_security_status'>security_status</span>
+  <span class='lbrace'>{</span>
+    <span class='label'>authentication:</span> <span class='lbrace'>{</span>
+      <span class='label'>enabled:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span><span class='comma'>,</span>
+      <span class='label'>strategies:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_available_strategies'>available_strategies</span><span class='comma'>,</span>
+      <span class='label'>default_strategy:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_default_strategy'>default_strategy</span>
+    <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='label'>authorization:</span> <span class='lbrace'>{</span>
+      <span class='label'>enabled:</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span><span class='comma'>,</span>
+      <span class='label'>policy_types:</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_policy_types'>policy_types</span>
+    <span class='rbrace'>}</span>
+  <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+</div>
+
+      <div id="footer">
+  Generated on Sun Jul 19 11:59:36 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.38 (ruby-3.3.8).
+</div>
+
+    </div>
+  </body>
+</html>

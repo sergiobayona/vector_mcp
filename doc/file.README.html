@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  File: README
+  
+    &mdash; VectorMCP Documentation
+  
+</title>
+
+  <link rel="stylesheet" href="css/style.css" type="text/css" />
+
+  <link rel="stylesheet" href="css/common.css" type="text/css" />
+
+<script type="text/javascript">
+  pathId = "README";
+  relpath = '';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div class="nav_wrap">
+      <iframe id="nav" src="file_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="_index.html">Index</a> &raquo; 
+    <span class="title">File: README</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><div id='filecontents'><h1 id="vectormcp">VectorMCP</h1>
+
+<p><a href="https://badge.fury.io/rb/vector_mcp"><img src="https://badge.fury.io/rb/vector_mcp.svg" alt="Gem Version"></a>
+<a href="https://sergiobayona.github.io/vector_mcp/"><img src="http://img.shields.io/badge/yard-docs-blue.svg" alt="Docs"></a>
+<a href="https://github.com/sergiobayona/vector_mcp/actions/workflows/ruby.yml"><img src="https://github.com/sergiobayona/VectorMCP/actions/workflows/ruby.yml/badge.svg?branch=main" alt="Build Status"></a>
+<a href="https://qlty.sh/gh/sergiobayona/projects/vector_mcp"><img src="https://qlty.sh/badges/fdb143b3-148a-4a86-8e3b-4ccebe993528/maintainability.svg" alt="Maintainability"></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
+
+<p>VectorMCP is a Ruby implementation of the Model Context Protocol (MCP) server-side specification. It gives you a framework for exposing tools, resources, prompts, roots, sampling, middleware, and security over the MCP streamable HTTP transport.</p>
+
+<h2 id="highlights">Highlights</h2>
+
+<ul>
+<li>Streamable HTTP is the built-in transport, with session management, resumability, and MCP 2025-11-25 compliance</li>
+<li>Class-based tools via <code>VectorMCP::Tool</code>, plus the original block-based <code>register_tool</code> API</li>
+<li>Rack and Rails mounting through <code>server.rack_app</code></li>
+<li>Opt-in authentication and authorization, structured logging, and middleware hooks</li>
+<li>Request-scoped identity: every request is dispatched through its own invocation, so concurrent requests on one session can never observe each other&#39;s headers or auth</li>
+<li>Image-aware tools/resources/prompts, roots, and server-initiated sampling</li>
+<li>Token-based field anonymization middleware to keep sensitive values out of LLM context</li>
+</ul>
+
+<h2 id="requirements">Requirements</h2>
+
+<ul>
+<li>Ruby 3.2+</li>
+</ul>
+
+<h2 id="installation">Installation</h2>
+
+<pre class="code bash"><code class="bash">gem install vector_mcp
+</code></pre>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_gem'>gem</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>vector_mcp</span><span class='tstring_end'>&quot;</span></span>
+</code></pre>
+
+<h2 id="quick-start">Quick Start</h2>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>vector_mcp</span><span class='tstring_end'>&quot;</span></span>
+
+<span class='kw'>class</span> <span class='const'>Greet</span> <span class='op'>&lt;</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Tool.html" title="VectorMCP::Tool (class)">Tool</a></span></span>
+  <span class='id identifier rubyid_description'>description</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Say hello to someone</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_param'>param</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='label'>type:</span> <span class='symbol'>:string</span><span class='comma'>,</span> <span class='label'>desc:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Name to greet</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>required:</span> <span class='kw'>true</span>
+
+  <span class='kw'>def</span> <span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_args'>args</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='rparen'>)</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Hello, </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>name</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>!</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span>
+
+<span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Server.html" title="VectorMCP::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="VectorMCP.html#new-class_method" title="VectorMCP.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>MyApp</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>version:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>1.0.0</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+<span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='const'>Greet</span><span class='rparen'>)</span>
+<span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span><span class='lparen'>(</span><span class='label'>port:</span> <span class='int'>8080</span><span class='rparen'>)</span>
+</code></pre>
+
+<p>The class-based DSL is optional. The existing block-based API still works:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register_tool'>register_tool</span><span class='lparen'>(</span>
+  <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>echo</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Echo back the supplied text</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>input_schema:</span> <span class='lbrace'>{</span>
+    <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>object</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+    <span class='label'>properties:</span> <span class='lbrace'>{</span> <span class='label'>text:</span> <span class='lbrace'>{</span> <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>string</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span> <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='label'>required:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>text</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='rbrace'>}</span>
+<span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_args'>args</span><span class='op'>|</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>text</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='rbrace'>}</span>
+</code></pre>
+
+<h2 id="rack-and-rails">Rack and Rails</h2>
+
+<p>VectorMCP can run as a standalone HTTP server or be mounted inside an existing Rack app:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>vector_mcp</span><span class='tstring_end'>&quot;</span></span>
+
+<span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Server.html" title="VectorMCP::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="VectorMCP.html#new-class_method" title="VectorMCP.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>MyApp</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>version:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>1.0.0</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+<span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='const'>Greet</span><span class='rparen'>)</span>
+
+<span class='const'>MCP_APP</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_rack_app'>rack_app</span>
+</code></pre>
+
+<p>In Rails, mount it in <code>config/routes.rb</code>:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_mount'>mount</span> <span class='const'>MCP_APP</span> <span class='op'>=&gt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>/mcp</span><span class='tstring_end'>&quot;</span></span>
+</code></pre>
+
+<p>For ActiveRecord-backed tools, opt into <code>VectorMCP::Rails::Tool</code>:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>vector_mcp/rails/tool</span><span class='tstring_end'>&quot;</span></span>
+
+<span class='kw'>class</span> <span class='const'>FindUser</span> <span class='op'>&lt;</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Rails.html" title="VectorMCP::Rails (module)">Rails</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Rails/Tool.html" title="VectorMCP::Rails::Tool (class)">Tool</a></span></span>
+  <span class='id identifier rubyid_description'>description</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Find a user by id</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_param'>param</span> <span class='symbol'>:id</span><span class='comma'>,</span> <span class='label'>type:</span> <span class='symbol'>:integer</span><span class='comma'>,</span> <span class='label'>required:</span> <span class='kw'>true</span>
+
+  <span class='kw'>def</span> <span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_args'>args</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_user'>user</span> <span class='op'>=</span> <span class='id identifier rubyid_find!'>find!</span><span class='lparen'>(</span><span class='const'>User</span><span class='comma'>,</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='lbrace'>{</span> <span class='label'>id:</span> <span class='id identifier rubyid_user'>user</span><span class='period'>.</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='label'>email:</span> <span class='id identifier rubyid_user'>user</span><span class='period'>.</span><span class='id identifier rubyid_email'>email</span> <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p>See <a href="./docs/rails-setup-guide.md">docs/rails-setup-guide.md</a> for a full setup guide.</p>
+
+<h2 id="tools-resources-and-prompts">Tools, Resources, and Prompts</h2>
+
+<p>Expose callable tools:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register_tool'>register_tool</span><span class='lparen'>(</span>
+  <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>calculate</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Performs basic math</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>input_schema:</span> <span class='lbrace'>{</span>
+    <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>object</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+    <span class='label'>properties:</span> <span class='lbrace'>{</span>
+      <span class='label'>operation:</span> <span class='lbrace'>{</span> <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>string</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>enum:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>add</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>subtract</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>multiply</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='rbrace'>}</span><span class='comma'>,</span>
+      <span class='label'>a:</span> <span class='lbrace'>{</span> <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>number</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span><span class='comma'>,</span>
+      <span class='label'>b:</span> <span class='lbrace'>{</span> <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>number</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span>
+    <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='label'>required:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>operation</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>b</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='rbrace'>}</span>
+<span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_args'>args</span><span class='op'>|</span>
+  <span class='kw'>case</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>operation</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>add</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>then</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>+</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>b</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>subtract</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>then</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>-</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>b</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>multiply</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>then</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>*</span> <span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>b</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p>Expose readable resources:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register_resource'>register_resource</span><span class='lparen'>(</span>
+  <span class='label'>uri:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>file://config.json</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>App Configuration</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Current application settings</span><span class='tstring_end'>&quot;</span></span>
+<span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.json</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+</code></pre>
+
+<p>Define prompt templates:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register_prompt'>register_prompt</span><span class='lparen'>(</span>
+  <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>code_review</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Reviews code for best practices</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>arguments:</span> <span class='lbracket'>[</span>
+    <span class='lbrace'>{</span> <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>language</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Programming language</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>required:</span> <span class='kw'>true</span> <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='lbrace'>{</span> <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>code</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Code to review</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>required:</span> <span class='kw'>true</span> <span class='rbrace'>}</span>
+  <span class='rbracket'>]</span>
+<span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_args'>args</span><span class='op'>|</span>
+  <span class='lbrace'>{</span>
+    <span class='label'>messages:</span> <span class='lbracket'>[</span><span class='lbrace'>{</span>
+      <span class='label'>role:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>user</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+      <span class='label'>content:</span> <span class='lbrace'>{</span>
+        <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>text</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+        <span class='label'>text:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Review this </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>language</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'> code:\n\n</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_args'>args</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>code</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+      <span class='rbrace'>}</span>
+    <span class='rbrace'>}</span><span class='rbracket'>]</span>
+  <span class='rbrace'>}</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p><code>VectorMCP::Tool</code> also supports <code>type: :date</code> and <code>type: :datetime</code>, which are validated as strings in JSON Schema and coerced to <code>Date</code> and <code>Time</code> before <code>#call</code> runs.</p>
+
+<p>Handlers that take a second argument receive the per-request invocation, which exposes session identity, the request&#39;s headers/params, and the authenticated user in one place:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_register_tool'>register_tool</span><span class='lparen'>(</span>
+  <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>whoami</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>description:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Reports the caller&#39;s identity</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>input_schema:</span> <span class='lbrace'>{</span> <span class='label'>type:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>object</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>properties:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span> <span class='rbrace'>}</span>
+<span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid__args'>_args</span><span class='comma'>,</span> <span class='id identifier rubyid_invocation'>invocation</span><span class='op'>|</span>
+  <span class='lbrace'>{</span>
+    <span class='label'>session:</span> <span class='id identifier rubyid_invocation'>invocation</span><span class='period'>.</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span>
+    <span class='label'>user:</span> <span class='id identifier rubyid_invocation'>invocation</span><span class='period'>.</span><span class='id identifier rubyid_user'>user</span><span class='comma'>,</span>
+    <span class='label'>api_key_header:</span> <span class='id identifier rubyid_invocation'>invocation</span><span class='period'>.</span><span class='id identifier rubyid_request_header'>request_header</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>X-API-Key</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='rbrace'>}</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p>Resource handlers get the same invocation as their second argument (it also answers the familiar <code>user</code> / <code>authenticated?</code> / <code>can?</code> queries, so handlers written against the older security-context argument keep working unchanged).</p>
+
+<h2 id="security-and-middleware">Security and Middleware</h2>
+
+<p>VectorMCP keeps security opt-in, but the primitives are built in:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span>
+  <span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span>
+  <span class='label'>keys:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>your-secret-key</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+<span class='rparen'>)</span>
+
+<span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_enable_authorization!'>enable_authorization!</span> <span class='kw'>do</span>
+  <span class='id identifier rubyid_authorize_tools'>authorize_tools</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_user'>user</span><span class='comma'>,</span> <span class='id identifier rubyid__action'>_action</span><span class='comma'>,</span> <span class='id identifier rubyid_tool'>tool</span><span class='op'>|</span>
+    <span class='id identifier rubyid_user'>user</span><span class='lbracket'>[</span><span class='symbol'>:role</span><span class='rbracket'>]</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>admin</span><span class='tstring_end'>&quot;</span></span> <span class='op'>||</span> <span class='op'>!</span><span class='id identifier rubyid_tool'>tool</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span><span class='period'>.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>admin_</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p>Custom authentication works too:</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:custom</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_request'>request</span><span class='op'>|</span>
+  <span class='id identifier rubyid_api_key'>api_key</span> <span class='op'>=</span> <span class='id identifier rubyid_request'>request</span><span class='lbracket'>[</span><span class='symbol'>:headers</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>X-API-Key</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_user'>user</span> <span class='op'>=</span> <span class='const'>User</span><span class='period'>.</span><span class='id identifier rubyid_find_by'>find_by</span><span class='lparen'>(</span><span class='label'>api_key:</span> <span class='id identifier rubyid_api_key'>api_key</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_user'>user</span> <span class='op'>?</span> <span class='lbrace'>{</span> <span class='label'>user_id:</span> <span class='id identifier rubyid_user'>user</span><span class='period'>.</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='label'>role:</span> <span class='id identifier rubyid_user'>user</span><span class='period'>.</span><span class='id identifier rubyid_role'>role</span> <span class='rbrace'>}</span> <span class='op'>:</span> <span class='kw'>false</span>
+<span class='kw'>end</span>
+</code></pre>
+
+<p>For MCP clients that speak OAuth 2.1 (e.g. Claude Desktop), pass a <code>resource_metadata_url:</code> to turn on RFC 9728 discovery. Unauthenticated requests to <code>/mcp</code> return <code>401</code> with a <code>WWW-Authenticate</code> header pointing at the configured metadata document, and the client drives the rest of the OAuth dance automatically. See <a href="./docs/oauth_resource_server.md">docs/oauth_resource_server.md</a> for the feature reference and <a href="./docs/rails_oauth_integration.md">docs/rails_oauth_integration.md</a> for a full Rails + Doorkeeper recipe.</p>
+
+<p>Middleware can hook into tool, resource, prompt, sampling, auth, and transport events, including <code>before_auth</code>, <code>after_auth</code>, <code>on_auth_error</code>, <code>before_request</code>, <code>after_response</code>, and <code>on_transport_error</code>.</p>
+
+<p>See <a href="./security/README.md">security/README.md</a> for the full security guide.</p>
+
+<h3 id="field-anonymization">Field Anonymization</h3>
+
+<p>Keep sensitive string values out of the LLM context by substituting them with stable opaque tokens. Values are tokenized on outbound tool results and restored on inbound tool arguments, so the LLM sees only tokens while your handlers receive the original data.</p>
+
+<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_anonymizer'>anonymizer</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/Middleware/Anonymizer.html" title="VectorMCP::Middleware::Anonymizer (class)">Anonymizer</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="VectorMCP/Middleware/Anonymizer.html#initialize-instance_method" title="VectorMCP::Middleware::Anonymizer#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+  <span class='label'>store:</span> <span class='const'><span class='object_link'><a href="VectorMCP.html" title="VectorMCP (module)">VectorMCP</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorMCP/TokenStore.html" title="VectorMCP::TokenStore (class)">TokenStore</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="VectorMCP.html#new-class_method" title="VectorMCP.new (method)">new</a></span></span><span class='comma'>,</span>
+  <span class='label'>field_rules:</span> <span class='lbracket'>[</span>
+    <span class='lbrace'>{</span> <span class='label'>pattern:</span> <span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>email</span><span class='regexp_end'>/i</span></span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>EMAIL</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span><span class='comma'>,</span>
+    <span class='lbrace'>{</span> <span class='label'>pattern:</span> <span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>\bssn\b</span><span class='regexp_end'>/i</span></span><span class='comma'>,</span> <span class='label'>prefix:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>SSN</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span>
+  <span class='rbracket'>]</span>
+<span class='rparen'>)</span>
+<span class='id identifier rubyid_anonymizer'>anonymizer</span><span class='period'>.</span><span class='id identifier rubyid_install_on'>install_on</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+</code></pre>
+
+<h2 id="transport-notes">Transport Notes</h2>
+
+<ul>
+<li>VectorMCP ships with streamable HTTP as its built-in transport</li>
+<li><code>POST /mcp</code> accepts a single JSON-RPC request, notification, or response; batch arrays are rejected</li>
+<li><code>GET /mcp</code> opens an SSE stream for server-initiated messages</li>
+<li><code>DELETE /mcp</code> terminates the session</li>
+<li>The server advertises MCP protocol <code>2025-11-25</code> and accepts <code>2025-03-26</code> and <code>2024-11-05</code> headers for compatibility</li>
+<li>Default allowed origins are restricted to localhost and loopback addresses</li>
+</ul>
+
+<p>Initialize a session with curl:</p>
+
+<pre class="code bash"><code class="bash">curl -X POST http://localhost:8080/mcp \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;Accept: application/json, text/event-stream&quot; \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-11-25&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;curl&quot;,&quot;version&quot;:&quot;1.0&quot;}}}&#39;
+</code></pre>
+
+<h2 id="more-features">More Features</h2>
+
+<ul>
+<li>Roots via <code>register_root</code> and <code>register_root_from_path</code></li>
+<li>Image resources and image-aware tools/prompts</li>
+<li>Structured logging with component loggers</li>
+<li>Server-initiated sampling with streaming/tool-call support</li>
+<li>Middleware-driven request shaping and observability</li>
+</ul>
+
+<h2 id="documentation">Documentation</h2>
+
+<ul>
+<li><a href="./CHANGELOG.md">CHANGELOG.md</a></li>
+<li><a href="./examples/">examples/</a></li>
+<li><a href="./docs/rails-setup-guide.md">docs/rails-setup-guide.md</a></li>
+<li><a href="./docs/rails_oauth_integration.md">docs/rails_oauth_integration.md</a></li>
+<li><a href="./docs/oauth_resource_server.md">docs/oauth_resource_server.md</a></li>
+<li><a href="./docs/streamable-http-spec-compliance.md">docs/streamable-http-spec-compliance.md</a></li>
+<li><a href="./security/README.md">security/README.md</a></li>
+<li><a href="https://modelcontextprotocol.io/">MCP Specification</a></li>
+</ul>
+
+<h2 id="contributing">Contributing</h2>
+
+<p>Bug reports and pull requests are welcome on <a href="https://github.com/sergiobayona/vector_mcp">GitHub</a>.</p>
+
+<h2 id="license">License</h2>
+
+<p>Available as open source under the <a href="https://opensource.org/licenses/MIT">MIT License</a>.</p>
+</div></div>
+
+      <div id="footer">
+  Generated on Sun Jul 19 11:59:35 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.38 (ruby-3.3.8).
+</div>
+
+    </div>
+  </body>
+</html>
