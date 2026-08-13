@@ -22,7 +22,7 @@ RSpec.describe "VectorMCP::Rails::Tool integration with Server", :active_record 
                             "id" => 1,
                             "method" => "tools/call",
                             "params" => { "name" => tool_name, "arguments" => arguments }
-                          }, session, "test-session")
+                          }, session)
   end
 
   describe "find! helper" do

@@ -40,7 +40,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                            "name" => "string_tool",
                                            "arguments" => { "message" => "Hello World" }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to eq("Received: Hello World")
@@ -56,7 +56,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "string_tool",
                                     "arguments" => {}
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.message).to include("Invalid arguments for tool 'string_tool'")
           expect(error.details[:tool]).to eq("string_tool")
@@ -75,7 +75,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "string_tool",
                                     "arguments" => { "message" => "" }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("min")
         end
@@ -91,7 +91,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "string_tool",
                                     "arguments" => { "message" => 123 }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("type")
         end
@@ -110,7 +110,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       "extra" => "not allowed"
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("additional properties")
         end
@@ -143,7 +143,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                            "name" => "number_tool",
                                            "arguments" => { "age" => 25 }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Age: 25")
@@ -161,7 +161,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              "score" => 85.5
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Score: 85.5")
@@ -177,7 +177,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "number_tool",
                                     "arguments" => { "age" => -1 }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("minimum")
         end
@@ -193,7 +193,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "number_tool",
                                     "arguments" => { "age" => 200 }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("maximum")
         end
@@ -209,7 +209,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "number_tool",
                                     "arguments" => { "age" => "twenty-five" }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("type")
         end
@@ -254,7 +254,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              "priority" => "high"
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Tags: urgent, bug, frontend")
@@ -274,7 +274,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       "priority" => "medium"
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("min")
         end
@@ -293,7 +293,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       "priority" => "medium"
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("more items than")
         end
@@ -312,7 +312,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       "priority" => "super-urgent"
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("did not match one of")
         end
@@ -370,7 +370,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              }
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("User: Alice Smith (alice@example.com)")
@@ -394,7 +394,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       }
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("required")
           expect(error.details[:validation_errors].first).to include("email")
@@ -419,7 +419,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       }
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("did not match one of")
         end
@@ -453,7 +453,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                            "name" => "optional_tool",
                                            "arguments" => { "required_param" => "value" }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Required: value")
@@ -471,7 +471,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              "extra_field" => "allowed because additionalProperties: true"
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Required: value")
@@ -491,7 +491,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       # Missing required_param
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.details[:validation_errors].first).to include("required")
           expect(error.details[:validation_errors].first).to include("required_param")
@@ -530,7 +530,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              "objects" => { "nested" => true }
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Accepted anything:")
@@ -548,7 +548,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                              "even_invalid_types" => { "complex" => %w[data structures] }
                                            }
                                          }
-                                       }, session, "test-session")
+                                       }, session)
 
         expect(result[:isError]).to be(false)
         expect(result[:content][0][:text]).to include("Empty schema accepted:")
@@ -582,7 +582,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                     "name" => "strict_tool",
                                     "arguments" => { "name" => 123 } # Wrong type and missing required field
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           expect(error.message).to include("Invalid arguments for tool 'strict_tool'")
           expect(error.details).to have_key(:tool)
@@ -608,7 +608,7 @@ RSpec.describe "Input Schema Validation Integration" do
                                       "extra_field" => "invalid"  # Additional property error
                                     }
                                   }
-                                }, session, "test-session")
+                                }, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |error|
           # Should report multiple validation errors
           expect(error.details[:validation_errors].length).to be > 1

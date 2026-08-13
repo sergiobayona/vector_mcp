@@ -320,16 +320,19 @@ RSpec.describe "Middleware Integration" do
   describe "Authentication hook integration" do
     let(:auth_middleware) { MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware.new }
 
+    def invocation_with_key(key)
+      VectorMCP::Invocation.new(session, request_context: {
+                                  headers: { "X-API-Key" => key },
+                                  params: {}
+                                })
+    end
+
     before do
       server.clear_middleware!
       server.use_middleware(MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware, %i[before_auth after_auth on_auth_error before_tool_call])
       allow(MiddlewareIntegrationSpecSupport::AuthTrackingMiddleware).to receive(:new).and_return(auth_middleware)
 
       server.enable_authentication!(strategy: :api_key, keys: ["valid-key"])
-      session.request_context = {
-        headers: { "X-API-Key" => "valid-key" },
-        params: {}
-      }
 
       server.register_tool(
         name: "secured_tool",
@@ -339,7 +342,7 @@ RSpec.describe "Middleware Integration" do
     end
 
     it "runs auth hooks before business-operation hooks and exposes the authenticated user" do
-      VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, session, server)
+      VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, invocation_with_key("valid-key"), server)
 
       expect(auth_middleware.events.map { |event| event[:hook] }).to include(:before_auth, :after_auth, :before_tool_call)
       before_tool_event = auth_middleware.events.find { |event| event[:hook] == :before_tool_call }
@@ -347,13 +350,8 @@ RSpec.describe "Middleware Integration" do
     end
 
     it "runs auth error hooks on authentication failure" do
-      session.request_context = {
-        headers: { "X-API-Key" => "invalid-key" },
-        params: {}
-      }
-
       expect do
-        VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, session, server)
+        VectorMCP::Handlers::Core.call_tool({ "name" => "secured_tool", "arguments" => {} }, invocation_with_key("invalid-key"), server)
       end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
 
       expect(auth_middleware.events.map { |event| event[:hook] }).to include(:before_auth, :on_auth_error)

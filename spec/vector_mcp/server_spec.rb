@@ -434,12 +434,12 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "allows the initialize request" do
-        expect(server.handle_message(initialize_message, session, session_id)).to eq({ capabilities: server.server_capabilities })
+        expect(server.handle_message(initialize_message, session)).to eq({ capabilities: server.server_capabilities })
       end
 
       it "raises InitializationError for other requests" do
         expect do
-          server.handle_message(other_message, session, session_id)
+          server.handle_message(other_message, session)
         end.to raise_error(VectorMCP::InitializationError) { |e| expect(e.request_id).to eq("2") }
       end
     end
@@ -458,17 +458,17 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "calls the correct request handler" do
-        server.handle_message(message, session, session_id)
+        server.handle_message(message, session)
         expect(mock_handler).to have_received(:call).with(params, session, server)
       end
 
       it "returns the result from the handler" do
-        result = server.handle_message(message, session, session_id)
+        result = server.handle_message(message, session)
         expect(result).to eq(expected_result)
       end
 
       it "tracks in-flight requests" do
-        server.handle_message(message, session, session_id)
+        server.handle_message(message, session)
         expect(server.in_flight_requests).not_to include(request_id)
       end
     end
@@ -478,7 +478,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises MethodNotFoundError" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::MethodNotFoundError) do |e|
           expect(e.message).to include("non_existent_method")
           expect(e.code).to eq(-32_601)
@@ -498,7 +498,7 @@ RSpec.describe VectorMCP::Server do
 
       it "re-raises the specific protocol error" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InvalidParamsError) do |e|
           expect(e.message).to eq("Bad param")
           expect(e.code).to eq(-32_602)
@@ -519,7 +519,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises InternalError with limited details" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InternalError) do |e|
           expect(e.code).to eq(-32_603)
           expect(e.message).to eq("Request handler failed unexpectedly")
@@ -534,7 +534,7 @@ RSpec.describe VectorMCP::Server do
         # ignoring the potentially long backtrace.
         log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
         expect(server.logger).to receive(:error).with(match(log_pattern))
-        expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
+        expect { server.handle_message(message, session) }.to raise_error(VectorMCP::InternalError)
       end
     end
 
@@ -552,7 +552,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises InternalError" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InternalError) do |e|
           expect(e.code).to eq(-32_603)
           # Error now caught by the generic handler in Server#handle_request
@@ -567,7 +567,7 @@ RSpec.describe VectorMCP::Server do
         # Expect the log message from the generic handler in Server#handle_request
         log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
         expect(server.logger).to receive(:error).with(match(log_pattern))
-        expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
+        expect { server.handle_message(message, session) }.to raise_error(VectorMCP::InternalError)
       end
     end
 
@@ -585,7 +585,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises InternalError" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InternalError) do |e|
           expect(e.code).to eq(-32_603)
           # Error now caught by the generic handler in Server#handle_request
@@ -600,7 +600,7 @@ RSpec.describe VectorMCP::Server do
         # Expect the log message from the generic handler in Server#handle_request
         log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{error_message}/
         expect(server.logger).to receive(:error).with(match(log_pattern))
-        expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
+        expect { server.handle_message(message, session) }.to raise_error(VectorMCP::InternalError)
       end
     end
 
@@ -616,12 +616,12 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "calls the correct notification handler" do
-        server.handle_message(message, session, session_id)
+        server.handle_message(message, session)
         expect(mock_handler).to have_received(:call).with(params, session, server)
       end
 
       it "returns nil" do
-        expect(server.handle_message(message, session, session_id)).to be_nil
+        expect(server.handle_message(message, session)).to be_nil
       end
     end
 
@@ -637,12 +637,12 @@ RSpec.describe VectorMCP::Server do
       end
 
       it "does not raise an error" do
-        expect { server.handle_message(message, session, session_id) }.not_to raise_error
+        expect { server.handle_message(message, session) }.not_to raise_error
       end
 
       it "logs the error" do
         expect(server.logger).to receive(:error).with(/Error executing notification handler '#{method}': #{error_message}/)
-        server.handle_message(message, session, session_id)
+        server.handle_message(message, session)
       end
     end
 
@@ -651,7 +651,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises an InvalidRequestError" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InvalidRequestError, /Request object must include a 'method' member/) do |e|
           expect(e.request_id).to eq("456") # Check if ID is captured
         end
@@ -663,7 +663,7 @@ RSpec.describe VectorMCP::Server do
 
       it "raises an InvalidRequestError" do
         expect do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
         end.to raise_error(VectorMCP::InvalidRequestError, /Invalid message format/) do |e|
           expect(e.request_id).to be_nil
         end
@@ -692,12 +692,12 @@ RSpec.describe VectorMCP::Server do
         end
 
         it "calls the registered prompt handler with arguments" do
-          server.handle_message(message, session, session_id)
+          server.handle_message(message, session)
           expect(mock_prompt_handler).to have_received(:call).with(request_args)
         end
 
         it "returns the result from the prompt handler" do
-          result = server.handle_message(message, session, session_id)
+          result = server.handle_message(message, session)
           expect(result).to eq(handler_result)
           expect(result[:description]).to eq(expected_description)
           expect(result[:messages]).to eq(expected_messages)
@@ -712,7 +712,7 @@ RSpec.describe VectorMCP::Server do
 
         it "raises InternalError due to invalid structure" do
           expect do
-            server.handle_message(message, session, session_id)
+            server.handle_message(message, session)
           end.to raise_error(VectorMCP::InternalError) do |e|
             expect(e.code).to eq(-32_603)
             expect(e.message).to eq("Prompt handler returned invalid data structure")
@@ -730,7 +730,7 @@ RSpec.describe VectorMCP::Server do
 
         it "raises InternalError due to invalid message structure" do
           expect do
-            server.handle_message(message, session, session_id)
+            server.handle_message(message, session)
           end.to raise_error(VectorMCP::InternalError) do |e|
             expect(e.code).to eq(-32_603)
             expect(e.message).to eq("Prompt handler returned invalid message structure")
@@ -748,7 +748,7 @@ RSpec.describe VectorMCP::Server do
 
         it "raises InternalError" do
           expect do
-            server.handle_message(message, session, session_id)
+            server.handle_message(message, session)
           end.to raise_error(VectorMCP::InternalError) do |e|
             expect(e.code).to eq(-32_603)
             # Error now caught by the generic handler in Server#handle_request
@@ -762,7 +762,7 @@ RSpec.describe VectorMCP::Server do
           # Expect the log message from the generic handler in Server#handle_request
           log_pattern = /Unhandled error during request '#{message["method"]}' \(ID: #{message["id"]}\): #{handler_error_message}/
           expect(server.logger).to receive(:error).with(match(log_pattern))
-          expect { server.handle_message(message, session, session_id) }.to raise_error(VectorMCP::InternalError)
+          expect { server.handle_message(message, session) }.to raise_error(VectorMCP::InternalError)
         end
       end
 
@@ -770,7 +770,7 @@ RSpec.describe VectorMCP::Server do
         let(:message_unknown) { { "id" => "p2", "method" => "prompts/get", "params" => { "name" => "unknown_prompt" } } }
         it "raises NotFoundError" do
           expect do
-            server.handle_message(message_unknown, session, session_id)
+            server.handle_message(message_unknown, session)
           end.to raise_error(VectorMCP::NotFoundError) do |e|
             expect(e.code).to eq(-32_001) # Should be the NotFoundError code
             # Check the details attribute for the specific message
@@ -852,7 +852,7 @@ RSpec.describe VectorMCP::Server do
 
     it "re-raises the protocol error with the correct request_id" do
       expect do
-        server.handle_message(message, session, session_id)
+        server.handle_message(message, session)
       end.to raise_error(VectorMCP::NotFoundError) { |err| expect(err.request_id).to eq(request_id) }
     end
   end

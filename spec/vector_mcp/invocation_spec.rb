@@ -18,7 +18,7 @@ RSpec.describe VectorMCP::Invocation do
       invocation = described_class.new(session, request_context: context)
 
       expect(invocation.request_header("X-API-Key")).to eq("k")
-      expect(session.request_header("X-API-Key")).to be_nil
+      expect(session.request_context.header("X-API-Key")).to be_nil
     end
 
     it "coerces hash request contexts" do

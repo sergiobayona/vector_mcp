@@ -180,7 +180,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
         allow(transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
         # Allow request context updates on existing sessions
-        allow(mock_session_context).to receive(:request_context=)
       end
 
       describe "POST requests" do
@@ -745,7 +744,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           before do
             allow(wildcard_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
             allow(wildcard_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
-            allow(mock_session_context).to receive(:request_context=)
           end
 
           it "allows requests from any origin" do
@@ -762,7 +760,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           before do
             allow(restricted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
             allow(restricted_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
-            allow(mock_session_context).to receive(:request_context=)
           end
 
           it "allows requests without Origin header" do
@@ -821,7 +818,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
     before do
       allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_new_session)
-      allow(mock_new_session_context).to receive(:request_context=)
     end
 
     it "integrates with session manager for POST requests" do
@@ -1055,7 +1051,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
 
       before do
         allow(transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
-        allow(mock_session_context).to receive(:request_context=)
       end
 
       it "handles VectorMCP::ProtocolError" do
@@ -1244,7 +1239,6 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       allow(mounted_transport.session_manager).to receive(:get_or_create_session).with(session_id, anything).and_return(mock_session)
       allow(mounted_transport.session_manager).to receive(:get_session).with(session_id).and_return(mock_session)
       allow(mounted_transport.session_manager).to receive(:terminate_session).with(session_id).and_return(true)
-      allow(mock_session_context).to receive(:request_context=)
     end
 
     describe "MCP endpoint at root path" do

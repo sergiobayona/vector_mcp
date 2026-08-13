@@ -37,7 +37,7 @@ RSpec.describe "Authentication Integration" do
                                          "name" => "test_tool",
                                          "arguments" => { "message" => "hello" }
                                        }
-                                     }, session, "test-session")
+                                     }, session)
 
       expect(result[:isError]).to be false
       expect(result[:content][0][:text]).to include("Tool executed with: hello")
@@ -64,16 +64,16 @@ RSpec.describe "Authentication Integration" do
                                   "name" => "test_tool",
                                   "arguments" => { "message" => "hello" }
                                 }
-                              }, session, "test-session")
+                              }, session)
       end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
     end
 
     it "allows tool access with valid API key" do
       # Set session request context with valid API key
-      session.request_context = {
-        headers: { "X-API-Key" => "valid-key-123" },
-        params: {}
-      }
+      invocation = VectorMCP::Invocation.new(session, request_context: {
+                                               headers: { "X-API-Key" => "valid-key-123" },
+                                               params: {}
+                                             })
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -83,7 +83,7 @@ RSpec.describe "Authentication Integration" do
                                          "name" => "test_tool",
                                          "arguments" => { "message" => "authenticated hello" }
                                        }
-                                     }, session, "test-session")
+                                     }, invocation)
 
       expect(result[:isError]).to be false
       expect(result[:content][0][:text]).to include("Tool executed with: authenticated hello")
@@ -91,10 +91,10 @@ RSpec.describe "Authentication Integration" do
 
     it "rejects tool access with invalid API key" do
       # Set session request context with invalid API key
-      session.request_context = {
-        headers: { "X-API-Key" => "invalid-key" },
-        params: {}
-      }
+      invocation = VectorMCP::Invocation.new(session, request_context: {
+                                               headers: { "X-API-Key" => "invalid-key" },
+                                               params: {}
+                                             })
 
       expect do
         server.handle_message({
@@ -105,7 +105,7 @@ RSpec.describe "Authentication Integration" do
                                   "name" => "test_tool",
                                   "arguments" => { "message" => "hello" }
                                 }
-                              }, session, "test-session")
+                              }, invocation)
       end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
     end
   end
@@ -132,10 +132,10 @@ RSpec.describe "Authentication Integration" do
 
     it "allows access with authorized user" do
       # Set session request context with admin API key
-      session.request_context = {
-        headers: { "X-API-Key" => "admin-key" },
-        params: {}
-      }
+      invocation = VectorMCP::Invocation.new(session, request_context: {
+                                               headers: { "X-API-Key" => "admin-key" },
+                                               params: {}
+                                             })
 
       result = server.handle_message({
                                        "jsonrpc" => "2.0",
@@ -145,7 +145,7 @@ RSpec.describe "Authentication Integration" do
                                          "name" => "test_tool",
                                          "arguments" => { "message" => "admin access" }
                                        }
-                                     }, session, "test-session")
+                                     }, invocation)
 
       expect(result[:isError]).to be false
       expect(result[:content][0][:text]).to include("Tool executed with: admin access")
@@ -153,10 +153,10 @@ RSpec.describe "Authentication Integration" do
 
     it "denies access to unauthorized user" do
       # Set session request context with user API key (not admin)
-      session.request_context = {
-        headers: { "X-API-Key" => "user-key" },
-        params: {}
-      }
+      invocation = VectorMCP::Invocation.new(session, request_context: {
+                                               headers: { "X-API-Key" => "user-key" },
+                                               params: {}
+                                             })
 
       expect do
         server.handle_message({
@@ -167,7 +167,7 @@ RSpec.describe "Authentication Integration" do
                                   "name" => "test_tool",
                                   "arguments" => { "message" => "user access" }
                                 }
-                              }, session, "test-session")
+                              }, invocation)
       end.to raise_error(VectorMCP::ForbiddenError, "Access denied")
     end
   end

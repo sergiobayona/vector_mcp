@@ -126,7 +126,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                          "name" => "greet",
                                          "arguments" => { "name" => "World" }
                                        }
-                                     }, session, "test-session")
+                                     }, session)
 
       expect(result[:isError]).to be(false)
       expect(result[:content][0][:text]).to eq("Hello, World!")
@@ -152,7 +152,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                          "name" => "session_checker",
                                          "arguments" => {}
                                        }
-                                     }, session, "test-session")
+                                     }, session)
 
       expect(result[:isError]).to be(false)
       expect(result[:content][0][:text]).to eq(session.id)
@@ -180,7 +180,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                   "name" => "validated_tool",
                                   "arguments" => { "count" => "not_a_number" }
                                 }
-                              }, session, "test-session")
+                              }, session)
       end.to raise_error(VectorMCP::InvalidParamsError)
     end
 
@@ -206,7 +206,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                   "name" => "required_tool",
                                   "arguments" => {}
                                 }
-                              }, session, "test-session")
+                              }, session)
       end.to raise_error(VectorMCP::InvalidParamsError)
     end
   end
@@ -236,7 +236,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                          "name" => "date_coercer",
                                          "arguments" => { "when" => "2026-12-31" }
                                        }
-                                     }, session, "test-session")
+                                     }, session)
 
       expect(result[:isError]).to be(false)
       expect(received[:class]).to eq(Date)
@@ -264,7 +264,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                   "name" => "date_bad_e2e",
                                   "arguments" => { "when" => "garbage" }
                                 }
-                              }, session, "test-session")
+                              }, session)
       end.to raise_error(VectorMCP::InvalidParamsError) do |error|
         expect(error.code).to eq(-32_602)
       end
@@ -291,7 +291,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                   "name" => "datetime_bad_e2e",
                                   "arguments" => { "at" => "garbage" }
                                 }
-                              }, session, "test-session")
+                              }, session)
       end.to raise_error(VectorMCP::InvalidParamsError) do |error|
         expect(error.code).to eq(-32_602)
       end
@@ -312,7 +312,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                        "id" => 1,
                                        "method" => "tools/list",
                                        "params" => {}
-                                     }, session, "test-session")
+                                     }, session)
 
       tool_def = result[:tools].find { |t| t[:name] == "date_schema" }
       prop = tool_def[:inputSchema]["properties"]["valid_until"]
@@ -337,7 +337,7 @@ RSpec.describe "VectorMCP::Tool integration with Server" do
                                        "id" => 1,
                                        "method" => "tools/list",
                                        "params" => {}
-                                     }, session, "test-session")
+                                     }, session)
 
       tool_def = result[:tools].find { |t| t[:name] == "listed_tool" }
       expect(tool_def).not_to be_nil

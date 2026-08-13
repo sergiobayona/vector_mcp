@@ -12,12 +12,11 @@ module VectorMCP
       # @param message [Hash] The parsed JSON-RPC message object.
       # @param session [VectorMCP::Session, VectorMCP::Invocation] The session (or per-request
       #   invocation view of it) this message belongs to.
-      # @param session_id [String, nil] Deprecated: defaults to session.id; used only for log prefixes.
       # @return [Object, nil] For requests, returns the result data to be sent in the JSON-RPC response.
       #   For notifications, returns `nil`.
       # @raise [VectorMCP::ProtocolError] if the message is invalid or an error occurs during handling.
-      def handle_message(message, session, session_id = nil)
-        session_id ||= session.id
+      def handle_message(message, session)
+        session_id = session.id
         id = message["id"]
         method = message["method"]
         params = message["params"] || {}
