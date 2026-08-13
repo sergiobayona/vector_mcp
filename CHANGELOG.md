@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Removed (deprecated in 0.6.0)
+
+* **The request-scoped API on `Session`**: `request_context=`, `update_request_context`, `request_headers?`, `request_params?`, `request_header`, `request_param`. Request-scoped data lives on the per-request `VectorMCP::Invocation` passed to handlers; sessions keep only their creation-time context.
+* **`Server#handle_message`'s third `session_id` argument** — the signature is now `handle_message(message, session)`.
+
+### Changed
+
+* **Docs and examples teach the invocation-based handler signatures** (`do |args, invocation|`); handlers written against the legacy security-context argument continue to work via the invocation's forwarded auth API.
+* **Stream handler drops the legacy session-id connection keying** — streaming connections are tracked solely by stream ID (per-stream, resumable); the dead session-id fallback lookups are removed.
+
 ## [0.6.0] – 2026-07-19
 
 ### Added

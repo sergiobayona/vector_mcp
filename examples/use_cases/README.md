@@ -377,7 +377,7 @@ server.register_tool(name: "business_operation") do |args|
       operation: "business_operation",
       duration_ms: ((Time.now - start_time) * 1000).round(2),
       status: "success",
-      user_id: session_context&.user&.[](:id)
+      user_id: invocation&.user&.[](:id)
     })
     
     result

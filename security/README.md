@@ -283,17 +283,17 @@ server.register_tool(
   name: "user_info",
   description: "Get current user information",
   input_schema: { type: "object" }
-) do |args, session_context|
+) do |args, invocation|
   # Access user data
-  user_id = session_context.user_identifier
-  authenticated = session_context.authenticated?
+  user_id = invocation.user_identifier
+  authenticated = invocation.authenticated?
   
   # Check permissions
-  if session_context.can_access?(:read, :user_data)
+  if invocation.can_access?(:read, :user_data)
     {
       user_id: user_id,
       authenticated: authenticated,
-      permissions: session_context.permissions.to_a
+      permissions: invocation.permissions.to_a
     }
   else
     { error: "Insufficient permissions" }
@@ -575,13 +575,12 @@ end
 #### 3. Session Context is Nil
 
 ```ruby
-# Make sure to pass session_context to your tool handlers
-server.register_tool(name: "test", description: "Test", input_schema: {}) do |args, session_context|
-  if session_context
-    # Use session_context here
-  else
-    # session_context will be nil if not provided by transport
-  end
+# Handlers that accept a second argument always receive the per-request
+# invocation, which exposes the resolved auth API (user, authenticated?,
+# can?, ...) alongside session identity and request data.
+server.register_tool(name: "test", description: "Test", input_schema: {}) do |args, invocation|
+  puts invocation.authenticated?
+  puts invocation.user_identifier
 end
 ```
 

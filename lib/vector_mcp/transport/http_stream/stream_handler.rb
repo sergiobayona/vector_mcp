@@ -223,7 +223,7 @@ module VectorMCP
           loop do
             sleep(30) # Send heartbeat every 30 seconds
 
-            connection = @active_connections[stream_id] || @active_connections[session.id]
+            connection = @active_connections[stream_id]
             break if connection.nil? || connection.closed?
 
             # Check if connection has been alive too long
@@ -278,11 +278,9 @@ module VectorMCP
         # @return [void]
         def cleanup_connection(session, connection = nil)
           connection ||= session.streaming_connection
-          connection ||= @active_connections[session.id]
           return unless connection
 
           @active_connections.delete(connection.stream_id)
-          @active_connections.delete(session.id) if @active_connections[session.id] == connection
 
           connection.close
           @transport.session_manager.remove_streaming_connection(session, connection)
@@ -324,16 +322,9 @@ module VectorMCP
         end
 
         def active_connections_for_session(session)
-          connections = session.streaming_connections.values.select do |connection|
+          session.streaming_connections.values.select do |connection|
             @active_connections[connection.stream_id] == connection && !connection.closed?
           end
-
-          legacy_connection = @active_connections[session.id]
-          connections << legacy_connection if legacy_connection &&
-                                              !legacy_connection.closed? &&
-                                              !connections.include?(legacy_connection)
-
-          connections
         end
 
         def preferred_connection_for(session, connections)

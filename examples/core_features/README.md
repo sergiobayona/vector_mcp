@@ -220,7 +220,7 @@ end
 register_tool(name: "logged_tool") do |arguments|
   logger.info("Tool called", context: { 
     tool: "logged_tool", 
-    user: session_context&.user&.[](:id) 
+    user: invocation&.user&.[](:id) 
   })
   
   result = process_request(arguments)

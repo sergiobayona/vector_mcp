@@ -251,7 +251,7 @@ image_tool = VectorMCP::Definitions::Tool.new(
       analysis_type: { type: "string", enum: ["objects", "text", "colors"] }
     }
   }
-) { |arguments, session_context| 
+) { |arguments, invocation|
   # Tool handler with image support
 }
 

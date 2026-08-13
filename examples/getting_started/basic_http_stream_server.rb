@@ -42,15 +42,15 @@ server.register_tool(
     },
     required: ["duration"]
   }
-) do |params, session_context|
+) do |params, invocation|
   duration = params[:duration] || 5
 
   # Send progress notifications during the process
   (1..duration).each do |second|
     # Use the transport to send notifications
-    if session_context.transport.respond_to?(:send_notification)
-      session_context.transport.send_notification(
-        session_context.id,
+    if invocation.transport.respond_to?(:send_notification)
+      invocation.transport.send_notification(
+        invocation.id,
         "progress",
         {
           message: "Processing step #{second} of #{duration}",

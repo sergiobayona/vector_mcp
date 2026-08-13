@@ -121,7 +121,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
     context "when session has streaming connection" do
       before do
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
+        mock_session.add_streaming_connection(mock_connection)
+        stream_handler.instance_variable_get(:@active_connections)["test-stream-id"] = mock_connection
       end
 
       it "sends message successfully" do
@@ -169,13 +170,14 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     context "when connection is from GET (stream origin enforcement)" do
       let(:get_connection) do
         VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
-          mock_session, mock_yielder, nil, false, :get
+          mock_session, mock_yielder, nil, false, :get, "get-stream-1"
         )
       end
 
       before do
         allow(get_connection).to receive(:closed?).and_return(false)
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = get_connection
+        mock_session.add_streaming_connection(get_connection)
+        stream_handler.instance_variable_get(:@active_connections)["get-stream-1"] = get_connection
       end
 
       it "blocks JSON-RPC responses on GET streams" do
@@ -227,10 +229,11 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
     context "when connection is from POST (no restrictions)" do
       before do
         post_connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
-          mock_session, mock_yielder, nil, false, :post
+          mock_session, mock_yielder, nil, false, :post, "post-stream-1"
         )
         allow(post_connection).to receive(:closed?).and_return(false)
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = post_connection
+        mock_session.add_streaming_connection(post_connection)
+        stream_handler.instance_variable_get(:@active_connections)["post-stream-1"] = post_connection
       end
 
       it "allows JSON-RPC responses on POST streams" do
@@ -262,7 +265,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       it "returns false for closed connection" do
         allow(mock_connection).to receive(:closed?).and_return(true)
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
+        mock_session.add_streaming_connection(mock_connection)
+        stream_handler.instance_variable_get(:@active_connections)["test-stream-id"] = mock_connection
 
         result = stream_handler.send_message_to_session(mock_session, message)
 
@@ -506,17 +510,19 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "removes connection from active connections" do
+        mock_session.add_streaming_connection(mock_connection)
         active_connections = stream_handler.instance_variable_get(:@active_connections)
-        active_connections[session_id] = mock_connection
+        active_connections["cleanup-stream-id"] = mock_connection
 
         stream_handler.send(:cleanup_connection, mock_session)
 
-        expect(active_connections[session_id]).to be_nil
+        expect(active_connections["cleanup-stream-id"]).to be_nil
       end
 
       it "closes the connection" do
+        mock_session.add_streaming_connection(mock_connection)
         active_connections = stream_handler.instance_variable_get(:@active_connections)
-        active_connections[session_id] = mock_connection
+        active_connections["cleanup-stream-id"] = mock_connection
 
         stream_handler.send(:cleanup_connection, mock_session)
 
@@ -524,8 +530,9 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "removes streaming connection from session manager" do
+        mock_session.add_streaming_connection(mock_connection)
         active_connections = stream_handler.instance_variable_get(:@active_connections)
-        active_connections[session_id] = mock_connection
+        active_connections["cleanup-stream-id"] = mock_connection
 
         stream_handler.send(:cleanup_connection, mock_session)
 
@@ -533,8 +540,9 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "logs cleanup activity" do
+        mock_session.add_streaming_connection(mock_connection)
         active_connections = stream_handler.instance_variable_get(:@active_connections)
-        active_connections[session_id] = mock_connection
+        active_connections["cleanup-stream-id"] = mock_connection
 
         expect(mock_logger).to receive(:debug).with(/Streaming connection cleaned up for #{session_id}/)
 
@@ -683,7 +691,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
       before do
         allow(mock_connection).to receive(:closed?).and_return(false, false, true) # Stop after 2 iterations
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
+        stream_handler.instance_variable_get(:@active_connections)[test_stream_id] = mock_connection
         allow(stream_handler).to receive(:sleep) # Mock sleep to speed up tests
       end
 
@@ -716,7 +724,7 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
       end
 
       it "stops when connection is removed from active connections" do
-        stream_handler.instance_variable_get(:@active_connections).delete(session_id)
+        stream_handler.instance_variable_get(:@active_connections).delete(test_stream_id)
 
         stream_handler.send(:keep_alive_loop, mock_session, mock_yielder, test_stream_id)
 
@@ -868,7 +876,8 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
         allow(mock_connection).to receive(:close)
         allow(mock_session_manager).to receive(:remove_streaming_connection)
         allow(mock_yielder).to receive(:<<)
-        stream_handler.instance_variable_get(:@active_connections)[session_id] = mock_connection
+        mock_session.add_streaming_connection(mock_connection)
+        stream_handler.instance_variable_get(:@active_connections)["test-stream-id"] = mock_connection
       end
 
       it "handles event store errors gracefully" do
@@ -915,12 +924,13 @@ RSpec.describe VectorMCP::Transport::HttpStream::StreamHandler do
 
     it "handles concurrent message sending" do
       connection = VectorMCP::Transport::HttpStream::StreamHandler::StreamingConnection.new(
-        mock_session, mock_yielder, nil, false
+        mock_session, mock_yielder, nil, false, :post, "ts-stream"
       )
       allow(connection).to receive(:closed?).and_return(false)
       allow(connection).to receive(:yielder).and_return(mock_yielder)
 
-      stream_handler.instance_variable_get(:@active_connections)[session_id] = connection
+      mock_session.add_streaming_connection(connection)
+      stream_handler.instance_variable_get(:@active_connections)["ts-stream"] = connection
 
       threads = []
       results = []

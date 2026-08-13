@@ -18,7 +18,7 @@ server.register_tool(
     properties: { topic: { type: "string" } },
     required: ["topic"]
   }
-) do |args, _session_context|
+) do |args, _invocation|
   "Public information about #{args["topic"]}: This is freely available data."
 end
 
@@ -38,8 +38,8 @@ server.register_tool(
     properties: { data_type: { type: "string" } },
     required: ["data_type"]
   }
-) do |args, session_context|
-  user_id = session_context&.user_identifier || "unknown"
+) do |args, invocation|
+  user_id = invocation&.user_identifier || "unknown"
   "🔒 Secure data for #{args["data_type"]} accessed by user: #{user_id}"
 end
 
@@ -70,8 +70,8 @@ server.register_tool(
     properties: { command: { type: "string" } },
     required: ["command"]
   }
-) do |args, session_context|
-  user_id = session_context&.user_identifier || "unknown"
+) do |args, invocation|
+  user_id = invocation&.user_identifier || "unknown"
   "⚡ Admin command '#{args["command"]}' executed by: #{user_id}"
 end
 
@@ -80,9 +80,9 @@ server.register_resource(
   uri: "config://settings",
   name: "Application Settings",
   description: "Application configuration data"
-) do |_params, session_context|
-  if session_context&.authenticated?
-    "Authenticated user settings for: #{session_context.user_identifier}"
+) do |_params, invocation|
+  if invocation&.authenticated?
+    "Authenticated user settings for: #{invocation.user_identifier}"
   else
     "Default public settings"
   end
