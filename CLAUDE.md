@@ -157,7 +157,7 @@ Use VectorMCP-specific error classes:
 
 ### Version Management
 
-Version defined in `lib/vector_mcp/version.rb` (currently 0.6.0)
+Version defined in `lib/vector_mcp/version.rb` (currently 0.7.0)
 
 ## Logging
 

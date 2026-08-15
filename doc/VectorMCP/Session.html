@@ -351,6 +351,8 @@ It tracks initialization status, and negotiated capabilities between the client 
   
   
     
+      <span class="note title readonly">readonly</span>
+    
     
   
   
@@ -633,102 +635,6 @@ It tracks initialization status, and negotiated capabilities between the client 
 </li>
 
       
-        <li class="public deprecated">
-  <span class="summary_signature">
-    
-      <a href="#request_header-instance_method" title="#request_header (instance method)">#<strong>request_header</strong>(name)  &#x21d2; String<sup>?</sup> </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  <span class="deprecated note title">deprecated</span>
-  
-
-  
-    <span class="summary_desc"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_header-instance_method" title="VectorMCP::Invocation#request_header (method)">Invocation#request_header</a></span> instead.</p>
-</div></span>
-  
-</li>
-
-      
-        <li class="public deprecated">
-  <span class="summary_signature">
-    
-      <a href="#request_headers%3F-instance_method" title="#request_headers? (instance method)">#<strong>request_headers?</strong>  &#x21d2; Boolean </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  <span class="deprecated note title">deprecated</span>
-  
-
-  
-    <span class="summary_desc"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_headers%3F-instance_method" title="VectorMCP::Invocation#request_headers? (method)">Invocation#request_headers?</a></span> instead.</p>
-</div></span>
-  
-</li>
-
-      
-        <li class="public deprecated">
-  <span class="summary_signature">
-    
-      <a href="#request_param-instance_method" title="#request_param (instance method)">#<strong>request_param</strong>(name)  &#x21d2; String<sup>?</sup> </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  <span class="deprecated note title">deprecated</span>
-  
-
-  
-    <span class="summary_desc"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_param-instance_method" title="VectorMCP::Invocation#request_param (method)">Invocation#request_param</a></span> instead.</p>
-</div></span>
-  
-</li>
-
-      
-        <li class="public deprecated">
-  <span class="summary_signature">
-    
-      <a href="#request_params%3F-instance_method" title="#request_params? (instance method)">#<strong>request_params?</strong>  &#x21d2; Boolean </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  <span class="deprecated note title">deprecated</span>
-  
-
-  
-    <span class="summary_desc"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_params%3F-instance_method" title="VectorMCP::Invocation#request_params? (method)">Invocation#request_params?</a></span> instead.</p>
-</div></span>
-  
-</li>
-
-      
         <li class="public ">
   <span class="summary_signature">
     
@@ -770,30 +676,6 @@ It tracks initialization status, and negotiated capabilities between the client 
 
   
     <span class="summary_desc"><div class='inline'><p>Records activity on this session, deferring expiry.</p>
-</div></span>
-  
-</li>
-
-      
-        <li class="public deprecated">
-  <span class="summary_signature">
-    
-      <a href="#update_request_context-instance_method" title="#update_request_context (instance method)">#<strong>update_request_context</strong>(**attributes)  &#x21d2; RequestContext </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  <span class="deprecated note title">deprecated</span>
-  
-
-  
-    <span class="summary_desc"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#update_request_context-instance_method" title="VectorMCP::Invocation#update_request_context (method)">Invocation#update_request_context</a></span> instead.</p>
 </div></span>
   
 </li>
@@ -1350,11 +1232,11 @@ It tracks initialization status, and negotiated capabilities between the client 
 </div>
     
       
-      <span id="request_context=-instance_method"></span>
+      <span id=""></span>
       <div class="method_details ">
   <h3 class="signature " id="request_context-instance_method">
   
-    #<strong>request_context</strong>  &#x21d2; <tt><span class='object_link'><a href="RequestContext.html" title="VectorMCP::RequestContext (class)">RequestContext</a></span></tt> 
+    #<strong>request_context</strong>  &#x21d2; <tt><span class='object_link'><a href="RequestContext.html" title="VectorMCP::RequestContext (class)">RequestContext</a></span></tt>  <span class="extras">(readonly)</span>
   
 
   
@@ -1979,292 +1861,6 @@ Expected keys include &quot;protocolVersion&quot;, &quot;clientInfo&quot;, and &
 </div>
     
       <div class="method_details ">
-  <h3 class="signature " id="request_header-instance_method">
-  
-    #<strong>request_header</strong>(name)  &#x21d2; <tt>String</tt><sup>?</sup> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <div class="note deprecated"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_header-instance_method" title="VectorMCP::Invocation#request_header (method)">Invocation#request_header</a></span> instead.</p>
-</div></div>
-<p>Returns The header value or nil if not found.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  <p class="tag_title">Parameters:</p>
-<ul class="param">
-  
-    <li>
-      
-        <span class='name'>name</span>
-      
-      
-        <span class='type'>(<tt>String</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The header name.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>String</tt>, <tt>nil</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The header value or nil if not found.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-166
-167
-168
-169</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 166</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_request_header'>request_header</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_deprecated_request_api'>deprecated_request_api</span><span class='lparen'>(</span><span class='symbol'>:request_header</span><span class='rparen'>)</span>
-  <span class='ivar'>@request_context</span><span class='period'>.</span><span class='id identifier rubyid_header'>header</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="request_headers?-instance_method">
-  
-    #<strong>request_headers?</strong>  &#x21d2; <tt>Boolean</tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <div class="note deprecated"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_headers%3F-instance_method" title="VectorMCP::Invocation#request_headers? (method)">Invocation#request_headers?</a></span> instead.</p>
-</div></div>
-<p>Returns True if the request context has headers.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>Boolean</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>True if the request context has headers.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-149
-150
-151
-152</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 149</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_request_headers?'>request_headers?</span>
-  <span class='id identifier rubyid_deprecated_request_api'>deprecated_request_api</span><span class='lparen'>(</span><span class='symbol'>:request_headers?</span><span class='rparen'>)</span>
-  <span class='ivar'>@request_context</span><span class='period'>.</span><span class='id identifier rubyid_headers?'>headers?</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="request_param-instance_method">
-  
-    #<strong>request_param</strong>(name)  &#x21d2; <tt>String</tt><sup>?</sup> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <div class="note deprecated"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_param-instance_method" title="VectorMCP::Invocation#request_param (method)">Invocation#request_param</a></span> instead.</p>
-</div></div>
-<p>Returns The parameter value or nil if not found.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  <p class="tag_title">Parameters:</p>
-<ul class="param">
-  
-    <li>
-      
-        <span class='name'>name</span>
-      
-      
-        <span class='type'>(<tt>String</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The parameter name.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>String</tt>, <tt>nil</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The parameter value or nil if not found.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-175
-176
-177
-178</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 175</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_request_param'>request_param</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_deprecated_request_api'>deprecated_request_api</span><span class='lparen'>(</span><span class='symbol'>:request_param</span><span class='rparen'>)</span>
-  <span class='ivar'>@request_context</span><span class='period'>.</span><span class='id identifier rubyid_param'>param</span><span class='lparen'>(</span><span class='id identifier rubyid_name'>name</span><span class='rparen'>)</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="request_params?-instance_method">
-  
-    #<strong>request_params?</strong>  &#x21d2; <tt>Boolean</tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <div class="note deprecated"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#request_params%3F-instance_method" title="VectorMCP::Invocation#request_params? (method)">Invocation#request_params?</a></span> instead.</p>
-</div></div>
-<p>Returns True if the request context has parameters.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>Boolean</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>True if the request context has parameters.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-157
-158
-159
-160</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 157</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_request_params?'>request_params?</span>
-  <span class='id identifier rubyid_deprecated_request_api'>deprecated_request_api</span><span class='lparen'>(</span><span class='symbol'>:request_params?</span><span class='rparen'>)</span>
-  <span class='ivar'>@request_context</span><span class='period'>.</span><span class='id identifier rubyid_params?'>params?</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
   <h3 class="signature " id="sample-instance_method">
   
     #<strong>sample</strong>(request_params, timeout: nil)  &#x21d2; <tt><span class='object_link'><a href="Sampling/Result.html" title="VectorMCP::Sampling::Result (class)">VectorMCP::Sampling::Result</a></span></tt> 
@@ -2375,50 +1971,50 @@ Defaults to the transport&#39;s default request timeout.</p>
       <pre class="lines">
 
 
-197
-198
-199
-200
-201
-202
-203
-204
-205
-206
-207
-208
-209
-210
-211
-212
-213
-214
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228
-229
-230
-231
-232
-233
-234
-235
-236
-237</pre>
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 197</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 139</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_sample'>sample</span><span class='lparen'>(</span><span class='id identifier rubyid_request_params'>request_params</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_validate_sampling_preconditions'>validate_sampling_preconditions</span>
@@ -2506,93 +2102,12 @@ Defaults to the transport&#39;s default request timeout.</p>
 </table>
 </div>
     
-      <div class="method_details ">
-  <h3 class="signature " id="update_request_context-instance_method">
-  
-    #<strong>update_request_context</strong>(**attributes)  &#x21d2; <tt><span class='object_link'><a href="RequestContext.html" title="VectorMCP::RequestContext (class)">RequestContext</a></span></tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <div class="note deprecated"><strong>Deprecated.</strong> <div class='inline'><p>Will be removed in 0.7. Use the per-request invocation&#39;s
-<span class='object_link'><a href="Invocation.html#update_request_context-instance_method" title="VectorMCP::Invocation#update_request_context (method)">Invocation#update_request_context</a></span> instead.</p>
-</div></div>
-<p>Updates the request context with new data.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  <p class="tag_title">Parameters:</p>
-<ul class="param">
-  
-    <li>
-      
-        <span class='name'>attributes</span>
-      
-      
-        <span class='type'>(<tt>Hash</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The attributes to merge into the request context.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt><span class='object_link'><a href="RequestContext.html" title="VectorMCP::RequestContext (class)">RequestContext</a></span></tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The updated request context.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-141
-142
-143
-144</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/session.rb', line 141</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_update_request_context'>update_request_context</span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_attributes'>attributes</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_deprecated_request_api'>deprecated_request_api</span><span class='lparen'>(</span><span class='symbol'>:update_request_context</span><span class='rparen'>)</span>
-  <span class='ivar'>@request_context</span> <span class='op'>=</span> <span class='ivar'>@request_context</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_attributes'>attributes</span><span class='rparen'>)</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
   </div>
 
 </div>
 
       <div id="footer">
-  Generated on Sun Jul 19 11:59:35 2026 by
+  Generated on Sat Aug 15 10:47:16 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.3.8).
 </div>

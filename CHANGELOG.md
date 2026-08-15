@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.7.0] – 2026-08-15
 
 ### Removed (deprecated in 0.6.0)
 
