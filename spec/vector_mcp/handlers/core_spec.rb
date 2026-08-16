@@ -11,12 +11,14 @@ RSpec.describe VectorMCP::Handlers::Core do
   let(:security_middleware) { double("security_middleware") }
   let(:middleware_manager) { double("middleware_manager") }
   let(:auth_manager) { double("auth_manager", required?: false) }
+  let(:anonymous_context) { VectorMCP::Security::SessionContext.anonymous }
   let(:server) do
     # Default empty registries
     tools = {}
     resources = {}
     prompts = {}
-    double("server", tools: tools, resources: resources, prompts: prompts, logger: logger, security_middleware: security_middleware,
+    roots = {}
+    double("server", tools: tools, resources: resources, prompts: prompts, roots: roots, logger: logger, security_middleware: security_middleware,
                      middleware_manager: middleware_manager, auth_manager: auth_manager)
   end
 
@@ -33,7 +35,7 @@ RSpec.describe VectorMCP::Handlers::Core do
 
     # Mock security middleware to allow all requests by default
     allow(security_middleware).to receive(:authenticate_request)
-      .and_return(VectorMCP::Security::SessionContext.anonymous)
+      .and_return(anonymous_context)
     allow(security_middleware).to receive(:authorize_action).and_return(true)
   end
 
@@ -52,6 +54,21 @@ RSpec.describe VectorMCP::Handlers::Core do
 
       result = described_class.list_tools({}, session, server)
       expect(result).to eq({ tools: [{ "name" => "t1" }, { "name" => "t2" }] })
+      expect(security_middleware).to have_received(:authorize_action).with(anonymous_context, :list, tool1)
+      expect(security_middleware).to have_received(:authorize_action).with(anonymous_context, :list, tool2)
+    end
+
+    it "filters tools denied by authorization policy" do
+      allowed = double("allowed_tool", as_mcp_definition: { "name" => "allowed" })
+      denied = double("denied_tool", as_mcp_definition: { "name" => "denied" })
+      server.tools.merge!("allowed" => allowed, "denied" => denied)
+      allow(security_middleware).to receive(:authorize_action) do |_context, action, item|
+        action == :list && item.equal?(allowed)
+      end
+
+      result = described_class.list_tools({}, session, server)
+
+      expect(result).to eq({ tools: [{ "name" => "allowed" }] })
     end
   end
 
@@ -188,6 +205,19 @@ RSpec.describe VectorMCP::Handlers::Core do
       result = described_class.list_resources({}, session, server)
       expect(result).to eq({ resources: [{ "uri" => "u1" }, { "uri" => "u2" }] })
     end
+
+    it "filters resources denied by authorization policy" do
+      allowed = double("allowed_resource", as_mcp_definition: { "uri" => "allowed" })
+      denied = double("denied_resource", as_mcp_definition: { "uri" => "denied" })
+      server.resources.merge!("allowed" => allowed, "denied" => denied)
+      allow(security_middleware).to receive(:authorize_action) do |_context, action, item|
+        action == :list && item.equal?(allowed)
+      end
+
+      result = described_class.list_resources({}, session, server)
+
+      expect(result).to eq({ resources: [{ "uri" => "allowed" }] })
+    end
   end
 
   describe ".read_resource" do
@@ -241,6 +271,19 @@ RSpec.describe VectorMCP::Handlers::Core do
       result = described_class.list_prompts({}, session, server)
       expect(result).to eq({ prompts: [{ "name" => "a" }, { "name" => "b" }] })
     end
+
+    it "filters prompts denied by authorization policy" do
+      allowed = double("allowed_prompt", as_mcp_definition: { "name" => "allowed" })
+      denied = double("denied_prompt", as_mcp_definition: { "name" => "denied" })
+      server.prompts.merge!("allowed" => allowed, "denied" => denied)
+      allow(security_middleware).to receive(:authorize_action) do |_context, action, item|
+        action == :list && item.equal?(allowed)
+      end
+
+      result = described_class.list_prompts({}, session, server)
+
+      expect(result).to eq({ prompts: [{ "name" => "allowed" }] })
+    end
   end
 
   describe ".list_roots" do
@@ -251,7 +294,10 @@ RSpec.describe VectorMCP::Handlers::Core do
              resources: {},
              prompts: {},
              roots: roots,
-             logger: logger)
+             logger: logger,
+             security_middleware: security_middleware,
+             middleware_manager: middleware_manager,
+             auth_manager: auth_manager)
     end
 
     before do
@@ -272,6 +318,19 @@ RSpec.describe VectorMCP::Handlers::Core do
                                { "uri" => "file:///path2", "name" => "Project 2" }
                              ]
                            })
+    end
+
+    it "filters roots denied by authorization policy" do
+      allowed = double("allowed_root", as_mcp_definition: { "uri" => "file:///allowed" })
+      denied = double("denied_root", as_mcp_definition: { "uri" => "file:///denied" })
+      roots.merge!("file:///allowed" => allowed, "file:///denied" => denied)
+      allow(security_middleware).to receive(:authorize_action) do |_context, action, item|
+        action == :list && item.equal?(allowed)
+      end
+
+      result = described_class.list_roots({}, session, server)
+
+      expect(result).to eq({ roots: [{ "uri" => "file:///allowed" }] })
     end
 
     it "returns empty array when no roots are registered" do
@@ -308,6 +367,36 @@ RSpec.describe VectorMCP::Handlers::Core do
         result = described_class.get_prompt(params, session, server)
         expect(result[:description]).to eq("d")
         expect(result[:messages].first[:role]).to eq("user")
+        expect(security_middleware).to have_received(:authorize_action).with(anonymous_context, :get, prompt)
+      end
+    end
+
+    context "when authentication is required" do
+      let(:auth_manager) { double("auth_manager", required?: true) }
+
+      before do
+        allow(security_middleware).to receive(:authenticate_request).and_return(anonymous_context)
+      end
+
+      it "rejects an unauthenticated prompt request without invoking the handler" do
+        expect(handler_proc).not_to receive(:call)
+
+        expect do
+          described_class.get_prompt({ "name" => prompt_name }, session, server)
+        end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
+      end
+    end
+
+    context "when prompt authorization is denied" do
+      before do
+        allow(security_middleware).to receive(:authorize_action).with(anonymous_context, :get, prompt).and_return(false)
+      end
+      it "raises ForbiddenError before invoking the prompt handler" do
+        expect(handler_proc).not_to receive(:call)
+
+        expect do
+          described_class.get_prompt({ "name" => prompt_name }, session, server)
+        end.to raise_error(VectorMCP::ForbiddenError, "Access denied")
       end
     end
 
@@ -373,13 +462,27 @@ RSpec.describe VectorMCP::Handlers::Core do
     end
   end
 
+  describe "catalog authentication coverage" do
+    let(:auth_manager) { double("auth_manager", required?: true) }
+
+    before do
+      allow(security_middleware).to receive(:authenticate_request).and_return(anonymous_context)
+    end
+
+    %i[list_tools list_resources list_prompts list_roots].each do |handler_name|
+      it "requires authentication for #{handler_name}" do
+        expect do
+          described_class.public_send(handler_name, {}, session, server)
+        end.to raise_error(VectorMCP::UnauthorizedError, "Authentication required")
+      end
+    end
+  end
+
   describe "authenticate_request! flow" do
     let(:tool) { double("tool", handler: proc { |_args| "ok" }, input_schema: nil) }
     let(:authenticated_context) do
       VectorMCP::Security::SessionContext.new(user: { user_id: "user-1" }, authenticated: true)
     end
-    let(:anonymous_context) { VectorMCP::Security::SessionContext.anonymous }
-
     before do
       server.tools["auth_tool"] = tool
       allow(VectorMCP::Util).to receive(:convert_to_mcp_content).with("ok").and_return(["ok"])

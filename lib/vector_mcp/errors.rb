@@ -4,6 +4,16 @@ module VectorMCP
   # Base error class for all VectorMCP specific errors.
   class Error < StandardError; end
 
+  # Raised when an HTTP request body exceeds the transport's configured limit.
+  class PayloadTooLargeError < Error
+    attr_reader :max_bytes
+
+    def initialize(max_bytes)
+      @max_bytes = max_bytes
+      super("Request body exceeds the maximum allowed size of #{max_bytes} bytes")
+    end
+  end
+
   # Base class for **all** JSON-RPC 2.0 errors that the VectorMCP library can
   # emit.  It mirrors the structure defined by the JSON-RPC spec and adds a
   # flexible `details` field that implementers may use to attach structured,

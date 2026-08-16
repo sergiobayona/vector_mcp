@@ -46,6 +46,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       expect(transport.host).to eq("localhost")
       expect(transport.port).to eq(8000)
       expect(transport.path_prefix).to eq("/mcp")
+      expect(transport.max_body_bytes).to eq(16 * 1024 * 1024)
     end
 
     context "with custom options" do
@@ -77,6 +78,24 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       end
     end
 
+    context "with request body size options" do
+      it "accepts a custom positive limit" do
+        custom_transport = described_class.new(mock_mcp_server, max_body_bytes: 1024)
+
+        expect(custom_transport.max_body_bytes).to eq(1024)
+      end
+
+      it "rejects non-positive or non-integer limits" do
+        expect do
+          described_class.new(mock_mcp_server, max_body_bytes: 0)
+        end.to raise_error(ArgumentError, "max_body_bytes must be a positive Integer")
+
+        expect do
+          described_class.new(mock_mcp_server, max_body_bytes: "1024")
+        end.to raise_error(ArgumentError, "max_body_bytes must be a positive Integer")
+      end
+    end
+
     context "with path prefix normalization" do
       [
         ["custom", "/custom"],
@@ -96,6 +115,26 @@ RSpec.describe VectorMCP::Transport::HttpStream do
     it "logs initialization" do
       expect(mock_logger).to receive(:info)
       described_class.new(mock_mcp_server)
+    end
+  end
+
+  describe "#start_puma_server" do
+    it "configures Puma to reject oversized bodies before Rack dispatch" do
+      runner = instance_double(Thread, join: nil)
+      puma_server = instance_double(Puma::Server, add_tcp_listener: nil, run: runner)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(transport).to receive(:setup_signal_handlers)
+      allow(transport.session_manager).to receive(:cleanup_all_sessions)
+
+      transport.send(:start_puma_server)
+
+      expect(Puma::Server).to have_received(:new).with(
+        transport,
+        nil,
+        min_threads: 4,
+        max_threads: 32,
+        http_content_length_limit: 16 * 1024 * 1024
+      )
     end
   end
 
@@ -205,6 +244,18 @@ RSpec.describe VectorMCP::Transport::HttpStream do
           response_data = JSON.parse(last_response.body)
           expect(response_data["error"]["code"]).to eq(-32_700)
           expect(response_data["error"]["message"]).to eq("Parse error")
+        end
+
+        context "when the request body exceeds max_body_bytes" do
+          let(:options) { { max_body_bytes: 32 } }
+
+          it "returns 413 and closes the connection" do
+            post "/mcp", "x" * 33, valid_headers.merge("CONTENT_TYPE" => "application/json")
+
+            expect(last_response.status).to eq(413)
+            expect(last_response.headers["Connection"]).to eq("close")
+            expect(last_response.body).to include("32 bytes")
+          end
         end
 
         it "handles protocol errors from server" do
@@ -927,6 +978,34 @@ RSpec.describe VectorMCP::Transport::HttpStream do
         result = transport.send(:read_request_body, env)
         expect(result).to eq("test body")
         expect(mock_input).to have_received(:rewind)
+      end
+
+      it "rejects a declared Content-Length above the limit before reading" do
+        limited_transport = described_class.new(mock_mcp_server, max_body_bytes: 4)
+        mock_input = StringIO.new("test body")
+        expect(mock_input).not_to receive(:read)
+
+        expect do
+          limited_transport.send(:read_request_body, { "rack.input" => mock_input, "CONTENT_LENGTH" => "9" })
+        end.to raise_error(VectorMCP::PayloadTooLargeError) { |error| expect(error.max_bytes).to eq(4) }
+      end
+
+      it "bounds reads when Content-Length is absent" do
+        limited_transport = described_class.new(mock_mcp_server, max_body_bytes: 4)
+        mock_input = StringIO.new("12345")
+        expect(mock_input).to receive(:read).with(5).and_call_original
+
+        expect do
+          limited_transport.send(:read_request_body, { "rack.input" => mock_input })
+        end.to raise_error(VectorMCP::PayloadTooLargeError)
+      end
+
+      it "accepts a body exactly at the configured limit" do
+        limited_transport = described_class.new(mock_mcp_server, max_body_bytes: 4)
+
+        result = limited_transport.send(:read_request_body, { "rack.input" => StringIO.new("1234") })
+
+        expect(result).to eq("1234")
       end
     end
 

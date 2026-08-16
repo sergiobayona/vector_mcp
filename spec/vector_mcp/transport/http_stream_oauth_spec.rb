@@ -45,6 +45,15 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
     ) do |_args, session|
       session&.security_context&.user_identifier || "anonymous"
     end
+    server.register_resource(
+      uri: "memory://secret",
+      name: "Secret resource",
+      description: "A protected resource"
+    ) { "secret" }
+    server.register_prompt(name: "secret_prompt", description: "A protected prompt") do
+      { messages: [{ role: "user", content: { type: "text", text: "secret" } }] }
+    end
+    server.register_root(uri: "file:///tmp", name: "Temporary files")
   end
 
   describe "when authentication is enabled with resource_metadata_url" do
@@ -129,6 +138,30 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
       post "/mcp", initialize_body, request_headers
 
       expect(last_response.headers.keys).not_to include("WWW-Authenticate")
+    end
+
+    it "rejects unauthenticated prompt and catalog requests at the handler layer" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+      headers = {
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_MCP_SESSION_ID" => session_id
+      }
+
+      requests = {
+        "tools/list" => {},
+        "resources/list" => {},
+        "prompts/list" => {},
+        "roots/list" => {},
+        "prompts/get" => { name: "secret_prompt", arguments: {} }
+      }
+
+      requests.each_with_index do |(method, params), index|
+        post "/mcp", { jsonrpc: "2.0", id: index + 2, method: method, params: params }.to_json, headers
+
+        expect(last_response.status).to eq(400), "expected #{method} to reject anonymous access"
+        expect(JSON.parse(last_response.body).dig("error", "code")).to eq(-32_401)
+      end
     end
   end
 

@@ -28,13 +28,16 @@ module VectorMCP
       # Handles the `tools/list` request.
       #
       # @param _params [Hash] The request parameters (ignored).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing an array of tool definitions.
       #   Example: `{ tools: [ { name: "my_tool", ... } ] }`
-      def self.list_tools(_params, _session, server)
+      def self.list_tools(_params, session, server)
+        session_context = authenticate_request!(session, server, operation_type: :tool_list, operation_name: "tools/list")
+        tools = filter_authorized_items(server.tools.values, session_context, server)
+
         {
-          tools: server.tools.values.map(&:as_mcp_definition)
+          tools: tools.map(&:as_mcp_definition)
         }
       end
 
@@ -79,13 +82,16 @@ module VectorMCP
       # Handles the `resources/list` request.
       #
       # @param _params [Hash] The request parameters (ignored).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing an array of resource definitions.
       #   Example: `{ resources: [ { uri: "memory://data", name: "My Data", ... } ] }`
-      def self.list_resources(_params, _session, server)
+      def self.list_resources(_params, session, server)
+        session_context = authenticate_request!(session, server, operation_type: :resource_list, operation_name: "resources/list")
+        resources = filter_authorized_items(server.resources.values, session_context, server)
+
         {
-          resources: server.resources.values.map(&:as_mcp_definition)
+          resources: resources.map(&:as_mcp_definition)
         }
       end
 
@@ -129,14 +135,17 @@ module VectorMCP
       # If the server supports dynamic prompt lists, this clears the `listChanged` flag.
       #
       # @param _params [Hash] The request parameters (ignored).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing an array of prompt definitions.
       #   Example: `{ prompts: [ { name: "my_prompt", ... } ] }`
-      def self.list_prompts(_params, _session, server)
+      def self.list_prompts(_params, session, server)
+        session_context = authenticate_request!(session, server, operation_type: :prompt_list, operation_name: "prompts/list")
+        prompts = filter_authorized_items(server.prompts.values, session_context, server)
+
         # Once the list is supplied, clear the listChanged flag
         result = {
-          prompts: server.prompts.values.map(&:as_mcp_definition)
+          prompts: prompts.map(&:as_mcp_definition)
         }
         server.clear_prompts_list_changed if server.respond_to?(:clear_prompts_list_changed)
         result
@@ -146,14 +155,17 @@ module VectorMCP
       # Returns the list of available roots and clears the `listChanged` flag.
       #
       # @param _params [Hash] The request parameters (ignored).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] A hash containing an array of root definitions.
       #   Example: `{ roots: [ { uri: "file:///path/to/dir", name: "My Project" } ] }`
-      def self.list_roots(_params, _session, server)
+      def self.list_roots(_params, session, server)
+        session_context = authenticate_request!(session, server, operation_type: :root_list, operation_name: "roots/list")
+        roots = filter_authorized_items(server.roots.values, session_context, server)
+
         # Once the list is supplied, clear the listChanged flag
         result = {
-          roots: server.roots.values.map(&:as_mcp_definition)
+          roots: roots.map(&:as_mcp_definition)
         }
         server.clear_roots_list_changed if server.respond_to?(:clear_roots_list_changed)
         result
@@ -177,7 +189,7 @@ module VectorMCP
       #
       # @param params [Hash] The request parameters.
       #   Expected keys: "name" (String), "arguments" (Hash, optional).
-      # @param _session [VectorMCP::Session] The current session (ignored).
+      # @param session [VectorMCP::Session] The current session.
       # @param server [VectorMCP::Server] The server instance.
       # @return [Hash] The result from the prompt's handler, which should conform to MCP's GetPromptResult.
       # @raise [VectorMCP::NotFoundError] if the prompt name is not found.
@@ -196,30 +208,8 @@ module VectorMCP
           metadata: { start_time: Time.now }
         )
 
-        # Execute before_prompt_get hooks
-        context = server.middleware_manager.execute_hooks(:before_prompt_get, context)
-        return handle_middleware_error(context) if context.error?
-
         begin
-          context_params = context.params
-          prompt_name = context_params["name"] || prompt_name
-          prompt = fetch_prompt(prompt_name, server)
-
-          arguments = context_params["arguments"] || {}
-          validate_prompt_arguments!(prompt_name, prompt, arguments)
-
-          # Call the registered handler after arguments were validated
-          result_data = prompt.handler.call(arguments)
-
-          validate_prompt_response!(prompt_name, result_data, server)
-
-          # Set result in context
-          context.result = result_data
-
-          # Execute after_prompt_get hooks
-          context = server.middleware_manager.execute_hooks(:after_prompt_get, context)
-
-          context.result
+          execute_prompt_request(context, prompt_name, session, server)
         rescue StandardError => e
           # Set error in context and execute error hooks
           context.error = e
@@ -525,6 +515,35 @@ module VectorMCP
         raise VectorMCP::ForbiddenError, "Access denied"
       end
 
+      # Filter catalog entries through their registered authorization policy.
+      # Listing intentionally omits denied items instead of revealing their existence.
+      def self.filter_authorized_items(items, session_context, server)
+        items.select do |item|
+          server.security_middleware.authorize_action(session_context, :list, item)
+        end
+      end
+
+      # Authenticate, authorize, validate, and execute a prompt request.
+      def self.execute_prompt_request(context, prompt_name, session, server)
+        session_context = authenticate_request!(session, server, operation_type: :prompt_get, operation_name: prompt_name)
+
+        context = server.middleware_manager.execute_hooks(:before_prompt_get, context)
+        return handle_middleware_error(context) if context.error?
+
+        context_params = context.params
+        prompt_name = context_params["name"] || prompt_name
+        prompt = fetch_prompt(prompt_name, server)
+        authorize_action!(session_context, :get, prompt, server)
+
+        arguments = context_params["arguments"] || {}
+        validate_prompt_arguments!(prompt_name, prompt, arguments)
+        result_data = prompt.handler.call(arguments)
+        validate_prompt_response!(prompt_name, result_data, server)
+
+        context.result = result_data
+        server.middleware_manager.execute_hooks(:after_prompt_get, context).result
+      end
+
       # Execute resource handler with proper arity handling.
       # The second argument is the per-request invocation, which also exposes
       # the SessionContext auth API for handlers written against the legacy
@@ -578,7 +597,8 @@ module VectorMCP
 
       private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :authenticate_request!,
                            :execute_tool_handler, :build_tool_result, :handle_tool_error, :create_resource_context,
-                           :find_resource!, :authorize_action!, :execute_resource_handler,
+                           :find_resource!, :authorize_action!, :filter_authorized_items, :execute_prompt_request,
+                           :execute_resource_handler,
                            :process_resource_content, :handle_resource_error, :create_auth_context,
                            :handle_auth_error
     end

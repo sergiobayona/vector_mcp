@@ -41,9 +41,10 @@ module VectorMCP
     # @attr_reader host [String] The hostname or IP address the server will bind to
     # @attr_reader port [Integer] The port number the server will listen on
     # @attr_reader path_prefix [String] The base URL path for MCP endpoints
+    # @attr_reader max_body_bytes [Integer] Maximum accepted POST body size
     # rubocop:disable Metrics/ClassLength
     class HttpStream
-      attr_reader :logger, :server, :host, :port, :path_prefix
+      attr_reader :logger, :server, :host, :port, :path_prefix, :max_body_bytes
 
       # Default configuration values
       DEFAULT_HOST = "localhost"
@@ -54,6 +55,8 @@ module VectorMCP
       DEFAULT_REQUEST_TIMEOUT = 30 # Default timeout for server-initiated requests
       DEFAULT_MIN_THREADS = 4
       DEFAULT_MAX_THREADS = 32
+      # Accommodates the 10 MiB ImageUtil limit after base64 expansion and JSON framing.
+      DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024
 
       # Default allowed origins — restrict to localhost by default for security.
       DEFAULT_ALLOWED_ORIGINS = %w[
@@ -76,6 +79,7 @@ module VectorMCP
       # @option options [Integer] :event_retention (100) Number of events to retain for resumability
       # @option options [Integer] :min_threads (4) Minimum Puma thread pool size
       # @option options [Integer] :max_threads (32) Maximum Puma thread pool size
+      # @option options [Integer] :max_body_bytes (16777216) Maximum POST body size in bytes
       # @option options [Array<String>] :allowed_origins Allowed origins for CORS validation.
       #   Defaults to localhost origins only. Pass ["*"] to allow all origins (NOT recommended for production).
       def initialize(server, options = {})
@@ -268,7 +272,13 @@ module VectorMCP
       #
       # @return [void]
       def start_puma_server
-        @puma_server = Puma::Server.new(self, nil, min_threads: @min_threads, max_threads: @max_threads)
+        @puma_server = Puma::Server.new(
+          self,
+          nil,
+          min_threads: @min_threads,
+          max_threads: @max_threads,
+          http_content_length_limit: @max_body_bytes
+        )
         @puma_server.add_tcp_listener(@host, @port)
 
         @running = true
@@ -458,6 +468,8 @@ module VectorMCP
         end
 
         handle_single_request(parsed, session, env)
+      rescue VectorMCP::PayloadTooLargeError => e
+        payload_too_large_response(e.message)
       rescue JSON::ParserError => e
         json_error_response(nil, -32_700, "Parse error", { details: e.message })
       end
@@ -573,9 +585,15 @@ module VectorMCP
       # @param env [Hash] The Rack environment
       # @return [String] The request body
       def read_request_body(env)
+        content_length = env["CONTENT_LENGTH"].to_i
+        raise VectorMCP::PayloadTooLargeError, @max_body_bytes if content_length > @max_body_bytes
+
         input = env["rack.input"]
         input.rewind
-        input.read
+        body = input.read(@max_body_bytes + 1) || ""
+        raise VectorMCP::PayloadTooLargeError, @max_body_bytes if body.bytesize > @max_body_bytes
+
+        body
       end
 
       # Optimized JSON parsing with better error handling and performance
@@ -742,6 +760,10 @@ module VectorMCP
 
       def not_acceptable_response(message = "Not Acceptable")
         [406, { "Content-Type" => "text/plain" }, [message]]
+      end
+
+      def payload_too_large_response(message = "Payload Too Large")
+        [413, { "Content-Type" => "text/plain", "Connection" => "close" }, [message]]
       end
 
       # Validates the MCP-Protocol-Version header per spec.
@@ -984,10 +1006,17 @@ module VectorMCP
         @event_retention = options[:event_retention] || DEFAULT_EVENT_RETENTION
         @min_threads = options[:min_threads] || DEFAULT_MIN_THREADS
         @max_threads = options[:max_threads] || DEFAULT_MAX_THREADS
+        @max_body_bytes = validate_max_body_bytes(options.fetch(:max_body_bytes, DEFAULT_MAX_BODY_BYTES))
         @allowed_origins = options[:allowed_origins] || DEFAULT_ALLOWED_ORIGINS
         @mounted = options.fetch(:mounted, false)
 
         warn_on_permissive_origins if @allowed_origins.include?("*")
+      end
+
+      def validate_max_body_bytes(value)
+        raise ArgumentError, "max_body_bytes must be a positive Integer" unless value.is_a?(Integer) && value.positive?
+
+        value
       end
 
       # Logs a security warning when wildcard origin is configured.

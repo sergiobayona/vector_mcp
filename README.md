@@ -237,6 +237,8 @@ anonymizer.install_on(server)
 - `DELETE /mcp` terminates the session
 - The server advertises MCP protocol `2025-11-25` and accepts `2025-03-26` and `2024-11-05` headers for compatibility
 - Default allowed origins are restricted to localhost and loopback addresses
+- POST bodies are capped at 16 MiB by default; configure `max_body_bytes:` on `run` or `rack_app` when needed
+- For mounted Rack apps, configure the same limit in the fronting web server or reverse proxy so requests are rejected before Rack buffering
 
 Initialize a session with curl:
 

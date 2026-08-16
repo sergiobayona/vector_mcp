@@ -1,3 +1,11 @@
+## [Unreleased]
+
+### Security
+
+* Authentication now covers `prompts/get` and all tool, resource, prompt, and root catalog list requests when authentication is enabled.
+* Prompt/root authorization policies are enforced; list policies filter denied catalog entries without disclosing them.
+* HTTP Stream POST bodies are capped at 16 MiB by default, with a configurable `max_body_bytes:` limit and `413 Payload Too Large` responses.
+
 ## [0.7.0] – 2026-08-15
 
 ### Removed (deprecated in 0.6.0)

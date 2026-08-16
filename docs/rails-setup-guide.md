@@ -107,6 +107,7 @@ You should receive a JSON response with `serverInfo`, `protocolVersion`, and an 
 MCP_APP = MCP_SERVER.rack_app(
   session_timeout: 600,              # 10 minutes (default: 300)
   event_retention: 200,              # Keep last 200 events for SSE resumability (default: 100)
+  max_body_bytes: 16 * 1024 * 1024,  # Maximum POST body size (default: 16 MiB)
   allowed_origins: [                 # Origins allowed to connect (default: localhost only)
     "https://myapp.com",
     "https://admin.myapp.com"
@@ -115,6 +116,8 @@ MCP_APP = MCP_SERVER.rack_app(
 ```
 
 **Default allowed origins** are restricted to localhost (`http://localhost`, `https://localhost`, `http://127.0.0.1`, etc.). In production, set this to your actual domain(s). Use `["*"]` only for development -- it permits any origin and logs a security warning.
+
+Also configure the same request-body limit in the Rails web server and any reverse proxy so oversized requests are rejected before those layers buffer the body. `max_body_bytes` remains the application-level backstop.
 
 ### Registering Tools That Access Rails Models
 
