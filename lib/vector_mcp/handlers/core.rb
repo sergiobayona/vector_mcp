@@ -4,6 +4,7 @@ require "json"
 require "uri"
 require "json-schema"
 require_relative "../middleware"
+require_relative "../security/request_authenticator"
 
 module VectorMCP
   module Handlers
@@ -169,19 +170,6 @@ module VectorMCP
         }
         server.clear_roots_list_changed if server.respond_to?(:clear_roots_list_changed)
         result
-      end
-
-      # Handles the `prompts/subscribe` request (placeholder).
-      # This implementation is a simple acknowledgement.
-      #
-      # @param _params [Hash] The request parameters (ignored).
-      # @param session [VectorMCP::Session] The current session.
-      # @param server [VectorMCP::Server] The server instance.
-      # @return [Hash] An empty hash.
-      def self.subscribe_prompts(_params, session, server)
-        # Use private helper via send to avoid making it public
-        server.send(:subscribe_prompts, session) if server.respond_to?(:send)
-        {}
       end
 
       # Handles the `prompts/get` request.
@@ -395,13 +383,7 @@ module VectorMCP
       # @param session [VectorMCP::Session] The current session
       # @return [VectorMCP::RequestContext] Request context for security middleware
       def self.extract_auth_credentials(session)
-        # All sessions should have a request_context - this is enforced by Session initialization
-        unless session.respond_to?(:request_context) && session.request_context
-          raise VectorMCP::InternalError,
-                "Session missing request_context - transport layer integration error. Session ID: #{session.id}"
-        end
-
-        session.request_context
+        VectorMCP::Security::RequestAuthenticator.request_context_for(session)
       end
       private_class_method :extract_auth_credentials
 
@@ -442,23 +424,12 @@ module VectorMCP
 
       # Authenticate the current request and return the caller's identity.
       def self.authenticate_request!(session, server, operation_type:, operation_name:)
-        request = extract_auth_credentials(session)
-        # before_auth middleware hooks see (and may modify) the request as a hash;
-        # AuthManager coerces it back into a RequestContext at its boundary.
-        context = create_auth_context(operation_type, operation_name, request.to_h, session, server)
-        context = server.middleware_manager.execute_hooks(:before_auth, context)
-        raise context.error if context.error?
-
-        session_context = server.security_middleware.authenticate_request(context.params)
-        session.security_context = session_context
-
-        raise VectorMCP::UnauthorizedError, "Authentication required" if server.auth_manager.required? && !session_context.authenticated?
-
-        context.result = session_context
-        server.middleware_manager.execute_hooks(:after_auth, context)
-        session_context
-      rescue StandardError => e
-        handle_auth_error(e, context, server)
+        VectorMCP::Security::RequestAuthenticator.authenticate!(
+          session,
+          server,
+          operation_type: operation_type,
+          operation_name: operation_name
+        )
       end
 
       # Execute tool handler with proper arity handling
@@ -574,33 +545,11 @@ module VectorMCP
         context.result
       end
 
-      # Create middleware context for authentication hooks.
-      def self.create_auth_context(operation_type, operation_name, request, session, server)
-        VectorMCP::Middleware::Context.new(
-          operation_type: operation_type,
-          operation_name: operation_name,
-          params: request,
-          session: session,
-          server: server,
-          metadata: { start_time: Time.now }
-        )
-      end
-
-      # Run auth error hooks and re-raise the original error.
-      def self.handle_auth_error(error, context, server)
-        return raise error unless context
-
-        context.error = error
-        server.middleware_manager.execute_hooks(:on_auth_error, context)
-        raise error
-      end
-
       private_class_method :handle_middleware_error, :create_tool_context, :find_tool!, :authenticate_request!,
                            :execute_tool_handler, :build_tool_result, :handle_tool_error, :create_resource_context,
                            :find_resource!, :authorize_action!, :filter_authorized_items, :execute_prompt_request,
                            :execute_resource_handler,
-                           :process_resource_content, :handle_resource_error, :create_auth_context,
-                           :handle_auth_error
+                           :process_resource_content, :handle_resource_error
     end
   end
 end

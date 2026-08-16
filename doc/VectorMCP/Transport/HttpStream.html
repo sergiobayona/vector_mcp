@@ -244,6 +244,21 @@ according to the MCP specification for Streamable HTTP transport.</p>
         </dt>
         <dd><pre class="code"><span class='int'>32</span></pre></dd>
       
+        <dt id="DEFAULT_MAX_BODY_BYTES-constant" class="">DEFAULT_MAX_BODY_BYTES =
+          <div class="docstring">
+  <div class="discussion">
+    <p>Accommodates the 10 MiB ImageUtil limit after base64 expansion and JSON framing.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>16</span> <span class='op'>*</span> <span class='int'>1024</span> <span class='op'>*</span> <span class='int'>1024</span></pre></dd>
+      
         <dt id="DEFAULT_ALLOWED_ORIGINS-constant" class="">DEFAULT_ALLOWED_ORIGINS =
           <div class="docstring">
   <div class="discussion">
@@ -354,6 +369,34 @@ according to the MCP specification for Streamable HTTP transport.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>The logger instance, shared with the server.</p>
+</div></span>
+  
+</li>
+
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#max_body_bytes-instance_method" title="#max_body_bytes (instance method)">#<strong>max_body_bytes</strong>  &#x21d2; Integer </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+      <span class="note title readonly">readonly</span>
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Maximum accepted POST body size.</p>
 </div></span>
   
 </li>
@@ -872,6 +915,21 @@ according to the MCP specification for Streamable HTTP transport.</p>
         </li>
       
         <li>
+          <span class="name">:max_body_bytes</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+              &mdash; default:
+              <tt>16777216</tt>
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>Maximum POST body size in bytes</p>
+</div>
+          
+        </li>
+      
+        <li>
           <span class="name">:allowed_origins</span>
           <span class="type">(<tt>Array&lt;String&gt;</tt>)</span>
           <span class="default">
@@ -894,20 +952,20 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-81
-82
-83
-84
 85
 86
 87
 88
 89
 90
-91</pre>
+91
+92
+93
+94
+95</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 81</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 85</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='ivar'>@server</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span>
@@ -974,12 +1032,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-246
-247
-248</pre>
+250
+251
+252</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 246</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 250</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_event_store'>event_store</span>
   <span class='ivar'>@event_store</span>
@@ -1033,12 +1091,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-45
 46
-47</pre>
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_host'>host</span>
   <span class='ivar'>@host</span>
@@ -1092,15 +1150,74 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-45
 46
-47</pre>
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_logger'>logger</span>
   <span class='ivar'>@logger</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      
+      <span id=""></span>
+      <div class="method_details ">
+  <h3 class="signature " id="max_body_bytes-instance_method">
+  
+    #<strong>max_body_bytes</strong>  &#x21d2; <tt>Integer</tt>  <span class="extras">(readonly)</span>
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Maximum accepted POST body size</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the current value of max_body_bytes</p>
+</div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+46
+47
+48</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_max_body_bytes'>max_body_bytes</span>
+  <span class='ivar'>@max_body_bytes</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1151,12 +1268,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-45
 46
-47</pre>
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_path_prefix'>path_prefix</span>
   <span class='ivar'>@path_prefix</span>
@@ -1210,12 +1327,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-45
 46
-47</pre>
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_port'>port</span>
   <span class='ivar'>@port</span>
@@ -1269,12 +1386,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-45
 46
-47</pre>
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_server'>server</span>
   <span class='ivar'>@server</span>
@@ -1328,12 +1445,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-240
-241
-242</pre>
+244
+245
+246</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 240</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 244</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_session_manager'>session_manager</span>
   <span class='ivar'>@session_manager</span>
@@ -1387,12 +1504,12 @@ Defaults to localhost origins only. Pass [&quot;*&quot;] to allow all origins (N
       <pre class="lines">
 
 
-252
-253
-254</pre>
+256
+257
+258</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 252</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 256</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stream_handler'>stream_handler</span>
   <span class='ivar'>@stream_handler</span>
@@ -1471,10 +1588,6 @@ Routes requests to appropriate handlers based on path and method.</p>
       <pre class="lines">
 
 
-109
-110
-111
-112
 113
 114
 115
@@ -1499,10 +1612,14 @@ Routes requests to appropriate handlers based on path and method.</p>
 134
 135
 136
-137</pre>
+137
+138
+139
+140
+141</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 109</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 113</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_start_time'>start_time</span> <span class='op'>=</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_now'>now</span>
@@ -1581,14 +1698,14 @@ This method will block until the server is stopped.</p>
       <pre class="lines">
 
 
-98
-99
-100
-101
-102</pre>
+102
+103
+104
+105
+106</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 98</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 102</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='id identifier rubyid_start_puma_server'>start_puma_server</span>
@@ -1678,17 +1795,17 @@ This method will block until the server is stopped.</p>
       <pre class="lines">
 
 
-144
-145
-146
-147
 148
 149
 150
-151</pre>
+151
+152
+153
+154
+155</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 144</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 148</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_send_notification'>send_notification</span><span class='lparen'>(</span><span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='id identifier rubyid_params'>params</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='comment'># Find the first available session
@@ -1796,16 +1913,16 @@ This method will block until the server is stopped.</p>
       <pre class="lines">
 
 
-159
-160
-161
-162
 163
 164
-165</pre>
+165
+166
+167
+168
+169</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 159</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 163</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_send_notification_to_session'>send_notification_to_session</span><span class='lparen'>(</span><span class='id identifier rubyid_session_id'>session_id</span><span class='comma'>,</span> <span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='id identifier rubyid_params'>params</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_session'>session</span> <span class='op'>=</span> <span class='ivar'>@session_manager</span><span class='period'>.</span><span class='id identifier rubyid_get_session'>get_session</span><span class='lparen'>(</span><span class='id identifier rubyid_session_id'>session_id</span><span class='rparen'>)</span>
@@ -1946,19 +2063,19 @@ For HTTP transport, this requires finding an appropriate session with streaming 
       <pre class="lines">
 
 
-177
-178
-179
-180
 181
 182
 183
 184
 185
-186</pre>
+186
+187
+188
+189
+190</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 177</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 181</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_send_request'>send_request</span><span class='lparen'>(</span><span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='id identifier rubyid_params'>params</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_REQUEST_TIMEOUT-constant" title="VectorMCP::Transport::HttpStream::DEFAULT_REQUEST_TIMEOUT (constant)">DEFAULT_REQUEST_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Method cannot be blank</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_method'>method</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span><span class='period'>.</span><span class='id identifier rubyid_strip'>strip</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -2116,10 +2233,6 @@ This method will block until a response is received or the timeout is reached.</
       <pre class="lines">
 
 
-198
-199
-200
-201
 202
 203
 204
@@ -2140,10 +2253,14 @@ This method will block until a response is received or the timeout is reached.</
 219
 220
 221
-222</pre>
+222
+223
+224
+225
+226</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 198</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 202</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_send_request_to_session'>send_request_to_session</span><span class='lparen'>(</span><span class='id identifier rubyid_session_id'>session_id</span><span class='comma'>,</span> <span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='id identifier rubyid_params'>params</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_REQUEST_TIMEOUT-constant" title="VectorMCP::Transport::HttpStream::DEFAULT_REQUEST_TIMEOUT (constant)">DEFAULT_REQUEST_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Method cannot be blank</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_method'>method</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span><span class='period'>.</span><span class='id identifier rubyid_strip'>strip</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -2200,17 +2317,17 @@ This method will block until a response is received or the timeout is reached.</
       <pre class="lines">
 
 
-227
-228
-229
-230
 231
 232
 233
-234</pre>
+234
+235
+236
+237
+238</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 227</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/transport/http_stream.rb', line 231</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop'>stop</span>
   <span class='id identifier rubyid_logger'>logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span> <span class='lbrace'>{</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Stopping HttpStream transport</span><span class='tstring_end'>&quot;</span></span> <span class='rbrace'>}</span>
@@ -2230,9 +2347,9 @@ This method will block until a response is received or the timeout is reached.</
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:09 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>

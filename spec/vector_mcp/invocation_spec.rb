@@ -31,6 +31,10 @@ RSpec.describe VectorMCP::Invocation do
     it "starts with an anonymous security context" do
       expect(described_class.new(session).security_context.authenticated?).to be(false)
     end
+
+    it "starts with authentication unresolved" do
+      expect(described_class.new(session).authentication_resolved?).to be(false)
+    end
   end
 
   describe "session delegation" do
@@ -54,7 +58,9 @@ RSpec.describe VectorMCP::Invocation do
         user: { api_key: "a" }, authenticated: true
       )
 
+      expect(invocation_a.authentication_resolved?).to be(true)
       expect(invocation_b.security_context.authenticated?).to be(false)
+      expect(invocation_b.authentication_resolved?).to be(false)
     end
   end
 
@@ -86,7 +92,7 @@ RSpec.describe VectorMCP::Invocation do
   end
 
   describe "equality" do
-    it "treats invocations of the same session as equal (for subscriber dedup)" do
+    it "treats invocations of the same session as equal" do
       invocation_a = described_class.new(session)
       invocation_b = described_class.new(session)
 

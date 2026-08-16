@@ -14,6 +14,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
   let(:mock_server_info) { instance_double("VectorMCP::ServerInfo", name: "TestServer", version: "0.1") }
   let(:mock_resource_provider_options) { instance_double("VectorMCP::ResourceProviderOptions") }
   let(:mock_server_capabilities) { instance_double("VectorMCP::ServerCapabilities", resources: mock_resource_provider_options) }
+  let(:mock_auth_manager) { instance_double(VectorMCP::Security::AuthManager, required?: false) }
   let(:mock_session_context) do
     session = VectorMCP::Session.new(mock_mcp_server, nil, id: "test-session-123")
     session.extend(VectorMCP::Transport::HttpStream::SessionManager::SessionStreaming)
@@ -28,6 +29,7 @@ RSpec.describe VectorMCP::Transport::HttpStream do
       server_capabilities: mock_server_capabilities,
       protocol_version: "2025-11-25",
       handle_message: "success",
+      auth_manager: mock_auth_manager,
       security_middleware: nil,
       middleware_manager: nil
     )

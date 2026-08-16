@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require_relative "../security/request_authenticator"
+
 module VectorMCP
   class Server
     # Handles message processing and request/notification dispatching
     module MessageHandling
+      PUBLIC_REQUEST_METHODS = %w[initialize ping].freeze
+      PUBLIC_NOTIFICATION_METHODS = %w[initialized].freeze
+
       # --- Message Handling Logic (primarily called by transports) ---
 
       # Handles an incoming JSON-RPC message (request or notification).
@@ -76,11 +81,7 @@ module VectorMCP
       # @api private
       def handle_request(id, method, params, session)
         validate_session_initialization(id, method, params, session)
-
-        handler = @request_handlers[method]
-        raise VectorMCP::MethodNotFoundError.new(method, request_id: id) unless handler
-
-        execute_request_handler(id, method, params, session, handler)
+        execute_request_handler(id, method, params, session)
       end
 
       # Validates that the session is properly initialized for the given request.
@@ -97,8 +98,14 @@ module VectorMCP
 
       # Executes the request handler with proper error handling and tracking.
       # @api private
-      def execute_request_handler(id, method, params, session, handler)
+      def execute_request_handler(id, method, params, session)
         @in_flight_requests[id] = { method: method, params: params, session: session, start_time: Time.now }
+
+        authenticate_message!(method, params, session) unless PUBLIC_REQUEST_METHODS.include?(method)
+
+        handler = @request_handlers[method]
+        raise VectorMCP::MethodNotFoundError.new(method, request_id: id) unless handler
+
         result = handler.call(params, session, self)
         result
       rescue VectorMCP::ProtocolError => e
@@ -133,6 +140,7 @@ module VectorMCP
         handler = @notification_handlers[method]
         if handler
           begin
+            authenticate_message!(method, params, session) unless PUBLIC_NOTIFICATION_METHODS.include?(method)
             handler.call(params, session, self)
           rescue StandardError => e
             logger.error("Error executing notification handler '#{method}': #{e.message}\nBacktrace (top 5):\n  #{e.backtrace.first(5).join("\n  ")}")
@@ -155,7 +163,6 @@ module VectorMCP
         on_request("resources/read", &Handlers::Core.method(:read_resource))
         on_request("prompts/list", &Handlers::Core.method(:list_prompts))
         on_request("prompts/get", &Handlers::Core.method(:get_prompt))
-        on_request("prompts/subscribe", &Handlers::Core.method(:subscribe_prompts))
         on_request("roots/list", &Handlers::Core.method(:list_roots))
 
         # Core Notifications
@@ -172,6 +179,12 @@ module VectorMCP
         lambda do |params, session, _server|
           session.public_send(method_name, params)
         end
+      end
+
+      def authenticate_message!(method, params, session)
+        return unless auth_manager.required?
+
+        VectorMCP::Security::RequestAuthenticator.authenticate_message!(method, params, session, self)
       end
     end
   end

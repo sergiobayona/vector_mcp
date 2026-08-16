@@ -520,7 +520,7 @@ the same IP can indicate a misconfigured client or credential stuffing.
 
 **Double authentication.** When OAuth mode is on, each authenticated
 request runs the custom strategy twice — once at the transport gate,
-once inside `VectorMCP::Handlers::Core#authenticate_session!`. For the
+once at the shared message dispatcher. For the
 Doorkeeper in-process lookup this is an extra indexed SELECT per request.
 If it matters, wrap the lookup in a short-lived request-local memoization:
 

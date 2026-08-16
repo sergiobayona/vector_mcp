@@ -99,6 +99,27 @@
   
 
 </div>
+  
+    <h2>
+      Constant Summary
+      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
+    </h2>
+
+    <dl class="constants">
+      
+        <dt id="PUBLIC_REQUEST_METHODS-constant" class="">PUBLIC_REQUEST_METHODS =
+          
+        </dt>
+        <dd><pre class="code"><span class='qwords_beg'>%w[</span><span class='tstring_content'>initialize</span><span class='words_sep'> </span><span class='tstring_content'>ping</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span></pre></dd>
+      
+        <dt id="PUBLIC_NOTIFICATION_METHODS-constant" class="">PUBLIC_NOTIFICATION_METHODS =
+          
+        </dt>
+        <dd><pre class="code"><span class='qwords_beg'>%w[</span><span class='tstring_content'>initialized</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span></pre></dd>
+      
+    </dl>
+  
+
 
 
 
@@ -287,11 +308,6 @@ For notifications, returns <code>nil</code>.</p>
       <pre class="lines">
 
 
-18
-19
-20
-21
-22
 23
 24
 25
@@ -308,10 +324,15 @@ For notifications, returns <code>nil</code>.</p>
 36
 37
 38
-39</pre>
+39
+40
+41
+42
+43
+44</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 18</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 23</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle_message'>handle_message</span><span class='lparen'>(</span><span class='id identifier rubyid_message'>message</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_session_id'>session_id</span> <span class='op'>=</span> <span class='id identifier rubyid_session'>session</span><span class='period'>.</span><span class='id identifier rubyid_id'>id</span>
@@ -418,13 +439,13 @@ For notifications, returns <code>nil</code>.</p>
       <pre class="lines">
 
 
-58
-59
-60
-61</pre>
+63
+64
+65
+66</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 58</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 63</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_notification'>on_notification</span><span class='lparen'>(</span><span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_handler'>handler</span><span class='rparen'>)</span>
   <span class='ivar'>@notification_handlers</span><span class='lbracket'>[</span><span class='id identifier rubyid_method'>method</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_handler'>handler</span>
@@ -513,13 +534,13 @@ For notifications, returns <code>nil</code>.</p>
       <pre class="lines">
 
 
-48
-49
-50
-51</pre>
+53
+54
+55
+56</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 48</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/message_handling.rb', line 53</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_request'>on_request</span><span class='lparen'>(</span><span class='id identifier rubyid_method'>method</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_handler'>handler</span><span class='rparen'>)</span>
   <span class='ivar'>@request_handlers</span><span class='lbracket'>[</span><span class='id identifier rubyid_method'>method</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_handler'>handler</span>
@@ -535,9 +556,9 @@ For notifications, returns <code>nil</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:08 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>

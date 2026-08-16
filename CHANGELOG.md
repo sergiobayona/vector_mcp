@@ -5,6 +5,8 @@
 * Authentication now covers `prompts/get` and all tool, resource, prompt, and root catalog list requests when authentication is enabled.
 * Prompt/root authorization policies are enforced; list policies filter denied catalog entries without disclosing them.
 * HTTP Stream POST bodies are capped at 16 MiB by default, with a configurable `max_body_bytes:` limit and `413 Payload Too Large` responses.
+* Authentication is enforced at the shared dispatcher for every registered request and notification handler except the explicit public handshake methods (`initialize`, `ping`, and `initialized`). HTTP GET/DELETE operations also require credentials outside OAuth resource-server mode.
+* The unsupported `prompts/subscribe` placeholder and its unbounded retained-session array were removed.
 
 ## [0.7.0] – 2026-08-15
 

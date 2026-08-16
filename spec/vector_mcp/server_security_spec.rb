@@ -427,6 +427,110 @@ RSpec.describe VectorMCP::Server, "Security Features" do
     end
   end
 
+  describe "central message authentication" do
+    let(:initialized_session) do
+      VectorMCP::Session.new(server).tap do |session|
+        session.initialize!(
+          "protocolVersion" => server.protocol_version,
+          "capabilities" => {},
+          "clientInfo" => { "name" => "security-spec" }
+        )
+      end
+    end
+
+    def invocation_for(session, headers: {})
+      VectorMCP::Invocation.new(
+        session,
+        request_context: VectorMCP::RequestContext.new(headers: headers)
+      )
+    end
+
+    it "rejects an unauthenticated custom request before invoking its handler" do
+      server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+      handler = double("custom request handler")
+      expect(handler).not_to receive(:call)
+      server.on_request("custom/protected", &handler.method(:call))
+
+      expect do
+        server.handle_message(
+          { "id" => 7, "method" => "custom/protected", "params" => {} },
+          invocation_for(initialized_session)
+        )
+      end.to raise_error(VectorMCP::UnauthorizedError) { |error| expect(error.request_id).to eq(7) }
+    end
+
+    it "executes an authenticated custom request with the resolved identity" do
+      server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+      server.on_request("custom/protected") do |_params, invocation, _server|
+        { authenticated: invocation.authenticated?, user: invocation.user }
+      end
+      invocation = invocation_for(initialized_session, headers: { "X-API-Key" => "secret-key" })
+
+      result = server.handle_message(
+        { "id" => 8, "method" => "custom/protected", "params" => {} },
+        invocation
+      )
+
+      expect(result).to eq(authenticated: true, user: { api_key: "secret-key" })
+      expect(invocation.authentication_resolved?).to be(true)
+    end
+
+    it "does not invoke custom notification handlers without credentials" do
+      server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+      handler = double("custom notification handler")
+      expect(handler).not_to receive(:call)
+      server.on_notification("custom/protected", &handler.method(:call))
+
+      expect do
+        server.handle_message(
+          { "method" => "custom/protected", "params" => {} },
+          invocation_for(initialized_session)
+        )
+      end.not_to raise_error
+    end
+
+    it "executes custom notifications carrying valid credentials" do
+      server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+      observed_user = nil
+      server.on_notification("custom/protected") do |_params, invocation, _server|
+        observed_user = invocation.user
+      end
+
+      server.handle_message(
+        { "method" => "custom/protected", "params" => {} },
+        invocation_for(initialized_session, headers: { "X-API-Key" => "secret-key" })
+      )
+
+      expect(observed_user).to eq(api_key: "secret-key")
+    end
+
+    it "keeps initialize, ping, and initialized public" do
+      server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+      invocation = invocation_for(initialized_session)
+
+      expect(server.handle_message({ "id" => 9, "method" => "ping" }, invocation)).to eq({})
+      expect do
+        server.handle_message({ "method" => "initialized" }, invocation_for(initialized_session))
+      end.not_to raise_error
+    end
+
+    it "authenticates a core request only once at the dispatcher" do
+      auth_calls = 0
+      server.enable_authentication!(strategy: :custom) do |_request|
+        auth_calls += 1
+        { user_id: 42 }
+      end
+      server.register_tool(name: "echo", description: "Echo", input_schema: {}) { "ok" }
+
+      server.handle_message(
+        { "id" => 10, "method" => "tools/list", "params" => {} },
+        invocation_for(initialized_session)
+      )
+
+      expect(auth_calls).to eq(1)
+    end
+  end
+
   describe "integration with existing functionality" do
     it "does not interfere with tool registration when security is disabled" do
       expect do

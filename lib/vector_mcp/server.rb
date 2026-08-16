@@ -112,7 +112,6 @@ module VectorMCP
       @notification_handlers = {}
       @in_flight_requests = {}
       @prompts_list_changed = false
-      @prompt_subscribers = []
       @roots_list_changed = false
 
       # Configure sampling capabilities

@@ -140,7 +140,59 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
       expect(last_response.headers.keys).not_to include("WWW-Authenticate")
     end
 
-    it "rejects unauthenticated prompt and catalog requests at the handler layer" do
+    it "leaves unsupported HTTP methods to the normal 405 response" do
+      put "/mcp", nil, request_headers
+
+      expect(last_response.status).to eq(405)
+    end
+
+    it "requires credentials for GET streaming" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+
+      get "/mcp", {}, "HTTP_ACCEPT" => "text/event-stream", "HTTP_MCP_SESSION_ID" => session_id
+
+      expect(last_response.status).to eq(401)
+      expect(last_response.headers).not_to have_key("WWW-Authenticate")
+    end
+
+    it "allows authenticated GET streaming" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+      allow(transport.stream_handler).to receive(:handle_streaming_request)
+        .and_return([200, { "Content-Type" => "text/event-stream" }, ["stream"]])
+
+      get "/mcp", {},
+          "HTTP_ACCEPT" => "text/event-stream",
+          "HTTP_MCP_SESSION_ID" => session_id,
+          "HTTP_X_API_KEY" => "valid-key"
+
+      expect(last_response.status).to eq(200)
+    end
+
+    it "requires credentials before terminating a session" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+
+      delete "/mcp", nil, "HTTP_MCP_SESSION_ID" => session_id
+
+      expect(last_response.status).to eq(401)
+      expect(transport.session_manager.get_session(session_id)).not_to be_nil
+    end
+
+    it "allows an authenticated client to terminate its session" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+
+      delete "/mcp", nil,
+             "HTTP_MCP_SESSION_ID" => session_id,
+             "HTTP_X_API_KEY" => "valid-key"
+
+      expect(last_response.status).to eq(204)
+      expect(transport.session_manager.get_session(session_id)).to be_nil
+    end
+
+    it "rejects unauthenticated prompt and catalog requests at the shared dispatcher" do
       post "/mcp", initialize_body, request_headers
       session_id = last_response.headers.fetch("Mcp-Session-Id")
       headers = {
@@ -162,6 +214,25 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
         expect(last_response.status).to eq(400), "expected #{method} to reject anonymous access"
         expect(JSON.parse(last_response.body).dig("error", "code")).to eq(-32_401)
       end
+    end
+
+    it "rejects unauthenticated custom request handlers at the shared dispatcher" do
+      executed = false
+      server.on_request("custom/protected") do
+        executed = true
+        { ok: true }
+      end
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+
+      post "/mcp",
+           { jsonrpc: "2.0", id: 20, method: "custom/protected", params: {} }.to_json,
+           "CONTENT_TYPE" => "application/json",
+           "HTTP_MCP_SESSION_ID" => session_id
+
+      expect(last_response.status).to eq(400)
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq(-32_401)
+      expect(executed).to be(false)
     end
   end
 

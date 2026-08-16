@@ -37,6 +37,7 @@ RSpec.describe VectorMCP::Server do
       expect(server.resources).to be_empty
       expect(server.prompts).to be_empty
       expect(server.in_flight_requests).to be_empty
+      expect(server.instance_variable_defined?(:@prompt_subscribers)).to be(false)
     end
 
     it "allows positional name argument" do
@@ -870,9 +871,9 @@ RSpec.describe VectorMCP::Server do
         resources/read
         prompts/list
         prompts/get
-        prompts/subscribe
       ]
       expect(request_handlers.keys).to include(*expected_requests)
+      expect(request_handlers).not_to have_key("prompts/subscribe")
     end
 
     it "registers all core notification handlers including cancel aliases" do

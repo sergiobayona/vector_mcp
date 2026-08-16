@@ -258,6 +258,8 @@
 <span class='kw'>end</span>
 </code></pre>
 
+<p>When authentication is enabled, VectorMCP applies it centrally to built-in and custom request/notification handlers. Only <code>initialize</code>, <code>ping</code>, and the <code>initialized</code> notification are public; HTTP GET streams and DELETE session requests also require credentials.</p>
+
 <p>For MCP clients that speak OAuth 2.1 (e.g. Claude Desktop), pass a <code>resource_metadata_url:</code> to turn on RFC 9728 discovery. Unauthenticated requests to <code>/mcp</code> return <code>401</code> with a <code>WWW-Authenticate</code> header pointing at the configured metadata document, and the client drives the rest of the OAuth dance automatically. See <a href="./docs/oauth_resource_server.md">docs/oauth_resource_server.md</a> for the feature reference and <a href="./docs/rails_oauth_integration.md">docs/rails_oauth_integration.md</a> for a full Rails + Doorkeeper recipe.</p>
 
 <p>Middleware can hook into tool, resource, prompt, sampling, auth, and transport events, including <code>before_auth</code>, <code>after_auth</code>, <code>on_auth_error</code>, <code>before_request</code>, <code>after_response</code>, and <code>on_transport_error</code>.</p>
@@ -287,6 +289,8 @@
 <li><code>DELETE /mcp</code> terminates the session</li>
 <li>The server advertises MCP protocol <code>2025-11-25</code> and accepts <code>2025-03-26</code> and <code>2024-11-05</code> headers for compatibility</li>
 <li>Default allowed origins are restricted to localhost and loopback addresses</li>
+<li>POST bodies are capped at 16 MiB by default; configure <code>max_body_bytes:</code> on <code>run</code> or <code>rack_app</code> when needed</li>
+<li>For mounted Rack apps, configure the same limit in the fronting web server or reverse proxy so requests are rejected before Rack buffering</li>
 </ul>
 
 <p>Initialize a session with curl:</p>
@@ -330,9 +334,9 @@
 </div></div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:08 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>

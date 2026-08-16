@@ -29,7 +29,7 @@ module VectorMCP
     attr_reader :request_context
 
     # @return [VectorMCP::Security::SessionContext] the security context resolved for this request
-    attr_accessor :security_context
+    attr_reader :security_context
 
     def_delegators :@session,
                    :id, :server, :transport, :data,
@@ -53,6 +53,19 @@ module VectorMCP
       @session = session
       @request_context = request_context ? RequestContext.coerce(request_context) : session.request_context
       @security_context = Security::SessionContext.anonymous
+      @authentication_resolved = false
+    end
+
+    # Store the identity resolved for this invocation. Assigning a context marks
+    # authentication as complete even when the resolved identity is anonymous.
+    def security_context=(context)
+      @security_context = context
+      @authentication_resolved = true
+    end
+
+    # @return [Boolean] whether authentication has run for this invocation
+    def authentication_resolved?
+      @authentication_resolved
     end
 
     # Replace this request's context (e.g. from middleware).
@@ -90,9 +103,8 @@ module VectorMCP
       @request_context.param(name)
     end
 
-    # Invocations compare by their underlying session, so collections that
-    # deduplicate sessions (e.g. prompt subscribers) treat every request
-    # view of one session as the same subscriber.
+    # Invocations compare by their underlying session so request-scoped views
+    # retain the identity semantics of that shared session.
     def ==(other)
       other_session = other.is_a?(Invocation) ? other.session : other
       @session == other_session

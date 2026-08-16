@@ -195,6 +195,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 
 
 
+  
+  
+  <h3 class="inherited">Constants included
+     from <span class='object_link'><a href="Server/MessageHandling.html" title="VectorMCP::Server::MessageHandling (module)">MessageHandling</a></span></h3>
+  <p class="inherited"><span class='object_link'><a href="Server/MessageHandling.html#PUBLIC_NOTIFICATION_METHODS-constant" title="VectorMCP::Server::MessageHandling::PUBLIC_NOTIFICATION_METHODS (constant)">MessageHandling::PUBLIC_NOTIFICATION_METHODS</a></span>, <span class='object_link'><a href="Server/MessageHandling.html#PUBLIC_REQUEST_METHODS-constant" title="VectorMCP::Server::MessageHandling::PUBLIC_REQUEST_METHODS (constant)">MessageHandling::PUBLIC_REQUEST_METHODS</a></span></p>
+
 
   <h2>Instance Attribute Summary <small><a href="#" class="summary_toggle">collapse</a></small></h2>
   <ul class="summary">
@@ -1047,7 +1053,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
   
   
   <h3 class="inherited">Methods included from <span class='object_link'><a href="Server/Capabilities.html" title="VectorMCP::Server::Capabilities (module)">Capabilities</a></span></h3>
-  <p class="inherited"><span class='object_link'><a href="Server/Capabilities.html#clear_prompts_list_changed-instance_method" title="VectorMCP::Server::Capabilities#clear_prompts_list_changed (method)">#clear_prompts_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#clear_roots_list_changed-instance_method" title="VectorMCP::Server::Capabilities#clear_roots_list_changed (method)">#clear_roots_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#notify_prompts_list_changed-instance_method" title="VectorMCP::Server::Capabilities#notify_prompts_list_changed (method)">#notify_prompts_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#notify_roots_list_changed-instance_method" title="VectorMCP::Server::Capabilities#notify_roots_list_changed (method)">#notify_roots_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#sampling_config-instance_method" title="VectorMCP::Server::Capabilities#sampling_config (method)">#sampling_config</a></span>, <span class='object_link'><a href="Server/Capabilities.html#server_capabilities-instance_method" title="VectorMCP::Server::Capabilities#server_capabilities (method)">#server_capabilities</a></span>, <span class='object_link'><a href="Server/Capabilities.html#server_info-instance_method" title="VectorMCP::Server::Capabilities#server_info (method)">#server_info</a></span>, <span class='object_link'><a href="Server/Capabilities.html#subscribe_prompts-instance_method" title="VectorMCP::Server::Capabilities#subscribe_prompts (method)">#subscribe_prompts</a></span></p>
+  <p class="inherited"><span class='object_link'><a href="Server/Capabilities.html#clear_prompts_list_changed-instance_method" title="VectorMCP::Server::Capabilities#clear_prompts_list_changed (method)">#clear_prompts_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#clear_roots_list_changed-instance_method" title="VectorMCP::Server::Capabilities#clear_roots_list_changed (method)">#clear_roots_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#notify_prompts_list_changed-instance_method" title="VectorMCP::Server::Capabilities#notify_prompts_list_changed (method)">#notify_prompts_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#notify_roots_list_changed-instance_method" title="VectorMCP::Server::Capabilities#notify_roots_list_changed (method)">#notify_roots_list_changed</a></span>, <span class='object_link'><a href="Server/Capabilities.html#sampling_config-instance_method" title="VectorMCP::Server::Capabilities#sampling_config (method)">#sampling_config</a></span>, <span class='object_link'><a href="Server/Capabilities.html#server_capabilities-instance_method" title="VectorMCP::Server::Capabilities#server_capabilities (method)">#server_capabilities</a></span>, <span class='object_link'><a href="Server/Capabilities.html#server_info-instance_method" title="VectorMCP::Server::Capabilities#server_info (method)">#server_info</a></span></p>
 
   
   
@@ -1230,8 +1236,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 129
 130
 131
-132
-133</pre>
+132</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 97</span>
@@ -1254,7 +1259,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
   <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
   <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
   <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-  <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
   <span class='comment'># Configure sampling capabilities
@@ -1735,8 +1739,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -1794,7 +1797,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -2440,8 +2442,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -2499,7 +2500,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -3187,8 +3187,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -3246,7 +3245,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -3934,8 +3932,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -3993,7 +3990,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -4639,8 +4635,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -4698,7 +4693,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -5344,8 +5338,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -5403,7 +5396,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -6049,8 +6041,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -6108,7 +6099,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -6796,8 +6786,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -6855,7 +6844,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -7501,8 +7489,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -7560,7 +7547,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -8206,8 +8192,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386
-387</pre>
+386</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
@@ -8265,7 +8250,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@notification_handlers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@in_flight_requests</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
     <span class='ivar'>@prompts_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
-    <span class='ivar'>@prompt_subscribers</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
     <span class='ivar'>@roots_list_changed</span> <span class='op'>=</span> <span class='kw'>false</span>
 
     <span class='comment'># Configure sampling capabilities
@@ -8594,12 +8578,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+247
 248
-249
-250</pre>
+249</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 248</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 247</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_prompts'>authorize_prompts</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:prompt</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8653,12 +8637,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+240
 241
-242
-243</pre>
+242</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 241</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 240</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_resources'>authorize_resources</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:resource</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8712,12 +8696,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+254
 255
-256
-257</pre>
+256</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 255</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 254</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_roots'>authorize_roots</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:root</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8771,12 +8755,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+233
 234
-235
-236</pre>
+235</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 234</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 233</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_tools'>authorize_tools</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:tool</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8811,13 +8795,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+305
 306
 307
-308
-309</pre>
+308</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 306</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 305</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_clear_middleware!'>clear_middleware!</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_clear!'>clear!</span>
@@ -8853,14 +8837,14 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+208
 209
 210
 211
-212
-213</pre>
+212</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 209</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 208</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
   <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
@@ -8897,13 +8881,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
+225
 226
 227
-228
-229</pre>
+228</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 226</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 225</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_disable_authorization!'>disable_authorization!</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
@@ -9005,16 +8989,16 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
+198
 199
 200
 201
 202
 203
-204
-205</pre>
+204</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 199</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 198</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -9072,14 +9056,14 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
+217
 218
 219
 220
-221
-222</pre>
+221</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 218</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 217</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_enable_authorization!'>enable_authorization!</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span>
@@ -9133,12 +9117,12 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
+300
 301
-302
-303</pre>
+302</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 301</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 300</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_middleware_stats'>middleware_stats</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_stats'>stats</span>
@@ -9218,15 +9202,15 @@ The returned object responds to <code>#call(env)</code> and can be mounted direc
       <pre class="lines">
 
 
+179
 180
 181
 182
 183
-184
-185</pre>
+184</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 180</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 179</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_rack_app'>rack_app</span><span class='lparen'>(</span><span class='op'>**</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_require_relative'>require_relative</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>transport/http_stream</span><span class='tstring_end'>&quot;</span></span>
@@ -9283,13 +9267,13 @@ The returned object responds to <code>#call(env)</code> and can be mounted direc
       <pre class="lines">
 
 
+293
 294
 295
-296
-297</pre>
+296</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 294</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 293</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_middleware'>remove_middleware</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='rparen'>)</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_unregister'>unregister</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='rparen'>)</span>
@@ -9381,6 +9365,7 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
+145
 146
 147
 148
@@ -9399,11 +9384,10 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
 161
 162
 163
-164
-165</pre>
+164</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 146</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 145</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span><span class='lparen'>(</span><span class='label'>transport:</span> <span class='symbol'>:http_stream</span><span class='comma'>,</span> <span class='op'>**</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_active_transport'>active_transport</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_transport'>transport</span>
@@ -9472,12 +9456,12 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
+260
 261
-262
-263</pre>
+262</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 261</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 260</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
   <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
@@ -9529,12 +9513,12 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
+266
 267
-268
-269</pre>
+268</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 267</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 266</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_status'>security_status</span>
   <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_security_status'>security_status</span>
@@ -9722,13 +9706,13 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
+286
 287
 288
-289
-290</pre>
+289</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 287</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 286</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_use_middleware'>use_middleware</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='comma'>,</span> <span class='id identifier rubyid_hooks'>hooks</span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Hook.html" title="VectorMCP::Middleware::Hook (class)">Hook</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Hook.html#DEFAULT_PRIORITY-constant" title="VectorMCP::Middleware::Hook::DEFAULT_PRIORITY (constant)">DEFAULT_PRIORITY</a></span></span><span class='comma'>,</span> <span class='label'>conditions:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='comma'>,</span> <span class='id identifier rubyid_hooks'>hooks</span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='id identifier rubyid_priority'>priority</span><span class='comma'>,</span> <span class='label'>conditions:</span> <span class='id identifier rubyid_conditions'>conditions</span><span class='rparen'>)</span>
@@ -9744,9 +9728,9 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:09 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>

@@ -359,7 +359,7 @@ module VectorMCP
       # Validates origin and dispatches to the appropriate handler by HTTP method.
       def validate_and_dispatch(method, env)
         return forbidden_response("Origin not allowed") unless valid_origin?(env)
-        return unauthorized_oauth_response(env) if oauth_gate_should_reject?(env)
+        return unauthorized_transport_response(env) if transport_gate_should_reject?(env, method)
 
         case method
         when "POST"
@@ -373,14 +373,16 @@ module VectorMCP
         end
       end
 
-      # True when OAuth 2.1 resource server mode is enabled and the incoming
-      # request has not successfully authenticated. Opt-in: only activates when the
-      # server was configured with a +resource_metadata_url+ via +enable_authentication!+.
+      # OAuth resource-server mode authenticates every MCP transport request.
+      # Other authentication modes authenticate GET/DELETE here because those
+      # operations do not pass through the JSON-RPC message dispatcher.
       #
       # @param env [Hash] The Rack environment
+      # @param method [String] The HTTP method
       # @return [Boolean]
-      def oauth_gate_should_reject?(env)
-        return false unless oauth_resource_server_enabled?
+      def transport_gate_should_reject?(env, method)
+        return false unless @server.auth_manager.required?
+        return false unless oauth_resource_server_enabled? || %w[GET DELETE].include?(method)
 
         !authenticate_transport_request(env).authenticated?
       end
@@ -435,6 +437,24 @@ module VectorMCP
         [401,
          { "Content-Type" => "application/json", "WWW-Authenticate" => header_value },
          [body]]
+      end
+
+      # Returns a plain HTTP authentication challenge for non-OAuth API-key/JWT
+      # deployments. OAuth mode uses its RFC 9728 discovery response instead.
+      def unauthorized_transport_response(env)
+        return unauthorized_oauth_response(env) if oauth_resource_server_enabled?
+
+        VectorMCP.logger_for("security").info do
+          "HTTP transport 401 issued for #{env["REQUEST_METHOD"]} #{env["PATH_INFO"]}"
+        end
+
+        body = {
+          jsonrpc: "2.0",
+          id: nil,
+          error: { code: -32_401, message: "Authentication required" }
+        }.to_json
+
+        [401, { "Content-Type" => "application/json" }, [body]]
       end
 
       # Handles POST requests (client-to-server JSON-RPC)

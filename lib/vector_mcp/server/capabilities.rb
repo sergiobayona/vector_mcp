@@ -54,13 +54,6 @@ module VectorMCP
         send_list_changed_notification("roots") if @roots_list_changed
       end
 
-      # Registers a session as a subscriber to prompt list changes.
-      # @api private
-      def subscribe_prompts(session)
-        @prompt_subscribers << session unless @prompt_subscribers.include?(session)
-        # Session subscribed to prompt list changes
-      end
-
       private
 
       # Sends a `notifications/<kind>/list_changed` notification to the transport.

@@ -212,7 +212,7 @@ All public methods are designed to be called by the server&#39;s message dispatc
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#list_prompts-class_method" title="list_prompts (class method)">.<strong>list_prompts</strong>(_params, _session, server)  &#x21d2; Hash </a>
+      <a href="#list_prompts-class_method" title="list_prompts (class method)">.<strong>list_prompts</strong>(_params, session, server)  &#x21d2; Hash </a>
     
 
     
@@ -235,7 +235,7 @@ All public methods are designed to be called by the server&#39;s message dispatc
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#list_resources-class_method" title="list_resources (class method)">.<strong>list_resources</strong>(_params, _session, server)  &#x21d2; Hash </a>
+      <a href="#list_resources-class_method" title="list_resources (class method)">.<strong>list_resources</strong>(_params, session, server)  &#x21d2; Hash </a>
     
 
     
@@ -258,7 +258,7 @@ All public methods are designed to be called by the server&#39;s message dispatc
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#list_roots-class_method" title="list_roots (class method)">.<strong>list_roots</strong>(_params, _session, server)  &#x21d2; Hash </a>
+      <a href="#list_roots-class_method" title="list_roots (class method)">.<strong>list_roots</strong>(_params, session, server)  &#x21d2; Hash </a>
     
 
     
@@ -281,7 +281,7 @@ All public methods are designed to be called by the server&#39;s message dispatc
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#list_tools-class_method" title="list_tools (class method)">.<strong>list_tools</strong>(_params, _session, server)  &#x21d2; Hash </a>
+      <a href="#list_tools-class_method" title="list_tools (class method)">.<strong>list_tools</strong>(_params, session, server)  &#x21d2; Hash </a>
     
 
     
@@ -342,29 +342,6 @@ All public methods are designed to be called by the server&#39;s message dispatc
 
   
     <span class="summary_desc"><div class='inline'><p>Handles the <code>resources/read</code> request.</p>
-</div></span>
-  
-</li>
-
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
-      <a href="#subscribe_prompts-class_method" title="subscribe_prompts (class method)">.<strong>subscribe_prompts</strong>(_params, session, server)  &#x21d2; Hash </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'><p>Handles the <code>prompts/subscribe</code> request (placeholder).</p>
 </div></span>
   
 </li>
@@ -528,10 +505,6 @@ Example success: <code>{ isError: false, content: [{ type: &quot;text&quot;, ...
       <pre class="lines">
 
 
-53
-54
-55
-56
 57
 58
 59
@@ -552,10 +525,14 @@ Example success: <code>{ isError: false, content: [{ type: &quot;text&quot;, ...
 74
 75
 76
-77</pre>
+77
+78
+79
+80
+81</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 53</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 57</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_call_tool'>call_tool</span><span class='lparen'>(</span><span class='id identifier rubyid_params'>params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tool_name'>tool_name</span> <span class='op'>=</span> <span class='id identifier rubyid_params'>params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>name</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -661,15 +638,15 @@ Example success: <code>{ isError: false, content: [{ type: &quot;text&quot;, ...
       <pre class="lines">
 
 
-253
-254
-255
-256
-257
-258</pre>
+231
+232
+233
+234
+235
+236</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 253</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 231</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_cancel_request_notification'>cancel_request_notification</span><span class='lparen'>(</span><span class='id identifier rubyid_params'>params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_id'>request_id</span> <span class='op'>=</span> <span class='id identifier rubyid_params'>params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>id</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -721,7 +698,7 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
   
     <li>
       
-        <span class='name'>_session</span>
+        <span class='name'>session</span>
       
       
         <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
@@ -729,7 +706,7 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
       
       
         &mdash;
-        <div class='inline'><p>The current session (ignored).</p>
+        <div class='inline'><p>The current session.</p>
 </div>
       
     </li>
@@ -843,29 +820,7 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
 208
 209
 210
-211
-212
-213
-214
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228
-229
-230
-231
-232
-233</pre>
+211</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 186</span>
@@ -883,30 +838,8 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
     <span class='label'>metadata:</span> <span class='lbrace'>{</span> <span class='label'>start_time:</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_now'>now</span> <span class='rbrace'>}</span>
   <span class='rparen'>)</span>
 
-  <span class='comment'># Execute before_prompt_get hooks
-</span>  <span class='id identifier rubyid_context'>context</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_middleware_manager'>middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_execute_hooks'>execute_hooks</span><span class='lparen'>(</span><span class='symbol'>:before_prompt_get</span><span class='comma'>,</span> <span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='id identifier rubyid_handle_middleware_error'>handle_middleware_error</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_error?'>error?</span>
-
   <span class='kw'>begin</span>
-    <span class='id identifier rubyid_context_params'>context_params</span> <span class='op'>=</span> <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_params'>params</span>
-    <span class='id identifier rubyid_prompt_name'>prompt_name</span> <span class='op'>=</span> <span class='id identifier rubyid_context_params'>context_params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>name</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_prompt_name'>prompt_name</span>
-    <span class='id identifier rubyid_prompt'>prompt</span> <span class='op'>=</span> <span class='id identifier rubyid_fetch_prompt'>fetch_prompt</span><span class='lparen'>(</span><span class='id identifier rubyid_prompt_name'>prompt_name</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
-
-    <span class='id identifier rubyid_arguments'>arguments</span> <span class='op'>=</span> <span class='id identifier rubyid_context_params'>context_params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>arguments</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
-    <span class='id identifier rubyid_validate_prompt_arguments!'>validate_prompt_arguments!</span><span class='lparen'>(</span><span class='id identifier rubyid_prompt_name'>prompt_name</span><span class='comma'>,</span> <span class='id identifier rubyid_prompt'>prompt</span><span class='comma'>,</span> <span class='id identifier rubyid_arguments'>arguments</span><span class='rparen'>)</span>
-
-    <span class='comment'># Call the registered handler after arguments were validated
-</span>    <span class='id identifier rubyid_result_data'>result_data</span> <span class='op'>=</span> <span class='id identifier rubyid_prompt'>prompt</span><span class='period'>.</span><span class='id identifier rubyid_handler'>handler</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_arguments'>arguments</span><span class='rparen'>)</span>
-
-    <span class='id identifier rubyid_validate_prompt_response!'>validate_prompt_response!</span><span class='lparen'>(</span><span class='id identifier rubyid_prompt_name'>prompt_name</span><span class='comma'>,</span> <span class='id identifier rubyid_result_data'>result_data</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
-
-    <span class='comment'># Set result in context
-</span>    <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_result'>result</span> <span class='op'>=</span> <span class='id identifier rubyid_result_data'>result_data</span>
-
-    <span class='comment'># Execute after_prompt_get hooks
-</span>    <span class='id identifier rubyid_context'>context</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_middleware_manager'>middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_execute_hooks'>execute_hooks</span><span class='lparen'>(</span><span class='symbol'>:after_prompt_get</span><span class='comma'>,</span> <span class='id identifier rubyid_context'>context</span><span class='rparen'>)</span>
-
-    <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_result'>result</span>
+    <span class='id identifier rubyid_execute_prompt_request'>execute_prompt_request</span><span class='lparen'>(</span><span class='id identifier rubyid_context'>context</span><span class='comma'>,</span> <span class='id identifier rubyid_prompt_name'>prompt_name</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
   <span class='kw'>rescue</span> <span class='const'>StandardError</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_e'>e</span>
     <span class='comment'># Set error in context and execute error hooks
 </span>    <span class='id identifier rubyid_context'>context</span><span class='period'>.</span><span class='id identifier rubyid_error'>error</span> <span class='op'>=</span> <span class='id identifier rubyid_e'>e</span>
@@ -997,12 +930,12 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
       <pre class="lines">
 
 
-243
-244
-245</pre>
+221
+222
+223</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 243</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 221</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_initialized_notification'>initialized_notification</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_logger'>logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Session initialized</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -1015,7 +948,7 @@ Expected keys: &quot;name&quot; (String), &quot;arguments&quot; (Hash, optional)
       <div class="method_details ">
   <h3 class="signature " id="list_prompts-class_method">
   
-    .<strong>list_prompts</strong>(_params, _session, server)  &#x21d2; <tt>Hash</tt> 
+    .<strong>list_prompts</strong>(_params, session, server)  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -1050,7 +983,7 @@ If the server supports dynamic prompt lists, this clears the <code>listChanged</
   
     <li>
       
-        <span class='name'>_session</span>
+        <span class='name'>session</span>
       
       
         <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
@@ -1058,7 +991,7 @@ If the server supports dynamic prompt lists, this clears the <code>listChanged</
       
       
         &mdash;
-        <div class='inline'><p>The current session (ignored).</p>
+        <div class='inline'><p>The current session.</p>
 </div>
       
     </li>
@@ -1105,22 +1038,28 @@ Example: <code>{ prompts: [ { name: &quot;my_prompt&quot;, ... } ] }</code></p>
       <pre class="lines">
 
 
-136
-137
-138
-139
-140
-141
-142
-143</pre>
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 136</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 143</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_prompts'>list_prompts</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_prompts'>list_prompts</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='id identifier rubyid_authenticate_request!'>authenticate_request!</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='label'>operation_type:</span> <span class='symbol'>:prompt_list</span><span class='comma'>,</span> <span class='label'>operation_name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>prompts/list</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_prompts'>prompts</span> <span class='op'>=</span> <span class='id identifier rubyid_filter_authorized_items'>filter_authorized_items</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_prompts'>prompts</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='comma'>,</span> <span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+
   <span class='comment'># Once the list is supplied, clear the listChanged flag
 </span>  <span class='id identifier rubyid_result'>result</span> <span class='op'>=</span> <span class='lbrace'>{</span>
-    <span class='label'>prompts:</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_prompts'>prompts</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
+    <span class='label'>prompts:</span> <span class='id identifier rubyid_prompts'>prompts</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
   <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_clear_prompts_list_changed'>clear_prompts_list_changed</span> <span class='kw'>if</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:clear_prompts_list_changed</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_result'>result</span>
@@ -1133,7 +1072,7 @@ Example: <code>{ prompts: [ { name: &quot;my_prompt&quot;, ... } ] }</code></p>
       <div class="method_details ">
   <h3 class="signature " id="list_resources-class_method">
   
-    .<strong>list_resources</strong>(_params, _session, server)  &#x21d2; <tt>Hash</tt> 
+    .<strong>list_resources</strong>(_params, session, server)  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -1167,7 +1106,7 @@ Example: <code>{ prompts: [ { name: &quot;my_prompt&quot;, ... } ] }</code></p>
   
     <li>
       
-        <span class='name'>_session</span>
+        <span class='name'>session</span>
       
       
         <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
@@ -1175,7 +1114,7 @@ Example: <code>{ prompts: [ { name: &quot;my_prompt&quot;, ... } ] }</code></p>
       
       
         &mdash;
-        <div class='inline'><p>The current session (ignored).</p>
+        <div class='inline'><p>The current session.</p>
 </div>
       
     </li>
@@ -1222,18 +1161,24 @@ Example: <code>{ resources: [ { uri: &quot;memory://data&quot;, name: &quot;My D
       <pre class="lines">
 
 
-86
-87
-88
-89
-90</pre>
+90
+91
+92
+93
+94
+95
+96
+97</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 86</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 90</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_resources'>list_resources</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_resources'>list_resources</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='id identifier rubyid_authenticate_request!'>authenticate_request!</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='label'>operation_type:</span> <span class='symbol'>:resource_list</span><span class='comma'>,</span> <span class='label'>operation_name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>resources/list</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_resources'>resources</span> <span class='op'>=</span> <span class='id identifier rubyid_filter_authorized_items'>filter_authorized_items</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_resources'>resources</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='comma'>,</span> <span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+
   <span class='lbrace'>{</span>
-    <span class='label'>resources:</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_resources'>resources</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
+    <span class='label'>resources:</span> <span class='id identifier rubyid_resources'>resources</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1244,7 +1189,7 @@ Example: <code>{ resources: [ { uri: &quot;memory://data&quot;, name: &quot;My D
       <div class="method_details ">
   <h3 class="signature " id="list_roots-class_method">
   
-    .<strong>list_roots</strong>(_params, _session, server)  &#x21d2; <tt>Hash</tt> 
+    .<strong>list_roots</strong>(_params, session, server)  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -1279,7 +1224,7 @@ Returns the list of available roots and clears the <code>listChanged</code> flag
   
     <li>
       
-        <span class='name'>_session</span>
+        <span class='name'>session</span>
       
       
         <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
@@ -1287,7 +1232,7 @@ Returns the list of available roots and clears the <code>listChanged</code> flag
       
       
         &mdash;
-        <div class='inline'><p>The current session (ignored).</p>
+        <div class='inline'><p>The current session.</p>
 </div>
       
     </li>
@@ -1334,22 +1279,28 @@ Example: <code>{ roots: [ { uri: &quot;file:///path/to/dir&quot;, name: &quot;My
       <pre class="lines">
 
 
-153
-154
-155
-156
-157
-158
-159
-160</pre>
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 153</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 163</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_roots'>list_roots</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_roots'>list_roots</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='id identifier rubyid_authenticate_request!'>authenticate_request!</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='label'>operation_type:</span> <span class='symbol'>:root_list</span><span class='comma'>,</span> <span class='label'>operation_name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>roots/list</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_roots'>roots</span> <span class='op'>=</span> <span class='id identifier rubyid_filter_authorized_items'>filter_authorized_items</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_roots'>roots</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='comma'>,</span> <span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+
   <span class='comment'># Once the list is supplied, clear the listChanged flag
 </span>  <span class='id identifier rubyid_result'>result</span> <span class='op'>=</span> <span class='lbrace'>{</span>
-    <span class='label'>roots:</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_roots'>roots</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
+    <span class='label'>roots:</span> <span class='id identifier rubyid_roots'>roots</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
   <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_clear_roots_list_changed'>clear_roots_list_changed</span> <span class='kw'>if</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:clear_roots_list_changed</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_result'>result</span>
@@ -1362,7 +1313,7 @@ Example: <code>{ roots: [ { uri: &quot;file:///path/to/dir&quot;, name: &quot;My
       <div class="method_details ">
   <h3 class="signature " id="list_tools-class_method">
   
-    .<strong>list_tools</strong>(_params, _session, server)  &#x21d2; <tt>Hash</tt> 
+    .<strong>list_tools</strong>(_params, session, server)  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -1396,7 +1347,7 @@ Example: <code>{ roots: [ { uri: &quot;file:///path/to/dir&quot;, name: &quot;My
   
     <li>
       
-        <span class='name'>_session</span>
+        <span class='name'>session</span>
       
       
         <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
@@ -1404,7 +1355,7 @@ Example: <code>{ roots: [ { uri: &quot;file:///path/to/dir&quot;, name: &quot;My
       
       
         &mdash;
-        <div class='inline'><p>The current session (ignored).</p>
+        <div class='inline'><p>The current session.</p>
 </div>
       
     </li>
@@ -1451,18 +1402,24 @@ Example: <code>{ tools: [ { name: &quot;my_tool&quot;, ... } ] }</code></p>
       <pre class="lines">
 
 
-35
 36
 37
 38
-39</pre>
+39
+40
+41
+42
+43</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 35</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 36</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_tools'>list_tools</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_list_tools'>list_tools</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='id identifier rubyid_authenticate_request!'>authenticate_request!</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='comma'>,</span> <span class='label'>operation_type:</span> <span class='symbol'>:tool_list</span><span class='comma'>,</span> <span class='label'>operation_name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tools/list</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_tools'>tools</span> <span class='op'>=</span> <span class='id identifier rubyid_filter_authorized_items'>filter_authorized_items</span><span class='lparen'>(</span><span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_tools'>tools</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='comma'>,</span> <span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
+
   <span class='lbrace'>{</span>
-    <span class='label'>tools:</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_tools'>tools</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
+    <span class='label'>tools:</span> <span class='id identifier rubyid_tools'>tools</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:as_mcp_definition</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1561,12 +1518,12 @@ Example: <code>{ tools: [ { name: &quot;my_tool&quot;, ... } ] }</code></p>
       <pre class="lines">
 
 
-24
 25
-26</pre>
+26
+27</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 24</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 25</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_ping'>ping</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid__session'>_session</span><span class='comma'>,</span> <span class='id identifier rubyid__server'>_server</span><span class='rparen'>)</span>
   <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -1712,13 +1669,6 @@ Example: <code>{ contents: [{ type: &quot;text&quot;, text: &quot;...&quot;, uri
       <pre class="lines">
 
 
-103
-104
-105
-106
-107
-108
-109
 110
 111
 112
@@ -1735,10 +1685,17 @@ Example: <code>{ contents: [{ type: &quot;text&quot;, text: &quot;...&quot;, uri
 123
 124
 125
-126</pre>
+126
+127
+128
+129
+130
+131
+132
+133</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 103</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 110</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_read_resource'>read_resource</span><span class='lparen'>(</span><span class='id identifier rubyid_params'>params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_uri_s'>uri_s</span> <span class='op'>=</span> <span class='id identifier rubyid_params'>params</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>uri</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -1769,125 +1726,14 @@ Example: <code>{ contents: [{ type: &quot;text&quot;, text: &quot;...&quot;, uri
 </table>
 </div>
     
-      <div class="method_details ">
-  <h3 class="signature " id="subscribe_prompts-class_method">
-  
-    .<strong>subscribe_prompts</strong>(_params, session, server)  &#x21d2; <tt>Hash</tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <p>Handles the <code>prompts/subscribe</code> request (placeholder).
-This implementation is a simple acknowledgement.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  <p class="tag_title">Parameters:</p>
-<ul class="param">
-  
-    <li>
-      
-        <span class='name'>_params</span>
-      
-      
-        <span class='type'>(<tt>Hash</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The request parameters (ignored).</p>
-</div>
-      
-    </li>
-  
-    <li>
-      
-        <span class='name'>session</span>
-      
-      
-        <span class='type'>(<tt><span class='object_link'><a href="../Session.html" title="VectorMCP::Session (class)">VectorMCP::Session</a></span></tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The current session.</p>
-</div>
-      
-    </li>
-  
-    <li>
-      
-        <span class='name'>server</span>
-      
-      
-        <span class='type'>(<tt><span class='object_link'><a href="../Server.html" title="VectorMCP::Server (class)">VectorMCP::Server</a></span></tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>The server instance.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>Hash</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>An empty hash.</p>
-</div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-169
-170
-171
-172
-173</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/handlers/core.rb', line 169</span>
-
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_subscribe_prompts'>subscribe_prompts</span><span class='lparen'>(</span><span class='id identifier rubyid__params'>_params</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='comma'>,</span> <span class='id identifier rubyid_server'>server</span><span class='rparen'>)</span>
-  <span class='comment'># Use private helper via send to avoid making it public
-</span>  <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_send'>send</span><span class='lparen'>(</span><span class='symbol'>:subscribe_prompts</span><span class='comma'>,</span> <span class='id identifier rubyid_session'>session</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:send</span><span class='rparen'>)</span>
-  <span class='lbrace'>{</span><span class='rbrace'>}</span>
-<span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
   </div>
 
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:08 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>

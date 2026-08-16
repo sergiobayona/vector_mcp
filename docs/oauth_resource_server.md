@@ -101,9 +101,9 @@ aren't doing OAuth) fully unaffected.
   your laptop. Use a public hostname or a tunnel (e.g. ngrok) for end-to-end
   testing.
 - **Double authentication for authenticated requests.** The transport gate
-  runs the authentication strategy, and the existing per-operation checks in
-  `VectorMCP::Handlers::Core` (e.g. `authenticate_session!` on `tools/call`)
-  run it again. For API keys and JWTs this is negligible. If your strategy
+  runs the authentication strategy, and the shared message dispatcher runs it
+  again before invoking the registered request/notification handler. For API
+  keys and JWTs this is negligible. If your strategy
   makes a network call on each authentication, consider caching within the
   strategy itself.
 
@@ -116,12 +116,13 @@ pipeline — it sits in front of it:
 2. **OAuth gate** (new) — if `oauth_resource_server_enabled?` and the request
    is unauthenticated, return `401` + `WWW-Authenticate` immediately.
 3. **Method dispatch** — `POST`, `GET`, `DELETE` handlers run normally.
-4. **Handler-layer authorization** — `VectorMCP::Handlers::Core#call_tool`,
-   `#read_resource`, etc. continue to call `authenticate_session!` and
-   `authorize_action!`. These checks are unchanged, so your existing
-   authorization policies continue to work.
+4. **Shared message authentication** — all registered request and notification
+   handlers are authenticated before invocation. Core handlers then apply their
+   resource-specific authorization policies.
 
-If `resource_metadata_url` is not set, step 2 is skipped entirely.
+If `resource_metadata_url` is not set, step 2 is skipped for POST requests;
+the dispatcher still authenticates protected JSON-RPC methods, and the transport
+authenticates GET/DELETE operations.
 
 ## Logging
 

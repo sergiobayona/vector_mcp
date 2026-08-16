@@ -584,14 +584,4 @@ RSpec.describe VectorMCP::Handlers::Core do
       end
     end
   end
-
-  describe ".subscribe_prompts" do
-    it "adds session as subscriber without error" do
-      server_double = VectorMCP::Server.new(name: "s", version: "1")
-      session_double = VectorMCP::Session.new(server_double)
-      expect do
-        described_class.subscribe_prompts({}, session_double, server_double)
-      end.not_to raise_error
-    end
-  end
 end

@@ -274,29 +274,6 @@
 </li>
 
       
-        <li class="public ">
-  <span class="summary_signature">
-    
-      <a href="#subscribe_prompts-instance_method" title="#subscribe_prompts (instance method)">#<strong>subscribe_prompts</strong>(session)  &#x21d2; Object </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  <span class="private note title">private</span>
-
-  
-    <span class="summary_desc"><div class='inline'><p>Registers a session as a subscriber to prompt list changes.</p>
-</div></span>
-  
-</li>
-
-      
     </ul>
   
 
@@ -649,60 +626,14 @@
 </table>
 </div>
     
-      <div class="method_details ">
-  <h3 class="signature " id="subscribe_prompts-instance_method">
-  
-    #<strong>subscribe_prompts</strong>(session)  &#x21d2; <tt>Object</tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <p class="note private">
-  <strong>This method is part of a private API.</strong>
-  You should avoid using this method if possible, as it may be removed or be changed in the future.
-</p>
-<p>Registers a session as a subscriber to prompt list changes.</p>
-
-
-  </div>
-</div>
-<div class="tags">
-  
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-59
-60
-61
-62</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server/capabilities.rb', line 59</span>
-
-<span class='kw'>def</span> <span class='id identifier rubyid_subscribe_prompts'>subscribe_prompts</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='rparen'>)</span>
-  <span class='ivar'>@prompt_subscribers</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_session'>session</span> <span class='kw'>unless</span> <span class='ivar'>@prompt_subscribers</span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_session'>session</span><span class='rparen'>)</span>
-  <span class='comment'># Session subscribed to prompt list changes
-</span><span class='kw'>end</span></pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
   </div>
 
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 10:47:16 2026 by
+  Generated on Sat Aug 15 21:27:08 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.38 (ruby-3.3.8).
+  0.9.38 (ruby-3.4.8).
 </div>
 
     </div>
