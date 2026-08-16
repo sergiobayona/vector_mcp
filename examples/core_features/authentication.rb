@@ -24,9 +24,13 @@ end
 
 # Enable authentication with API keys
 puts "🔐 Enabling authentication..."
+admin_api_key = ENV.fetch("MCP_ADMIN_API_KEY")
+user_api_key = ENV.fetch("MCP_USER_API_KEY")
+demo_api_key = ENV.fetch("MCP_DEMO_API_KEY")
 server.enable_authentication!(
   strategy: :api_key,
-  keys: %w[admin-secret-key user-read-key demo-key-123]
+  keys: [admin_api_key, user_api_key, demo_api_key],
+  rate_limit: { max_attempts: 10, window_seconds: 60 }
 )
 
 # Register protected tools (require authentication)
@@ -53,7 +57,7 @@ server.enable_authorization! do
       true # Public tools are always accessible
     when "admin_tool"
       # Only admin API key can use admin tools
-      user&.dig(:api_key) == "admin-secret-key"
+      user&.dig(:api_key) == admin_api_key
     else
       # Default: require authentication for secure_data and other tools
       user.present?
@@ -98,8 +102,8 @@ puts "\n🚀 Starting server..."
 puts "\nUsage Examples:"
 puts "  Public tool (no auth): echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\"," \
      "\"params\":{\"name\":\"public_info\",\"arguments\":{\"topic\":\"weather\"}}}'"
-puts "  Secure tool (needs auth): Add header 'X-API-Key: demo-key-123'"
-puts "  Admin tool (admin only): Add header 'X-API-Key: admin-secret-key'"
+puts "  Secure tool: use the MCP_DEMO_API_KEY value in the X-API-Key header"
+puts "  Admin tool: use the MCP_ADMIN_API_KEY value in the X-API-Key header"
 puts "\nPress Ctrl+C to stop"
 
 # Run the server

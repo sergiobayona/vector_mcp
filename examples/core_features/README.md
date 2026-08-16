@@ -57,7 +57,10 @@ register_tool(
 
 ```bash
 # API Key authentication
-API_KEY=your-secret-key ruby examples/core_features/authentication.rb
+MCP_ADMIN_API_KEY="$(ruby -rsecurerandom -e 'puts SecureRandom.hex(32)')" \
+MCP_USER_API_KEY="$(ruby -rsecurerandom -e 'puts SecureRandom.hex(32)')" \
+MCP_DEMO_API_KEY="$(ruby -rsecurerandom -e 'puts SecureRandom.hex(32)')" \
+ruby examples/core_features/authentication.rb
 
 # JWT authentication  
 JWT_SECRET=your-jwt-secret ruby examples/core_features/authentication.rb jwt
@@ -76,10 +79,10 @@ ruby examples/core_features/authentication.rb custom
 **Authentication strategies:**
 ```ruby
 # API Key - Simple and effective
-server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")], rate_limit: true)
 
 # JWT - Stateless and scalable
-server.enable_authentication!(strategy: :jwt_token, secret: "jwt-secret")
+server.enable_authentication!(strategy: :jwt, secret: ENV.fetch("JWT_SECRET"), rate_limit: true)
 
 # Custom - Maximum flexibility
 server.enable_authentication!(strategy: :custom) do |request|
@@ -182,7 +185,7 @@ register_tool(name: "unsafe_tool") { |args| execute(args) }
 ### 2. Enable Authentication
 ```ruby
 # Choose appropriate strategy for your use case
-server.enable_authentication!(strategy: :api_key, keys: ["secure-key"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")], rate_limit: true)
 server.enable_authorization! do
   authorize_tools do |user, action, tool|
     user[:role] == "admin" || !tool.name.include?("admin")

@@ -148,6 +148,32 @@ Integrates with transport layers to provide security controls</p>
       <li class="public ">
   <span class="summary_signature">
     
+      <a href="#authentication_rate_limiter-instance_method" title="#authentication_rate_limiter (instance method)">#<strong>authentication_rate_limiter</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns the value of attribute authentication_rate_limiter.</p>
+</div></span>
+  
+</li>
+
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#authorization-instance_method" title="#authorization (instance method)">#<strong>authorization</strong>  &#x21d2; Object </a>
     
 
@@ -391,13 +417,13 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-13
 14
 15
-16</pre>
+16
+17</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 13</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 14</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_auth_manager'>auth_manager</span><span class='comma'>,</span> <span class='id identifier rubyid_authorization'>authorization</span><span class='rparen'>)</span>
   <span class='ivar'>@auth_manager</span> <span class='op'>=</span> <span class='id identifier rubyid_auth_manager'>auth_manager</span>
@@ -449,6 +475,48 @@ Integrates with transport layers to provide security controls</p>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_auth_manager'>auth_manager</span>
   <span class='ivar'>@auth_manager</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      
+      <span id="authentication_rate_limiter=-instance_method"></span>
+      <div class="method_details ">
+  <h3 class="signature " id="authentication_rate_limiter-instance_method">
+  
+    #<strong>authentication_rate_limiter</strong>  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns the value of attribute authentication_rate_limiter.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+9
+10
+11</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 9</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span>
+  <span class='ivar'>@authentication_rate_limiter</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -582,17 +650,27 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-22
 23
 24
-25</pre>
+25
+26
+27
+28
+29
+30
+31</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 22</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 23</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authenticate_request'>authenticate_request</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>strategy:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_request_context'>request_context</span> <span class='op'>=</span> <span class='id identifier rubyid_rate_limit_request_context'>rate_limit_request_context</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='rparen'>)</span>
+  <span class='ivar'>@authentication_rate_limiter</span><span class='op'>&amp;.</span><span class='id identifier rubyid_check!'>check!</span><span class='lparen'>(</span><span class='id identifier rubyid_request_context'>request_context</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_request_context'>request_context</span>
+
   <span class='id identifier rubyid_auth_result'>auth_result</span> <span class='op'>=</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_authenticate'>authenticate</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
-  <span class='const'><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_from_auth_result'><span class='object_link'><a href="SessionContext.html#from_auth_result-class_method" title="VectorMCP::Security::SessionContext.from_auth_result (method)">from_auth_result</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_auth_result'>auth_result</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="SessionContext.html" title="VectorMCP::Security::SessionContext (class)">SessionContext</a></span></span><span class='period'>.</span><span class='id identifier rubyid_from_auth_result'><span class='object_link'><a href="SessionContext.html#from_auth_result-class_method" title="VectorMCP::Security::SessionContext.from_auth_result (method)">from_auth_result</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_auth_result'>auth_result</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_update_rate_limit'>update_rate_limit</span><span class='lparen'>(</span><span class='id identifier rubyid_request_context'>request_context</span><span class='comma'>,</span> <span class='id identifier rubyid_session_context'>session_context</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_session_context'>session_context</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -690,16 +768,16 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-32
-33
-34
-35
-36
-37
-38</pre>
+38
+39
+40
+41
+42
+43
+44</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 32</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 38</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_action'>authorize_action</span><span class='lparen'>(</span><span class='id identifier rubyid_session_context'>session_context</span><span class='comma'>,</span> <span class='id identifier rubyid_action'>action</span><span class='comma'>,</span> <span class='id identifier rubyid_resource'>resource</span><span class='rparen'>)</span>
   <span class='comment'># Always allow if authorization is disabled
@@ -808,12 +886,6 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-45
-46
-47
-48
-49
-50
 51
 52
 53
@@ -837,10 +909,16 @@ Integrates with transport layers to provide security controls</p>
 71
 72
 73
-74</pre>
+74
+75
+76
+77
+78
+79
+80</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 45</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 51</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_process_request'>process_request</span><span class='lparen'>(</span><span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>action:</span> <span class='symbol'>:access</span><span class='comma'>,</span> <span class='label'>resource:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='comment'># Step 1: Authenticate the request
@@ -919,12 +997,12 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-78
-79
-80</pre>
+84
+85
+86</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 78</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 84</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
   <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span> <span class='op'>||</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span>
@@ -976,29 +1054,31 @@ Integrates with transport layers to provide security controls</p>
       <pre class="lines">
 
 
-84
-85
-86
-87
-88
-89
 90
 91
 92
 93
 94
 95
-96</pre>
+96
+97
+98
+99
+100
+101
+102
+103</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 84</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/security/middleware.rb', line 90</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_status'>security_status</span>
   <span class='lbrace'>{</span>
     <span class='label'>authentication:</span> <span class='lbrace'>{</span>
       <span class='label'>enabled:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span><span class='comma'>,</span>
       <span class='label'>strategies:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_available_strategies'>available_strategies</span><span class='comma'>,</span>
-      <span class='label'>default_strategy:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_default_strategy'>default_strategy</span>
+      <span class='label'>default_strategy:</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_default_strategy'>default_strategy</span><span class='comma'>,</span>
+      <span class='label'>rate_limit:</span> <span class='ivar'>@authentication_rate_limiter</span><span class='op'>&amp;.</span><span class='id identifier rubyid_status'>status</span> <span class='op'>||</span> <span class='lbrace'>{</span> <span class='label'>enabled:</span> <span class='kw'>false</span> <span class='rbrace'>}</span>
     <span class='rbrace'>}</span><span class='comma'>,</span>
     <span class='label'>authorization:</span> <span class='lbrace'>{</span>
       <span class='label'>enabled:</span> <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_required?'>required?</span><span class='comma'>,</span>
@@ -1016,7 +1096,7 @@ Integrates with transport layers to provide security controls</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 21:27:09 2026 by
+  Generated on Sun Aug 16 09:33:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.4.8).
 </div>

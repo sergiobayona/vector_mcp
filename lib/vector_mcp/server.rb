@@ -11,6 +11,7 @@ require_relative "server/registry"
 require_relative "server/capabilities"
 require_relative "server/message_handling"
 require_relative "security/auth_manager"
+require_relative "security/authentication_rate_limiter"
 require_relative "security/authorization"
 require_relative "security/middleware"
 require_relative "security/session_context"
@@ -72,7 +73,8 @@ module VectorMCP
     SUPPORTED_PROTOCOL_VERSIONS = %w[2025-11-25 2025-03-26 2024-11-05].freeze
 
     attr_reader :logger, :name, :version, :protocol_version, :tools, :resources, :prompts, :roots, :in_flight_requests,
-                :auth_manager, :authorization, :security_middleware, :middleware_manager, :oauth_resource_metadata_url
+                :auth_manager, :authorization, :security_middleware, :middleware_manager, :oauth_resource_metadata_url,
+                :authentication_rate_limiter
     attr_accessor :transport
 
     # Initializes a new VectorMCP server.
@@ -122,6 +124,7 @@ module VectorMCP
       @authorization = Security::Authorization.new
       @security_middleware = Security::Middleware.new(@auth_manager, @authorization)
       @oauth_resource_metadata_url = nil
+      @authentication_rate_limiter = nil
 
       # Initialize middleware manager
       @middleware_manager = Middleware::Manager.new
@@ -194,10 +197,13 @@ module VectorMCP
     #   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
     #   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
     #   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+    # @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+    #   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
     # @return [void]
     def enable_authentication!(strategy: :api_key, **options, &block)
       clear_auth_strategies unless @auth_manager.strategies.empty?
       extract_oauth_metadata!(options)
+      configure_authentication_rate_limit!(options.delete(:rate_limit))
       @auth_manager.enable!(default_strategy: strategy)
       register_auth_strategy(strategy, options, block || options.delete(:handler))
       @logger.info("Authentication enabled with strategy: #{strategy}")
@@ -208,6 +214,7 @@ module VectorMCP
     def disable_authentication!
       @auth_manager.disable!
       @oauth_resource_metadata_url = nil
+      configure_authentication_rate_limit!(nil)
       @logger.info("Authentication disabled")
     end
 
@@ -315,6 +322,23 @@ module VectorMCP
     def extract_oauth_metadata!(options)
       @oauth_resource_metadata_url = options.delete(:resource_metadata_url)
       warn_on_insecure_oauth_metadata_url(@oauth_resource_metadata_url)
+    end
+
+    # Configure the optional in-process authentication failure limiter.
+    # @param configuration [Hash, true, false, nil] limiter configuration
+    # @return [void]
+    def configure_authentication_rate_limit!(configuration)
+      @authentication_rate_limiter = case configuration
+                                     when true
+                                       Security::AuthenticationRateLimiter.new
+                                     when Hash
+                                       Security::AuthenticationRateLimiter.new(**configuration)
+                                     when false, nil
+                                       nil
+                                     else
+                                       raise ArgumentError, "rate_limit must be true, false, nil, or a Hash"
+                                     end
+      @security_middleware.authentication_rate_limiter = @authentication_rate_limiter
     end
 
     # Register the appropriate auth strategy based on the strategy name

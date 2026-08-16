@@ -7,6 +7,7 @@
 * HTTP Stream POST bodies are capped at 16 MiB by default, with a configurable `max_body_bytes:` limit and `413 Payload Too Large` responses.
 * Authentication is enforced at the shared dispatcher for every registered request and notification handler except the explicit public handshake methods (`initialize`, `ping`, and `initialized`). HTTP GET/DELETE operations also require credentials outside OAuth resource-server mode.
 * The unsupported `prompts/subscribe` placeholder and its unbounded retained-session array were removed.
+* Authentication can now enable a bounded, thread-safe failure limiter with `rate_limit:`. It tracks client IPs and credential fingerprints, emits structured security events, resets matching counters after success, and returns `429`/`Retry-After` after repeated failures.
 
 ## [0.7.0] – 2026-08-15
 

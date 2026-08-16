@@ -11,7 +11,11 @@ server = VectorMCP::Server.new("security-demo", version: "1.0.0")
 security_logger = VectorMCP.logger_for("security")
 
 # Enable authentication with logging
-server.enable_authentication!(strategy: :api_key, keys: %w[admin-key user-key])
+server.enable_authentication!(
+  strategy: :api_key,
+  keys: [ENV.fetch("MCP_ADMIN_API_KEY"), ENV.fetch("MCP_USER_API_KEY")],
+  rate_limit: true
+)
 
 # Log authentication attempts
 puts "Simulating authentication events:"

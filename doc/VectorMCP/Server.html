@@ -236,6 +236,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <li class="public ">
   <span class="summary_signature">
     
+      <a href="#authentication_rate_limiter-instance_method" title="#authentication_rate_limiter (instance method)">#<strong>authentication_rate_limiter</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+      <span class="note title readonly">readonly</span>
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns the value of attribute authentication_rate_limiter.</p>
+</div></span>
+  
+</li>
+
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#authorization-instance_method" title="#authorization (instance method)">#<strong>authorization</strong>  &#x21d2; Object </a>
     
 
@@ -1201,8 +1229,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-97
-98
 99
 100
 101
@@ -1236,10 +1262,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 129
 130
 131
-132</pre>
+132
+133
+134
+135</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 97</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 99</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_name_pos'>name_pos</span> <span class='op'>=</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='op'>*</span><span class='comma'>,</span> <span class='label'>name:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>version:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>0.1.0</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Name provided both positionally (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name_pos'>name_pos</span><span class='embexpr_end'>}</span><span class='tstring_content'>) and as keyword argument (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_name'>name</span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_name_pos'>name_pos</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_name'>name</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_name_pos'>name_pos</span> <span class='op'>!=</span> <span class='id identifier rubyid_name'>name</span>
@@ -1269,6 +1298,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
   <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
   <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
   <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
   <span class='comment'># Initialize middleware manager
 </span>  <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -1314,15 +1344,57 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-74
 75
-76</pre>
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 74</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_auth_manager'>auth_manager</span>
   <span class='ivar'>@auth_manager</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      
+      <span id=""></span>
+      <div class="method_details ">
+  <h3 class="signature " id="authentication_rate_limiter-instance_method">
+  
+    #<strong>authentication_rate_limiter</strong>  &#x21d2; <tt>Object</tt>  <span class="extras">(readonly)</span>
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns the value of attribute authentication_rate_limiter.</p>
+
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+75
+76
+77</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span>
+  <span class='ivar'>@authentication_rate_limiter</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1356,12 +1428,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-74
 75
-76</pre>
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 74</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorization'>authorization</span>
   <span class='ivar'>@authorization</span>
@@ -1415,7 +1487,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -1739,10 +1810,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -1757,7 +1852,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -1807,6 +1903,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -1879,10 +1976,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -1893,6 +1993,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -2000,6 +2101,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -2118,7 +2236,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -2442,10 +2559,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -2460,7 +2601,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -2510,6 +2652,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -2582,10 +2725,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -2596,6 +2742,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -2703,6 +2850,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -2804,12 +2968,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-74
 75
-76</pre>
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 74</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_middleware_manager'>middleware_manager</span>
   <span class='ivar'>@middleware_manager</span>
@@ -2863,7 +3027,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -3187,10 +3350,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -3205,7 +3392,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -3255,6 +3443,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -3327,10 +3516,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -3341,6 +3533,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -3448,6 +3641,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -3549,12 +3759,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-74
 75
-76</pre>
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 74</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_oauth_resource_metadata_url'>oauth_resource_metadata_url</span>
   <span class='ivar'>@oauth_resource_metadata_url</span>
@@ -3608,7 +3818,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -3932,10 +4141,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -3950,7 +4183,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -4000,6 +4234,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -4072,10 +4307,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -4086,6 +4324,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -4193,6 +4432,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -4311,7 +4567,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -4635,10 +4890,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -4653,7 +4932,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -4703,6 +4983,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -4775,10 +5056,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -4789,6 +5073,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -4896,6 +5181,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -5014,7 +5316,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -5338,10 +5639,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -5356,7 +5681,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -5406,6 +5732,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -5478,10 +5805,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -5492,6 +5822,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -5599,6 +5930,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -5717,7 +6065,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -6041,10 +6388,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -6059,7 +6430,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -6109,6 +6481,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -6181,10 +6554,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -6195,6 +6571,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -6302,6 +6679,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -6403,12 +6797,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-74
 75
-76</pre>
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 74</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 75</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_middleware'>security_middleware</span>
   <span class='ivar'>@security_middleware</span>
@@ -6462,7 +6856,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -6786,10 +7179,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -6804,7 +7221,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -6854,6 +7272,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -6926,10 +7345,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -6940,6 +7362,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -7047,6 +7470,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -7165,7 +7605,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -7489,10 +7928,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -7507,7 +7970,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -7557,6 +8021,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -7629,10 +8094,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -7643,6 +8111,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -7750,6 +8219,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -7868,7 +8354,6 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-62
 63
 64
 65
@@ -8192,10 +8677,34 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 383
 384
 385
-386</pre>
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 63</span>
 
 <span class='kw'>class</span> <span class='const'><span class='object_link'><a href="" title="VectorMCP::Server (class)">Server</a></span></span>
   <span class='id identifier rubyid_include'>include</span> <span class='const'><span class='object_link'><a href="Definitions.html" title="VectorMCP::Definitions (module)">Definitions</a></span></span> <span class='comment'># Make Tool, Resource, Prompt, Root structs easily available
@@ -8210,7 +8719,8 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='const'><span class='object_link'><a href="#SUPPORTED_PROTOCOL_VERSIONS-constant" title="VectorMCP::Server::SUPPORTED_PROTOCOL_VERSIONS (constant)">SUPPORTED_PROTOCOL_VERSIONS</a></span></span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>2025-11-25</span><span class='words_sep'> </span><span class='tstring_content'>2025-03-26</span><span class='words_sep'> </span><span class='tstring_content'>2024-11-05</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
 
   <span class='id identifier rubyid_attr_reader'>attr_reader</span> <span class='symbol'>:logger</span><span class='comma'>,</span> <span class='symbol'>:name</span><span class='comma'>,</span> <span class='symbol'>:version</span><span class='comma'>,</span> <span class='symbol'>:protocol_version</span><span class='comma'>,</span> <span class='symbol'>:tools</span><span class='comma'>,</span> <span class='symbol'>:resources</span><span class='comma'>,</span> <span class='symbol'>:prompts</span><span class='comma'>,</span> <span class='symbol'>:roots</span><span class='comma'>,</span> <span class='symbol'>:in_flight_requests</span><span class='comma'>,</span>
-              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span>
+              <span class='symbol'>:auth_manager</span><span class='comma'>,</span> <span class='symbol'>:authorization</span><span class='comma'>,</span> <span class='symbol'>:security_middleware</span><span class='comma'>,</span> <span class='symbol'>:middleware_manager</span><span class='comma'>,</span> <span class='symbol'>:oauth_resource_metadata_url</span><span class='comma'>,</span>
+              <span class='symbol'>:authentication_rate_limiter</span>
   <span class='id identifier rubyid_attr_accessor'>attr_accessor</span> <span class='symbol'>:transport</span>
 
   <span class='comment'># Initializes a new VectorMCP server.
@@ -8260,6 +8770,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
     <span class='ivar'>@authorization</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Authorization.html" title="VectorMCP::Security::Authorization (class)">Authorization</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Authorization.html#initialize-instance_method" title="VectorMCP::Security::Authorization#initialize (method)">new</a></span></span>
     <span class='ivar'>@security_middleware</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/Middleware.html" title="VectorMCP::Security::Middleware (class)">Middleware</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/Middleware.html#initialize-instance_method" title="VectorMCP::Security::Middleware#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@auth_manager</span><span class='comma'>,</span> <span class='ivar'>@authorization</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
     <span class='comment'># Initialize middleware manager
 </span>    <span class='ivar'>@middleware_manager</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Manager.html" title="VectorMCP::Middleware::Manager (class)">Manager</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Middleware/Manager.html#initialize-instance_method" title="VectorMCP::Middleware::Manager#initialize (method)">new</a></span></span>
@@ -8332,10 +8843,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='comment'>#   enabling MCP clients (e.g. Claude Desktop) to discover the authorization server and
 </span>  <span class='comment'>#   initiate an OAuth 2.1 flow. When omitted (default), auth failures continue to surface
 </span>  <span class='comment'>#   as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth deployments.
+</span>  <span class='comment'># @option options [Hash, Boolean] :rate_limit Optional authentication failure limiter.
+</span>  <span class='comment'>#   Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.
 </span>  <span class='comment'># @return [void]
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
     <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -8346,6 +8860,7 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
     <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
     <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -8453,6 +8968,23 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
 </span>  <span class='kw'>def</span> <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
     <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:resource_metadata_url</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_warn_on_insecure_oauth_metadata_url'>warn_on_insecure_oauth_metadata_url</span><span class='lparen'>(</span><span class='ivar'>@oauth_resource_metadata_url</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='comment'># Configure the optional in-process authentication failure limiter.
+</span>  <span class='comment'># @param configuration [Hash, true, false, nil] limiter configuration
+</span>  <span class='comment'># @return [void]
+</span>  <span class='kw'>def</span> <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+    <span class='ivar'>@authentication_rate_limiter</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_configuration'>configuration</span>
+                                   <span class='kw'>when</span> <span class='kw'>true</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span>
+                                   <span class='kw'>when</span> <span class='const'>Hash</span>
+                                     <span class='const'><span class='object_link'><a href="Security.html" title="VectorMCP::Security (module)">Security</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html" title="VectorMCP::Security::AuthenticationRateLimiter (class)">AuthenticationRateLimiter</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Security/AuthenticationRateLimiter.html#initialize-instance_method" title="VectorMCP::Security::AuthenticationRateLimiter#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='op'>**</span><span class='id identifier rubyid_configuration'>configuration</span><span class='rparen'>)</span>
+                                   <span class='kw'>when</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='kw'>nil</span>
+                                     <span class='kw'>nil</span>
+                                   <span class='kw'>else</span>
+                                     <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rate_limit must be true, false, nil, or a Hash</span><span class='tstring_end'>&quot;</span></span>
+                                   <span class='kw'>end</span>
+    <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_authentication_rate_limiter'>authentication_rate_limiter</span> <span class='op'>=</span> <span class='ivar'>@authentication_rate_limiter</span>
   <span class='kw'>end</span>
 
   <span class='comment'># Register the appropriate auth strategy based on the strategy name
@@ -8578,12 +9110,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-247
-248
-249</pre>
+254
+255
+256</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 247</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 254</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_prompts'>authorize_prompts</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:prompt</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8637,12 +9169,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-240
-241
-242</pre>
+247
+248
+249</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 240</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 247</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_resources'>authorize_resources</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:resource</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8696,12 +9228,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-254
-255
-256</pre>
+261
+262
+263</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 254</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 261</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_roots'>authorize_roots</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:root</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8755,12 +9287,12 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-233
-234
-235</pre>
+240
+241
+242</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 233</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 240</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_authorize_tools'>authorize_tools</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_add_policy'>add_policy</span><span class='lparen'>(</span><span class='symbol'>:tool</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='rparen'>)</span>
@@ -8795,13 +9327,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-305
-306
-307
-308</pre>
+312
+313
+314
+315</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 305</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 312</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_clear_middleware!'>clear_middleware!</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_clear!'>clear!</span>
@@ -8837,18 +9369,20 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-208
-209
-210
-211
-212</pre>
+214
+215
+216
+217
+218
+219</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 208</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 214</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_disable_authentication!'>disable_authentication!</span>
   <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
   <span class='ivar'>@oauth_resource_metadata_url</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication disabled</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -8881,13 +9415,13 @@ resources, prompts), and then run with a chosen transport mechanism (e.g., HttpS
       <pre class="lines">
 
 
-225
-226
-227
-228</pre>
+232
+233
+234
+235</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 225</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 232</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_disable_authorization!'>disable_authorization!</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_disable!'>disable!</span>
@@ -8977,6 +9511,19 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
           
         </li>
       
+        <li>
+          <span class="name">:rate_limit</span>
+          <span class="type">(<tt>Hash</tt>, <tt>Boolean</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>Optional authentication failure limiter.
+Pass +true+ for defaults or configure +:max_attempts+, +:window_seconds+, and +:max_entries+.</p>
+</div>
+          
+        </li>
+      
     </ul>
   
     
@@ -8989,20 +9536,22 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
-198
-199
-200
-201
-202
 203
-204</pre>
+204
+205
+206
+207
+208
+209
+210</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 198</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 203</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_enable_authentication!'>enable_authentication!</span><span class='lparen'>(</span><span class='label'>strategy:</span> <span class='symbol'>:api_key</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_clear_auth_strategies'>clear_auth_strategies</span> <span class='kw'>unless</span> <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_strategies'>strategies</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
   <span class='id identifier rubyid_extract_oauth_metadata!'>extract_oauth_metadata!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_configure_authentication_rate_limit!'>configure_authentication_rate_limit!</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:rate_limit</span><span class='rparen'>)</span><span class='rparen'>)</span>
   <span class='ivar'>@auth_manager</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span><span class='lparen'>(</span><span class='label'>default_strategy:</span> <span class='id identifier rubyid_strategy'>strategy</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_register_auth_strategy'>register_auth_strategy</span><span class='lparen'>(</span><span class='id identifier rubyid_strategy'>strategy</span><span class='comma'>,</span> <span class='id identifier rubyid_options'>options</span><span class='comma'>,</span> <span class='id identifier rubyid_block'>block</span> <span class='op'>||</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:handler</span><span class='rparen'>)</span><span class='rparen'>)</span>
   <span class='ivar'>@logger</span><span class='period'>.</span><span class='id identifier rubyid_info'>info</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Authentication enabled with strategy: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_strategy'>strategy</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -9056,14 +9605,14 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
-217
-218
-219
-220
-221</pre>
+224
+225
+226
+227
+228</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 217</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 224</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_enable_authorization!'>enable_authorization!</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='rparen'>)</span>
   <span class='ivar'>@authorization</span><span class='period'>.</span><span class='id identifier rubyid_enable!'>enable!</span>
@@ -9117,12 +9666,12 @@ as JSON-RPC +-32401+ errors — existing behavior is preserved for non-OAuth dep
       <pre class="lines">
 
 
-300
-301
-302</pre>
+307
+308
+309</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 300</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 307</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_middleware_stats'>middleware_stats</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_stats'>stats</span>
@@ -9202,15 +9751,15 @@ The returned object responds to <code>#call(env)</code> and can be mounted direc
       <pre class="lines">
 
 
-179
-180
-181
 182
 183
-184</pre>
+184
+185
+186
+187</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 179</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 182</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_rack_app'>rack_app</span><span class='lparen'>(</span><span class='op'>**</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_require_relative'>require_relative</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>transport/http_stream</span><span class='tstring_end'>&quot;</span></span>
@@ -9267,13 +9816,13 @@ The returned object responds to <code>#call(env)</code> and can be mounted direc
       <pre class="lines">
 
 
-293
-294
-295
-296</pre>
+300
+301
+302
+303</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 293</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 300</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_middleware'>remove_middleware</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='rparen'>)</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_unregister'>unregister</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='rparen'>)</span>
@@ -9365,9 +9914,6 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
-145
-146
-147
 148
 149
 150
@@ -9384,10 +9930,13 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
 161
 162
 163
-164</pre>
+164
+165
+166
+167</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 145</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 148</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span><span class='lparen'>(</span><span class='label'>transport:</span> <span class='symbol'>:http_stream</span><span class='comma'>,</span> <span class='op'>**</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_active_transport'>active_transport</span> <span class='op'>=</span> <span class='kw'>case</span> <span class='id identifier rubyid_transport'>transport</span>
@@ -9456,12 +10005,12 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
-260
-261
-262</pre>
+267
+268
+269</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 260</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 267</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
   <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_security_enabled?'>security_enabled?</span>
@@ -9513,12 +10062,12 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
-266
-267
-268</pre>
+273
+274
+275</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 266</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 273</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_security_status'>security_status</span>
   <span class='ivar'>@security_middleware</span><span class='period'>.</span><span class='id identifier rubyid_security_status'>security_status</span>
@@ -9706,13 +10255,13 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
       <pre class="lines">
 
 
-286
-287
-288
-289</pre>
+293
+294
+295
+296</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 286</span>
+      <pre class="code"><span class="info file"># File 'lib/vector_mcp/server.rb', line 293</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_use_middleware'>use_middleware</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='comma'>,</span> <span class='id identifier rubyid_hooks'>hooks</span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='const'><span class='object_link'><a href="Middleware.html" title="VectorMCP::Middleware (module)">Middleware</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Hook.html" title="VectorMCP::Middleware::Hook (class)">Hook</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Middleware/Hook.html#DEFAULT_PRIORITY-constant" title="VectorMCP::Middleware::Hook::DEFAULT_PRIORITY (constant)">DEFAULT_PRIORITY</a></span></span><span class='comma'>,</span> <span class='label'>conditions:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='ivar'>@middleware_manager</span><span class='period'>.</span><span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='id identifier rubyid_middleware_class'>middleware_class</span><span class='comma'>,</span> <span class='id identifier rubyid_hooks'>hooks</span><span class='comma'>,</span> <span class='label'>priority:</span> <span class='id identifier rubyid_priority'>priority</span><span class='comma'>,</span> <span class='label'>conditions:</span> <span class='id identifier rubyid_conditions'>conditions</span><span class='rparen'>)</span>
@@ -9728,7 +10277,7 @@ These are passed to the transport&#39;s constructor if a symbol is provided for 
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 21:27:09 2026 by
+  Generated on Sun Aug 16 09:33:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.38 (ruby-3.4.8).
 </div>

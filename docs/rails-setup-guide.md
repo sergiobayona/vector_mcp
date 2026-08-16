@@ -377,9 +377,12 @@ MCP_SERVER.enable_authentication!(
   keys: [
     Rails.application.credentials.mcp_api_key,
     ENV["MCP_API_KEY"]
-  ].compact
+  ].compact,
+  rate_limit: { max_attempts: 10, window_seconds: 60 }
 )
 ```
+
+Generate API keys with at least 256 bits of entropy (`SecureRandom.hex(32)`) and keep them in Rails credentials or another secret manager. The optional limiter tracks failures per client IP and credential fingerprint and returns HTTP `429` with `Retry-After` when the threshold is exceeded. It is local to each Ruby process, so retain a shared proxy or `Rack::Attack` limit for multi-worker deployments.
 
 Clients include the key in the `Authorization` header:
 

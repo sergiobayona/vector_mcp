@@ -197,6 +197,24 @@ module VectorMCP
     end
   end
 
+  # Represents an authentication attempt blocked by the configured limiter (-32029).
+  class RateLimitExceededError < ServerError
+    attr_reader :retry_after
+
+    # @param message [String] The error message.
+    # @param retry_after [Integer] Seconds until the caller should retry.
+    # @param request_id [String, Integer, nil] The ID of the originating request.
+    def initialize(message = "Too many authentication attempts", retry_after:, request_id: nil)
+      @retry_after = retry_after
+      super(
+        message,
+        code: -32_029,
+        details: { retry_after: retry_after },
+        request_id: request_id
+      )
+    end
+  end
+
   # Represents an authorization failed error (-32403).
   # Indicates the authenticated user does not have permission to perform the requested action.
   class ForbiddenError < ProtocolError

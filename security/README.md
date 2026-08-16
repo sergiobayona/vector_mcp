@@ -33,7 +33,7 @@ server = VectorMCP::Server.new(name: "MyServer", version: "1.0.0")
 server.run  # No authentication or authorization
 
 # Opt-in to security features as needed
-server.enable_authentication!(strategy: :api_key, keys: ["secret-key"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")])
 server.enable_authorization! do
   authorize_tools { |user, action, tool| user[:role] == "admin" }
 end
@@ -51,7 +51,8 @@ server = VectorMCP::Server.new(name: "SecureServer", version: "1.0.0")
 # Enable API key authentication
 server.enable_authentication!(
   strategy: :api_key,
-  keys: ["your-secret-api-key", "another-valid-key"]
+  keys: [ENV.fetch("MCP_API_KEY")],
+  rate_limit: true
 )
 
 # Register a protected tool
@@ -69,21 +70,23 @@ server.run(transport: :http_stream)
 **Client Usage:**
 ```bash
 # Include API key in headers
-curl -H "X-API-Key: your-secret-api-key" -X POST http://localhost:3000/message
+curl -H "X-API-Key: $MCP_API_KEY" -X POST http://localhost:3000/message
 ```
 
 ### Basic Authorization
 
 ```ruby
-server.enable_authentication!(strategy: :api_key, keys: ["admin-key", "user-key"])
+admin_key = ENV.fetch("MCP_ADMIN_API_KEY")
+user_key = ENV.fetch("MCP_USER_API_KEY")
+server.enable_authentication!(strategy: :api_key, keys: [admin_key, user_key])
 
 server.enable_authorization! do
   authorize_tools do |user, action, tool|
     case tool.name
     when "admin_tool"
-      user[:api_key] == "admin-key"  # Only admin key can access
+      user[:api_key] == admin_key  # Only admin key can access
     when "user_tool"
-      ["admin-key", "user-key"].include?(user[:api_key])  # Both can access
+      [admin_key, user_key].include?(user[:api_key])  # Both can access
     else
       true  # All authenticated users can access other tools
     end
@@ -101,31 +104,31 @@ The simplest authentication method using pre-shared keys.
 # Single key
 server.enable_authentication!(
   strategy: :api_key,
-  keys: ["my-secret-key"]
+  keys: [ENV.fetch("MCP_API_KEY")]
 )
 
 # Multiple keys for different users/services
 server.enable_authentication!(
   strategy: :api_key,
   keys: [
-    "service-a-key",
-    "service-b-key", 
-    "admin-master-key"
+    ENV.fetch("SERVICE_A_MCP_API_KEY"),
+    ENV.fetch("SERVICE_B_MCP_API_KEY"),
+    ENV.fetch("MCP_ADMIN_API_KEY")
   ]
 )
 ```
 
 **Client Headers:**
 ```
-X-API-Key: my-secret-key
+X-API-Key: $MCP_API_KEY
 # or
-Authorization: Bearer my-secret-key
+Authorization: Bearer $MCP_API_KEY
 ```
 
 **Query Parameters:**
 ```
-GET /mcp?api_key=my-secret-key
-POST /mcp?api_key=my-secret-key
+GET /mcp?api_key=$MCP_API_KEY
+POST /mcp?api_key=$MCP_API_KEY
 ```
 
 ### JWT Token Authentication
@@ -211,6 +214,32 @@ def validate_api_key(key)
   user = User.find_by(api_key: key)
   user ? { user_id: user.id, provider: "api_key" } : false
 end
+```
+
+### Authentication Failure Rate Limiting
+
+Enable the built-in limiter for servers exposed beyond a trusted local environment:
+
+```ruby
+server.enable_authentication!(
+  strategy: :api_key,
+  keys: [ENV.fetch("MCP_API_KEY")],
+  rate_limit: {
+    max_attempts: 10,
+    window_seconds: 60,
+    max_entries: 10_000
+  }
+)
+```
+
+The limiter reserves attempt slots atomically, retains failures in a rolling window, and clears matching IP and credential counters after successful authentication. It never stores raw credentials: API keys and bearer/JWT tokens are represented by SHA-256 fingerprints. Once a limit is reached, HTTP clients receive `429 Too Many Requests`, a `Retry-After` header, and JSON-RPC code `-32029`. Structured `authentication_failure_limit_reached` and `authentication_rate_limited` security events are emitted without the attempted credential.
+
+The limiter uses Rack's `REMOTE_ADDR`, so configure trusted-proxy handling correctly. Its state is local to one Ruby process; use a gateway, WAF, or shared-store limiter as an additional control when running multiple workers or hosts.
+
+Generate API keys with at least 256 bits of entropy and store them outside source control:
+
+```bash
+ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'
 ```
 
 ## Authorization Framework
@@ -308,17 +337,17 @@ end
 Full HTTP header and query parameter support:
 
 ```ruby
-server.enable_authentication!(strategy: :api_key, keys: ["key123"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")], rate_limit: true)
 server.run(transport: :http_stream, host: "localhost", port: 3000)
 ```
 
 **Client Connection:**
 ```bash
 # Connect with API key in header
-curl -H "X-API-Key: key123" -H "Content-Type: application/json" http://localhost:3000/mcp
+curl -H "X-API-Key: $MCP_API_KEY" -H "Content-Type: application/json" http://localhost:3000/mcp
 
 # Or in query parameter
-curl http://localhost:3000/mcp?api_key=key123
+curl "http://localhost:3000/mcp?api_key=$MCP_API_KEY"
 ```
 
 ## Advanced Features
@@ -433,7 +462,7 @@ server.enable_authentication!(strategy: :custom) do |request|
     logger.info("Authentication successful for user #{user[:id]}")
     user
   else
-    logger.warn("Authentication failed for API key: #{api_key&.slice(0, 8)}...")
+    logger.warn("Authentication failed")
     false
   end
 end
@@ -519,7 +548,7 @@ if ENV["RAILS_ENV"] == "development"
   # Relaxed security for development
   server.enable_authentication!(
     strategy: :api_key,
-    keys: ["dev-key-123"]
+    keys: [ENV.fetch("MCP_DEV_API_KEY")]
   )
 else
   # Strict security for production
@@ -548,18 +577,17 @@ end
 
 ```ruby
 # Check if authentication is properly enabled
-server.enable_authentication!(strategy: :api_key, keys: ["test-key"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")])
 
 # Verify the key format in requests
-# Correct: "X-API-Key: test-key"
-# Incorrect: "X-Api-Key: test-key" (wrong case)
+# Correct: "X-API-Key: <value from MCP_API_KEY>"
 ```
 
 #### 2. Authorization Policies Not Working
 
 ```ruby
 # Ensure authorization is enabled AND authentication is working
-server.enable_authentication!(strategy: :api_key, keys: ["key"])
+server.enable_authentication!(strategy: :api_key, keys: [ENV.fetch("MCP_API_KEY")])
 server.enable_authorization! do  # This line is required
   authorize_tools { |user, action, tool| true }
 end
@@ -604,7 +632,7 @@ VectorMCP.logger.level = Logger::DEBUG
 ```ruby
 # Test authentication manually
 auth_result = server.auth_manager.authenticate({
-  headers: { "X-API-Key" => "your-key" }
+  headers: { "X-API-Key" => ENV.fetch("MCP_API_KEY") }
 })
 puts "Auth result: #{auth_result}"
 
@@ -634,7 +662,14 @@ puts JSON.pretty_generate(status)
 #   "authentication": {
 #     "enabled": true,
 #     "strategies": ["api_key"],
-#     "default_strategy": "api_key"
+#     "default_strategy": "api_key",
+#     "rate_limit": {
+#       "enabled": true,
+#       "max_attempts": 10,
+#       "window_seconds": 60,
+#       "max_entries": 10000,
+#       "tracked_entries": 0
+#     }
 #   },
 #   "authorization": {
 #     "enabled": true,
@@ -650,7 +685,7 @@ puts JSON.pretty_generate(status)
 3. **Validate Inputs**: Sanitize and validate all inputs in authorization policies
 4. **Monitor Access**: Log authentication and authorization events for audit trails
 5. **Regular Updates**: Keep dependencies updated for security patches
-6. **Rate Limiting**: Consider implementing rate limiting to prevent brute force attacks
+6. **Rate Limiting**: Enable `rate_limit:` and add a shared gateway/WAF limit for multi-process deployments
 
 ---
 

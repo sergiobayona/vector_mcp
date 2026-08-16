@@ -371,6 +371,8 @@ module VectorMCP
         else
           method_not_allowed_response(%w[POST GET DELETE])
         end
+      rescue VectorMCP::RateLimitExceededError => e
+        rate_limit_response(e)
       end
 
       # OAuth resource-server mode authenticates every MCP transport request.
@@ -407,6 +409,8 @@ module VectorMCP
       def authenticate_transport_request(env)
         request_context = VectorMCP::RequestContext.from_rack_env(env, "http_stream")
         @server.security_middleware.authenticate_request(request_context)
+      rescue VectorMCP::RateLimitExceededError
+        raise
       rescue StandardError => e
         VectorMCP.logger_for("security").warn do
           "OAuth transport auth strategy raised #{e.class}: #{e.message}"
@@ -693,11 +697,25 @@ module VectorMCP
       end
 
       def build_protocol_error_response(env, error, session_id: nil)
+        return rate_limit_response(error) if error.is_a?(VectorMCP::RateLimitExceededError)
+
         if client_accepts_sse?(env)
           sse_error_response(error.request_id, error.code, error.message, error.details, session_id: session_id)
         else
           json_error_response(error.request_id, error.code, error.message, error.details)
         end
+      end
+
+      def rate_limit_response(error)
+        body = {
+          jsonrpc: "2.0",
+          id: error.request_id,
+          error: { code: error.code, message: error.message, data: error.details }
+        }.to_json
+
+        [429,
+         { "Content-Type" => "application/json", "Retry-After" => error.retry_after.to_s },
+         [body]]
       end
 
       def client_accepts_sse?(env)

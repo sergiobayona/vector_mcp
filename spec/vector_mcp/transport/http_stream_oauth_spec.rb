@@ -37,6 +37,10 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
     }
   end
 
+  let(:tools_list_body) do
+    { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }.to_json
+  end
+
   before do
     server.register_tool(
       name: "whoami",
@@ -241,6 +245,72 @@ RSpec.describe "HttpStream OAuth 2.1 Resource Server", :oauth do
       post "/mcp", initialize_body, request_headers
 
       expect(last_response.status).not_to eq(401)
+    end
+  end
+
+  describe "with authentication failure rate limiting in legacy mode" do
+    before do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["valid-key"],
+        rate_limit: { max_attempts: 2, window_seconds: 60 }
+      )
+    end
+
+    it "returns HTTP 429 with retry guidance after repeated failures" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+      headers = { "CONTENT_TYPE" => "application/json", "HTTP_MCP_SESSION_ID" => session_id }
+
+      %w[wrong-key-two wrong-key-three].each do |credential|
+        post "/mcp", tools_list_body, headers.merge("HTTP_X_API_KEY" => credential)
+      end
+      expect(last_response.status).to eq(400)
+
+      post "/mcp", tools_list_body, headers.merge("HTTP_X_API_KEY" => "another-wrong-key")
+
+      expect(last_response.status).to eq(429)
+      expect(last_response.headers["Retry-After"]).to eq("60")
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq(-32_029)
+    end
+
+    it "resets failure counters after successful authentication" do
+      post "/mcp", initialize_body, request_headers
+      session_id = last_response.headers.fetch("Mcp-Session-Id")
+      headers = { "CONTENT_TYPE" => "application/json", "HTTP_MCP_SESSION_ID" => session_id }
+
+      post "/mcp", tools_list_body, headers.merge("HTTP_X_API_KEY" => "wrong-key")
+      post "/mcp", tools_list_body, headers.merge("HTTP_X_API_KEY" => "valid-key")
+      expect(last_response.status).to eq(200)
+
+      %w[wrong-key-two wrong-key-three].each do |credential|
+        post "/mcp", tools_list_body, headers.merge("HTTP_X_API_KEY" => credential)
+      end
+      expect(last_response.status).to eq(400)
+    end
+  end
+
+  describe "with authentication failure rate limiting in OAuth mode" do
+    before do
+      server.enable_authentication!(
+        strategy: :api_key,
+        keys: ["valid-key"],
+        resource_metadata_url: resource_metadata_url,
+        rate_limit: { max_attempts: 2, window_seconds: 60 }
+      )
+    end
+
+    it "rate limits failures at the transport authentication gate" do
+      headers = request_headers.merge("HTTP_AUTHORIZATION" => "Bearer wrong-key")
+
+      2.times { post "/mcp", initialize_body, headers }
+      expect(last_response.status).to eq(401)
+
+      post "/mcp", initialize_body, headers
+
+      expect(last_response.status).to eq(429)
+      expect(last_response.headers["Retry-After"]).to eq("60")
+      expect(JSON.parse(last_response.body).dig("error", "code")).to eq(-32_029)
     end
   end
 

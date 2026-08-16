@@ -36,6 +36,30 @@ RSpec.describe VectorMCP::Security::Middleware do
 
       expect(auth_manager).to have_received(:authenticate).with(request, strategy: :jwt)
     end
+
+    it "checks and resets the limiter after successful authentication" do
+      rate_limiter = instance_spy(VectorMCP::Security::AuthenticationRateLimiter)
+      middleware.authentication_rate_limiter = rate_limiter
+
+      middleware.authenticate_request(request)
+
+      expect(rate_limiter).to have_received(:check!).with(an_instance_of(VectorMCP::RequestContext))
+      expect(rate_limiter).to have_received(:record_success).with(an_instance_of(VectorMCP::RequestContext))
+      expect(rate_limiter).not_to have_received(:record_failure)
+    end
+
+    it "records failed authentication" do
+      rate_limiter = instance_spy(VectorMCP::Security::AuthenticationRateLimiter)
+      middleware.authentication_rate_limiter = rate_limiter
+      allow(auth_manager).to receive(:authenticate)
+        .with(request, strategy: nil)
+        .and_return(VectorMCP::Security::AuthResult.failure)
+
+      middleware.authenticate_request(request)
+
+      expect(rate_limiter).to have_received(:record_failure).with(an_instance_of(VectorMCP::RequestContext))
+      expect(rate_limiter).not_to have_received(:record_success)
+    end
   end
 
   describe "#authorize_action" do
@@ -182,6 +206,7 @@ RSpec.describe VectorMCP::Security::Middleware do
       expect(status[:authentication][:enabled]).to be true
       expect(status[:authentication][:strategies]).to eq(%i[api_key jwt])
       expect(status[:authentication][:default_strategy]).to eq(:api_key)
+      expect(status[:authentication][:rate_limit]).to eq(enabled: false)
       expect(status[:authorization][:enabled]).to be true
       expect(status[:authorization][:policy_types]).to eq(%i[tool resource])
     end

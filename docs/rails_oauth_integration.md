@@ -607,9 +607,10 @@ Before you ship, confirm all of the following:
       not just that the happy path works.
 - [ ] **Auth failures are logged and alerted.** 401s, strategy errors,
       and authorization denials flow to your alerting stack.
-- [ ] **Rate limiting.** `Rack::Attack` (or equivalent) throttles
-      `/oauth/authorize`, `/oauth/token`, `/oauth/register`, and `/mcp`
-      per IP and per user.
+- [ ] **Rate limiting.** VectorMCP's `rate_limit:` option protects MCP
+      authentication, and `Rack::Attack` (or equivalent) applies a shared
+      throttle to `/oauth/authorize`, `/oauth/token`, `/oauth/register`, and
+      `/mcp` per IP and per user across all workers.
 - [ ] **Token revocation is operational.** You can revoke an access token
       from a Rails console (`Doorkeeper::AccessToken.find_by(token:
       "...").revoke`) and confirm the next MCP request fails.

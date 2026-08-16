@@ -112,6 +112,33 @@ RSpec.describe VectorMCP::Server, "Security Features" do
       expect(server.auth_manager.default_strategy).to eq(:api_key)
       expect(server.auth_manager.strategies).to have_key(:api_key)
     end
+
+    context "with authentication rate limiting" do
+      it "supports the default limiter configuration" do
+        server.enable_authentication!(strategy: :api_key, keys: ["key"], rate_limit: true)
+
+        expect(server.authentication_rate_limiter).to be_a(VectorMCP::Security::AuthenticationRateLimiter)
+        expect(server.security_middleware.authentication_rate_limiter).to equal(server.authentication_rate_limiter)
+      end
+
+      it "supports explicit limiter configuration without forwarding it to the strategy" do
+        server.enable_authentication!(
+          strategy: :api_key,
+          keys: ["key"],
+          rate_limit: { max_attempts: 3, window_seconds: 30, max_entries: 100 }
+        )
+
+        status = server.authentication_rate_limiter.status
+        expect(status).to include(max_attempts: 3, window_seconds: 30, max_entries: 100)
+        expect(server.security_status.dig(:authentication, :rate_limit)).to include(enabled: true, max_attempts: 3)
+      end
+
+      it "rejects invalid limiter configuration" do
+        expect do
+          server.enable_authentication!(strategy: :api_key, keys: ["key"], rate_limit: "invalid")
+        end.to raise_error(ArgumentError, /rate_limit/)
+      end
+    end
   end
 
   describe "#disable_authentication!" do
@@ -137,6 +164,15 @@ RSpec.describe VectorMCP::Server, "Security Features" do
       server.disable_authentication!
 
       expect(server.oauth_resource_metadata_url).to be_nil
+    end
+
+    it "clears authentication rate limiting state" do
+      server.enable_authentication!(strategy: :api_key, keys: ["key"], rate_limit: true)
+
+      server.disable_authentication!
+
+      expect(server.authentication_rate_limiter).to be_nil
+      expect(server.security_middleware.authentication_rate_limiter).to be_nil
     end
   end
 

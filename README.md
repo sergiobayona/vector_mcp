@@ -188,7 +188,8 @@ VectorMCP keeps security opt-in, but the primitives are built in:
 ```ruby
 server.enable_authentication!(
   strategy: :api_key,
-  keys: ["your-secret-key"]
+  keys: [ENV.fetch("MCP_API_KEY")],
+  rate_limit: { max_attempts: 10, window_seconds: 60 }
 )
 
 server.enable_authorization! do
@@ -209,6 +210,8 @@ end
 ```
 
 When authentication is enabled, VectorMCP applies it centrally to built-in and custom request/notification handlers. Only `initialize`, `ping`, and the `initialized` notification are public; HTTP GET streams and DELETE session requests also require credentials.
+
+For public deployments, enable authentication failure limiting with `rate_limit: true` (10 attempts per 60 seconds by default), or provide `max_attempts`, `window_seconds`, and `max_entries`. Repeated failures are tracked by client IP and a one-way credential fingerprint; blocked requests return HTTP `429`, JSON-RPC `-32029`, and `Retry-After`. The limiter is in-process, so multi-process or distributed deployments should also enforce a shared limit at the proxy or gateway. Generate API keys with at least 256 bits of entropy—for example, `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`—and load them from a secret manager or environment variable.
 
 For MCP clients that speak OAuth 2.1 (e.g. Claude Desktop), pass a `resource_metadata_url:` to turn on RFC 9728 discovery. Unauthenticated requests to `/mcp` return `401` with a `WWW-Authenticate` header pointing at the configured metadata document, and the client drives the rest of the OAuth dance automatically. See [docs/oauth_resource_server.md](./docs/oauth_resource_server.md) for the feature reference and [docs/rails_oauth_integration.md](./docs/rails_oauth_integration.md) for a full Rails + Doorkeeper recipe.
 

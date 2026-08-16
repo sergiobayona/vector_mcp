@@ -55,7 +55,8 @@ Pass `resource_metadata_url:` to `enable_authentication!`:
 ```ruby
 server.enable_authentication!(
   strategy: :custom,
-  resource_metadata_url: "https://app.example.com/.well-known/oauth-protected-resource"
+  resource_metadata_url: "https://app.example.com/.well-known/oauth-protected-resource",
+  rate_limit: { max_attempts: 10, window_seconds: 60 }
 ) do |request|
   token = request[:headers]["Authorization"]&.sub(/\ABearer /, "")
   next false unless token
@@ -70,6 +71,11 @@ end
 The URL you pass is the one advertised in the `WWW-Authenticate` header's
 `resource_metadata` parameter. Point it at the document *your application*
 serves that describes where to find the authorization server.
+
+`rate_limit:` is recommended for internet-facing endpoints. It covers the OAuth
+transport gate as well as shared-dispatch authentication and returns HTTP `429`
+with `Retry-After` after repeated failures. Limiter state is process-local; use a
+shared gateway/WAF limit when running multiple workers or hosts.
 
 ## Opt-in, zero default change
 

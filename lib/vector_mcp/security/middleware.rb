@@ -6,6 +6,7 @@ module VectorMCP
     # Integrates with transport layers to provide security controls
     class Middleware
       attr_reader :auth_manager, :authorization
+      attr_accessor :authentication_rate_limiter
 
       # Initialize middleware with auth components
       # @param auth_manager [AuthManager] the authentication manager
@@ -20,8 +21,13 @@ module VectorMCP
       # @param strategy [Symbol] optional authentication strategy override
       # @return [SessionContext] the session context for the request
       def authenticate_request(request, strategy: nil)
+        request_context = rate_limit_request_context(request)
+        @authentication_rate_limiter&.check!(request_context) if request_context
+
         auth_result = @auth_manager.authenticate(request, strategy: strategy)
-        SessionContext.from_auth_result(auth_result)
+        session_context = SessionContext.from_auth_result(auth_result)
+        update_rate_limit(request_context, session_context)
+        session_context
       end
 
       # Check if a session is authorized for an action on a resource
@@ -86,13 +92,34 @@ module VectorMCP
           authentication: {
             enabled: @auth_manager.required?,
             strategies: @auth_manager.available_strategies,
-            default_strategy: @auth_manager.default_strategy
+            default_strategy: @auth_manager.default_strategy,
+            rate_limit: @authentication_rate_limiter&.status || { enabled: false }
           },
           authorization: {
             enabled: @authorization.required?,
             policy_types: @authorization.policy_types
           }
         }
+      end
+
+      private
+
+      def rate_limit_request_context(request)
+        return unless @authentication_rate_limiter
+
+        VectorMCP::RequestContext.coerce(request)
+      rescue ArgumentError
+        VectorMCP::RequestContext.minimal("unknown")
+      end
+
+      def update_rate_limit(request, session_context)
+        return unless @authentication_rate_limiter
+
+        if session_context.authenticated?
+          @authentication_rate_limiter.record_success(request)
+        else
+          @authentication_rate_limiter.record_failure(request)
+        end
       end
     end
   end
